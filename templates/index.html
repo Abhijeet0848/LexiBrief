@@ -857,25 +857,6 @@
                         </label>
                       </div>
 
-                      {/* Quick Sample Text Chips if empty */}
-                      {!inputText.trim() && !uploadedDocInfo && (
-                        <div className="flex flex-wrap items-center gap-1.5 mb-2.5 animate-fadeIn">
-                          <span className="text-[11px] font-medium text-slate-600">Try samples:</span>
-                          <button
-                            onClick={handleLoadSample}
-                            className="btn-3d-secondary px-2.5 py-1 rounded-lg text-[11px] font-semibold text-indigo-700 flex items-center gap-1 cursor-pointer hover:bg-indigo-50"
-                          >
-                            <SparklesIcon className="w-3 h-3 text-amber-500" />
-                            <span>NLP Article</span>
-                          </button>
-                          <button
-                            onClick={handleLoadResearchSample}
-                            className="btn-3d-secondary px-2.5 py-1 rounded-lg text-[11px] font-semibold text-slate-700 flex items-center gap-1 cursor-pointer hover:bg-slate-100"
-                          >
-                            <span>🔬 Research Abstract</span>
-                          </button>
-                        </div>
-                      )}
 
                       {/* Uploaded Document Info Card */}
                       {uploadedDocInfo && (
@@ -913,7 +894,7 @@
                       <textarea
                         value={inputText}
                         onChange={(e) => setInputText(e.target.value)}
-                        placeholder="Paste or type text to summarize here... or click one of the sample buttons above to try immediately."
+                        placeholder="Paste or type text to summarize here..."
                         className="w-full h-[380px] sm:h-[430px] min-h-[320px] p-4 sm:p-5 rounded-2xl bg-slate-50/60 hover:bg-slate-50/90 border border-slate-200/90 text-slate-800 text-sm leading-relaxed placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-y transition-all duration-200 shadow-inner font-sans"
                       />
                     </div>
@@ -1779,13 +1760,6 @@
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={handleLoadRougeSample}
-                        className="px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition border border-indigo-200/60 flex items-center gap-1.5"
-                      >
-                        <span>⚡ Load Example</span>
-                      </button>
-
                       {(rougeRef || rougeCand || rougeScores) && (
                         <button
                           onClick={handleClearRouge}
