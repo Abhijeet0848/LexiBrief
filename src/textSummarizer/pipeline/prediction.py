@@ -1,3 +1,4 @@
+import hashlib
 from typing import Optional, Dict, Any, List
 from textSummarizer.components.text_extractor import TextExtractor
 from textSummarizer.components.nlp_processor import NLPProcessor
@@ -6,11 +7,17 @@ from textSummarizer.components.abstractive_summarizer import AbstractiveSummariz
 from textSummarizer.logging import logger
 
 class PredictionPipeline:
-    """Unified NLP Summarization Pipeline coordinating Extractive and Abstractive Transformer engines."""
+    """Unified NLP Summarization Pipeline coordinating Extractive and Abstractive Transformer engines with LRU caching."""
 
     def __init__(self):
         self.abstractive_engine = AbstractiveSummarizer()
         self.extractive_engine = ExtractiveSummarizer()
+        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._max_cache_entries = 128
+
+    def _make_cache_key(self, text: str, mode: str, method: str, model_name: str, max_len: Optional[int], min_len: Optional[int]) -> str:
+        key_raw = f"{text}|{mode}|{method}|{model_name}|{max_len}|{min_len}"
+        return hashlib.sha256(key_raw.encode("utf-8")).hexdigest()
 
     def predict(
         self,
@@ -22,16 +29,8 @@ class PredictionPipeline:
         min_length: Optional[int] = None
     ) -> Dict[str, Any]:
         """
-        Executes end-to-end NLP summarization, keyword extraction, key-points extraction,
-        and ROUGE scoring.
-        
-        Args:
-            text: Raw input text.
-            mode: 'concise', 'balanced', or 'detailed'.
-            method: 'abstractive', 'extractive', or 'auto'.
-            model_name: 'bart', 't5', 'pegasus', etc.
-            max_length: Optional token limit.
-            min_length: Optional min token limit.
+        Executes high-speed end-to-end NLP summarization, keyword extraction, key-points extraction,
+        and ROUGE scoring in an optimized single-pass workflow.
         """
         cleaned_text = TextExtractor.clean_text(text)
         if not cleaned_text:
@@ -43,6 +42,7 @@ class PredictionPipeline:
                 "mode": mode,
                 "keywords": [],
                 "nlp_stats": {},
+                "summary_stats": {},
                 "rouge": {
                     "rouge1": {"precision": 0.0, "recall": 0.0, "f1": 0.0},
                     "rouge2": {"precision": 0.0, "recall": 0.0, "f1": 0.0},
@@ -50,14 +50,23 @@ class PredictionPipeline:
                 }
             }
 
-        # 1. Compute input text NLP statistics & salient domain keywords
-        nlp_stats = NLPProcessor.compute_stats(cleaned_text)
-        keywords = NLPProcessor.extract_keywords(cleaned_text, top_k=8)
+        # Check in-memory prediction cache
+        cache_key = self._make_cache_key(cleaned_text, mode, method, model_name, max_length, min_length)
+        if cache_key in self._cache:
+            return self._cache[cache_key]
 
-        # 2. Extract structured key takeaways (action points)
-        key_points = NLPProcessor.extract_key_points(cleaned_text, top_k=4)
+        # 1. Single-pass tokenization and sentence splitting
+        pre_words = NLPProcessor.tokenize_words(cleaned_text)
+        pre_sentences = NLPProcessor.split_sentences(cleaned_text)
 
-        # 3. Mode configuration mapping
+        # 2. Compute input text NLP statistics & salient domain keywords with precomputed tokens
+        nlp_stats = NLPProcessor.compute_stats(cleaned_text, precomputed_words=pre_words, precomputed_sentences=pre_sentences)
+        keywords = NLPProcessor.extract_keywords(cleaned_text, top_k=8, precomputed_tokens=pre_words)
+
+        # 3. Extract structured key takeaways (action points) with precomputed sentences
+        key_points = NLPProcessor.extract_key_points(cleaned_text, top_k=4, precomputed_sentences=pre_sentences)
+
+        # 4. Mode configuration mapping
         mode_configs = {
             "concise": {"max_length": max_length or 64, "min_length": min_length or 20, "ratio": 0.25},
             "balanced": {"max_length": max_length or 128, "min_length": min_length or 40, "ratio": 0.40},
@@ -69,9 +78,9 @@ class PredictionPipeline:
         engine_used = ""
         model_source = ""
 
-        # 4. Engine selection
+        # 5. Engine selection
         if method == "extractive":
-            summary = self.extractive_engine.summarize(cleaned_text, ratio=cfg["ratio"])
+            summary = self.extractive_engine.summarize(cleaned_text, ratio=cfg["ratio"], precomputed_sentences=pre_sentences)
             engine_used = "Extractive (TF-IDF Saliency)"
             model_source = "extractive_tfidf_engine"
         elif method == "abstractive":
@@ -86,7 +95,7 @@ class PredictionPipeline:
                 model_source = self.abstractive_engine.model_identifier
             except Exception as e:
                 logger.warning(f"Abstractive engine error: {e}. Falling back to Extractive TF-IDF.")
-                summary = self.extractive_engine.summarize(cleaned_text, ratio=cfg["ratio"])
+                summary = self.extractive_engine.summarize(cleaned_text, ratio=cfg["ratio"], precomputed_sentences=pre_sentences)
                 engine_used = "Extractive Fallback (TF-IDF)"
                 model_source = "extractive_fallback_tfidf"
         else:  # "auto" or "hybrid"
@@ -101,17 +110,17 @@ class PredictionPipeline:
                 model_source = self.abstractive_engine.model_identifier
             except Exception as e:
                 logger.info(f"Auto-selected Extractive NLP engine (Transformer note: {e})")
-                summary = self.extractive_engine.summarize(cleaned_text, ratio=cfg["ratio"])
+                summary = self.extractive_engine.summarize(cleaned_text, ratio=cfg["ratio"], precomputed_sentences=pre_sentences)
                 engine_used = "Extractive (TF-IDF / Saliency)"
                 model_source = "extractive_nlp_engine"
 
-        # 5. Compute real-time ROUGE evaluation scores against original source text
+        # 6. Compute real-time ROUGE evaluation scores against original source text
         rouge_scores = NLPProcessor.compute_rouge(cleaned_text, summary)
 
-        # 6. Compute summary-specific NLP statistics
+        # 7. Compute summary-specific NLP statistics
         summary_stats = NLPProcessor.compute_stats(summary)
 
-        return {
+        result = {
             "summary": summary,
             "key_points": key_points,
             "method_used": engine_used,
@@ -122,3 +131,11 @@ class PredictionPipeline:
             "summary_stats": summary_stats,
             "rouge": rouge_scores
         }
+
+        # Store in LRU cache
+        if len(self._cache) >= self._max_cache_entries:
+            # Pop the oldest entry
+            self._cache.pop(next(iter(self._cache)))
+        self._cache[cache_key] = result
+
+        return result

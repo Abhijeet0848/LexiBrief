@@ -1,10 +1,16 @@
 import re
 import math
 from collections import Counter
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
+
+# Precompiled regular expressions for maximum performance
+_RE_SENTENCE_SPLIT = re.compile(r'(?<=[.!?])\s+(?=[A-Z0-9"\'])')
+_RE_WORDS = re.compile(r'\b[A-Za-z0-9_-]{2,}\b')
+_RE_VOWELS = re.compile(r'[aeiouy]')
+
 
 class NLPProcessor:
-    """Performs tokenization, sentence splitting, stopword removal, keyword extraction, key-point extraction, and ROUGE evaluation."""
+    """High-performance NLP processing engine: tokenization, sentence splitting, stats, keywords, key-points, and ROUGE scoring."""
 
     STOPWORDS = {
         'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and', 'any',
@@ -29,61 +35,73 @@ class NLPProcessor:
 
     @classmethod
     def split_sentences(cls, text: str) -> List[str]:
-        """Splits text into discrete sentences with boundary preservation."""
+        """Splits text into discrete sentences with boundary preservation using precompiled regex."""
         if not text:
             return []
-        raw_sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z0-9"\'])', text)
-        sentences = []
-        for s in raw_sentences:
-            s_clean = s.strip()
-            if len(s_clean) > 5:
-                sentences.append(s_clean)
+        raw_sentences = _RE_SENTENCE_SPLIT.split(text)
+        sentences = [s.strip() for s in raw_sentences if len(s.strip()) > 5]
         return sentences if sentences else [text.strip()]
 
     @classmethod
     def tokenize_words(cls, text: str) -> List[str]:
-        """Extracts alphabetic words of length >= 2."""
-        return re.findall(r'\b[A-Za-z0-9_-]{2,}\b', text.lower())
+        """Extracts lowercase alphabetic words of length >= 2 using precompiled regex."""
+        if not text:
+            return []
+        return _RE_WORDS.findall(text.lower())
 
     @classmethod
-    def extract_keywords(cls, text: str, top_k: int = 8) -> List[Dict[str, Any]]:
-        """Extracts salient domain keywords using TF and stopword filtering."""
-        tokens = cls.tokenize_words(text)
-        filtered = [t for t in tokens if t not in cls.STOPWORDS and not t.isdigit() and len(t) >= 3]
+    def extract_keywords(cls, text: str, top_k: int = 8, precomputed_tokens: List[str] = None) -> List[Dict[str, Any]]:
+        """Extracts salient domain keywords with rapid single-pass frequency counting."""
+        tokens = precomputed_tokens if precomputed_tokens is not None else cls.tokenize_words(text)
+        stopwords = cls.STOPWORDS
+        filtered = [t for t in tokens if t not in stopwords and not t.isdigit() and len(t) >= 3]
         if not filtered:
             return []
 
         counts = Counter(filtered)
-        max_freq = counts.most_common(1)[0][1] if counts else 1
+        top_items = counts.most_common(top_k)
+        if not top_items:
+            return []
 
-        salient = []
-        for word, count in counts.most_common(top_k):
-            salient.append({
+        max_freq = top_items[0][1]
+        return [
+            {
                 "keyword": word,
                 "count": count,
                 "importance": round(count / max_freq, 2)
-            })
-        return salient
+            }
+            for word, count in top_items
+        ]
 
     @classmethod
-    def extract_key_points(cls, text: str, top_k: int = 4) -> List[str]:
+    def extract_key_points(cls, text: str, top_k: int = 4, precomputed_sentences: List[str] = None) -> List[str]:
         """Extracts bulleted key takeaways and essential declarative clauses."""
-        sentences = cls.split_sentences(text)
+        sentences = precomputed_sentences if precomputed_sentences is not None else cls.split_sentences(text)
         if not sentences:
             return []
         if len(sentences) <= top_k:
             return sentences
 
-        # Score sentences based on informative keywords and position
-        keywords_dict = {item['keyword']: item['count'] for item in cls.extract_keywords(text, top_k=15)}
+        # Precompute sentence tokens and keyword dictionary in single pass
+        sent_tokens = [cls.tokenize_words(s) for s in sentences]
+        all_words = [w for toks in sent_tokens for w in toks if w not in cls.STOPWORDS and not w.isdigit() and len(w) >= 3]
+        
+        if not all_words:
+            return sentences[:top_k]
+
+        word_counts = Counter(all_words)
+        top_kw = dict(word_counts.most_common(15))
+
         scored = []
+        num_sentences = len(sentences)
         for idx, sentence in enumerate(sentences):
-            words = cls.tokenize_words(sentence)
-            if len(words) < 4:
+            words = sent_tokens[idx]
+            token_count = len(words)
+            if token_count < 4:
                 continue
-            kw_score = sum(keywords_dict.get(w, 0) for w in words)
-            pos_weight = 1.3 if idx == 0 else (1.1 if idx == len(sentences) - 1 else 1.0)
-            score = (kw_score / math.sqrt(len(words))) * pos_weight
+            kw_score = sum(top_kw.get(w, 0) for w in words)
+            pos_weight = 1.3 if idx == 0 else (1.1 if idx == num_sentences - 1 else 1.0)
+            score = (kw_score / math.sqrt(token_count)) * pos_weight
             scored.append((idx, score, sentence))
 
         if not scored:
@@ -94,21 +112,20 @@ class NLPProcessor:
         return [s[2] for s in top_sentences]
 
     @classmethod
-    def compute_stats(cls, text: str) -> Dict[str, Any]:
-        """Computes comprehensive NLP metrics and readability score for text."""
-        words = cls.tokenize_words(text)
-        sentences = cls.split_sentences(text)
+    def compute_stats(cls, text: str, precomputed_words: List[str] = None, precomputed_sentences: List[str] = None) -> Dict[str, Any]:
+        """Computes comprehensive NLP metrics and Flesch readability score in a high-speed single pass."""
+        words = precomputed_words if precomputed_words is not None else cls.tokenize_words(text)
+        sentences = precomputed_sentences if precomputed_sentences is not None else cls.split_sentences(text)
         chars = len(text)
         word_count = len(words)
         sentence_count = max(1, len(sentences))
         avg_sentence_len = round(word_count / sentence_count, 1)
         reading_time_sec = round((word_count / 200) * 60, 1)  # 200 wpm baseline
 
-        # Approximate syllable estimation for Flesch Reading Ease
+        # Optimized syllable estimation using single pass
         syllable_count = 0
         for w in words:
-            w_lower = w.lower()
-            vowels = len(re.findall(r'[aeiouy]', w_lower))
+            vowels = len(_RE_VOWELS.findall(w))
             syllable_count += max(1, vowels)
 
         if word_count > 0:
@@ -131,8 +148,8 @@ class NLPProcessor:
     @classmethod
     def compute_rouge(cls, reference: str, candidate: str) -> Dict[str, Dict[str, float]]:
         """
-        Computes ROUGE-1, ROUGE-2, and ROUGE-L (Precision, Recall, F1)
-        comparing reference text with the generated summary.
+        High-Performance ROUGE-1, ROUGE-2, and ROUGE-L (Precision, Recall, F1).
+        Uses O(N) rolling buffer memory for Longest Common Subsequence (LCS) calculation.
         """
         ref_tokens = cls.tokenize_words(reference)
         cand_tokens = cls.tokenize_words(candidate)
@@ -144,10 +161,12 @@ class NLPProcessor:
                 "rougeL": {"precision": 0.0, "recall": 0.0, "f1": 0.0},
             }
 
-        # Helper for n-gram overlap
-        def _get_ngrams(tokens: List[str], n: int):
-            return [tuple(tokens[i:i+n]) for i in range(len(tokens) - n + 1)]
+        # Fast Identity Short-Circuit
+        if ref_tokens == cand_tokens:
+            perfect = {"precision": 1.0, "recall": 1.0, "f1": 1.0}
+            return {"rouge1": perfect, "rouge2": perfect, "rougeL": perfect}
 
+        # Fast PRF helper
         def _calc_prf(ref_grams, cand_grams):
             if not cand_grams or not ref_grams:
                 return 0.0, 0.0, 0.0
@@ -163,21 +182,33 @@ class NLPProcessor:
         r1_p, r1_r, r1_f1 = _calc_prf(ref_tokens, cand_tokens)
 
         # ROUGE-2
-        ref_bigrams = _get_ngrams(ref_tokens, 2)
-        cand_bigrams = _get_ngrams(cand_tokens, 2)
+        ref_bigrams = [tuple(ref_tokens[i:i+2]) for i in range(len(ref_tokens) - 1)]
+        cand_bigrams = [tuple(cand_tokens[i:i+2]) for i in range(len(cand_tokens) - 1)]
         r2_p, r2_r, r2_f1 = _calc_prf(ref_bigrams, cand_bigrams)
 
-        # ROUGE-L (Longest Common Subsequence)
-        # Optimized LCS length
+        # ROUGE-L: High-Speed O(N) Space Rolling DP
         m, n = len(ref_tokens), len(cand_tokens)
-        dp = [[0] * (n + 1) for _ in range(m + 1)]
-        for i in range(m):
-            for j in range(n):
-                if ref_tokens[i] == cand_tokens[j]:
-                    dp[i + 1][j + 1] = dp[i][j] + 1
+        
+        # Always make the inner loop over the shorter array for maximum cache locality and speed
+        if m < n:
+            shorter, longer = ref_tokens, cand_tokens
+            short_len, long_len = m, n
+        else:
+            shorter, longer = cand_tokens, ref_tokens
+            short_len, long_len = n, m
+
+        dp = [0] * (short_len + 1)
+        for tok_long in longer:
+            prev = 0
+            for j, tok_short in enumerate(shorter):
+                temp = dp[j + 1]
+                if tok_long == tok_short:
+                    dp[j + 1] = prev + 1
                 else:
-                    dp[i + 1][j + 1] = max(dp[i + 1][j], dp[i][j + 1])
-        lcs_len = dp[m][n]
+                    dp[j + 1] = max(dp[j + 1], dp[j])
+                prev = temp
+
+        lcs_len = dp[short_len]
 
         rl_p = round(lcs_len / n, 4) if n > 0 else 0.0
         rl_r = round(lcs_len / m, 4) if m > 0 else 0.0

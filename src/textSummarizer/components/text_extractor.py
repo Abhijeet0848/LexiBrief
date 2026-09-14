@@ -5,21 +5,29 @@ import xml.etree.ElementTree as ET
 from typing import Tuple
 from textSummarizer.logging import logger
 
+_RE_CRLF = re.compile(r'\r\n')
+_RE_SPACES = re.compile(r'[ \t]+')
+_RE_MULTILINES = re.compile(r'\n\s*\n+')
+_RE_XML_TAGS = re.compile(r'<[^>]+>')
+_RE_PDF_TEXT_BLOCKS = re.compile(r'\((.*?)\)\s*T[jJ]')
+_RE_NON_PRINTABLE_PDF = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
+_RE_READABLE_CHUNKS = re.compile(r'[A-Za-z0-9\s.,;:\'"?!-]{5,}')
+
+
 class TextExtractor:
-    """Extracts, cleans, and standardizes text from various input formats (Raw text, PDF, DOCX, TXT)."""
+    """High-speed text extractor, cleaner, and format detector (Raw text, PDF, DOCX, TXT)."""
 
     @staticmethod
     def clean_text(text: str) -> str:
-        """Cleans and normalizes extracted text."""
+        """Cleans and normalizes extracted text with compiled regex patterns."""
         if not text:
             return ""
         # Normalize whitespace and line breaks
-        text = re.sub(r'\r\n', '\n', text)
-        text = re.sub(r'[ \t]+', ' ', text)
-        text = re.sub(r'\n\s*\n+', '\n\n', text)
-        # Remove non-printable control characters while preserving valid punctuation
-        text = "".join(ch for ch in text if ch.isprintable() or ch in '\n\t')
-        return text.strip()
+        text = _RE_CRLF.sub('\n', text)
+        text = _RE_SPACES.sub(' ', text)
+        text = _RE_MULTILINES.sub('\n\n', text)
+        # Remove non-printable control characters while preserving valid punctuation & whitespace
+        return "".join(ch for ch in text if ch.isprintable() or ch in '\n\t').strip()
 
     @staticmethod
     def extract_from_docx(file_bytes: bytes) -> str:
@@ -46,8 +54,8 @@ class TextExtractor:
             # Try raw text extraction from xml as fallback
             try:
                 raw_xml = xml_content.decode('utf-8', errors='ignore')
-                cleaned = re.sub(r'<[^>]+>', ' ', raw_xml)
-                return re.sub(r'\s+', ' ', cleaned).strip()
+                cleaned = _RE_XML_TAGS.sub(' ', raw_xml)
+                return _RE_SPACES.sub(' ', cleaned).strip()
             except Exception:
                 return file_bytes.decode('utf-8', errors='ignore')
 
@@ -73,13 +81,11 @@ class TextExtractor:
         # Stream extraction fallback for PDF text blocks
         try:
             content = file_bytes.decode('latin-1', errors='ignore')
-            # Extract plain strings inside parentheses / stream blocks
-            text_blocks = re.findall(r'\((.*?)\)\s*T[jJ]', content)
+            text_blocks = _RE_PDF_TEXT_BLOCKS.findall(content)
             if text_blocks:
                 return " ".join(text_blocks)
-            # General fallback
-            cleaned = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', content)
-            readable = re.findall(r'[A-Za-z0-9\s.,;:\'"?!-]{5,}', cleaned)
+            cleaned = _RE_NON_PRINTABLE_PDF.sub('', content)
+            readable = _RE_READABLE_CHUNKS.findall(cleaned)
             return " ".join(readable)
         except Exception as e:
             logger.error(f"PDF extraction error: {e}")
@@ -101,3 +107,4 @@ class TextExtractor:
 
         cleaned = cls.clean_text(raw)
         return cleaned, fmt
+

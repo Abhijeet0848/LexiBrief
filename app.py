@@ -12,7 +12,7 @@ for path in [BASE_DIR, SRC_DIR]:
     if path not in sys.path:
         sys.path.insert(0, path)
 
-from fastapi import FastAPI, Request, Form, HTTPException, UploadFile, File, Response
+from fastapi import FastAPI, Request, Form, HTTPException, UploadFile, File, Response, BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -354,7 +354,7 @@ async def training(request: Request):
 
 
 @app.post("/predict", tags=["Prediction & MongoDB"])
-async def predict_route(request: Request):
+async def predict_route(request: Request, background_tasks: BackgroundTasks):
     try:
         start_time = time.time()
         content_type = request.headers.get("content-type", "")
@@ -436,18 +436,21 @@ async def predict_route(request: Request):
             }
         }
 
-        # Persist summary to MongoDB 'summaries' collection
-        db_manager.save_summary({
-            "text": str(input_text),
-            "summary": summary_text,
-            "key_points": result_payload["key_points"],
-            "keywords": result_payload["keywords"],
-            "mode": selected_mode,
-            "method_used": prediction_result.get("method_used", selected_method),
-            "model_source": prediction_result.get("model_source", "unknown"),
-            "rouge": result_payload["rouge"],
-            "analytics": result_payload["analytics"]
-        })
+        # Non-blocking async background persistence to MongoDB
+        background_tasks.add_task(
+            db_manager.save_summary,
+            {
+                "text": str(input_text),
+                "summary": summary_text,
+                "key_points": result_payload["key_points"],
+                "keywords": result_payload["keywords"],
+                "mode": selected_mode,
+                "method_used": prediction_result.get("method_used", selected_method),
+                "model_source": prediction_result.get("model_source", "unknown"),
+                "rouge": result_payload["rouge"],
+                "analytics": result_payload["analytics"]
+            }
+        )
 
         return result_payload
     except HTTPException as he:
