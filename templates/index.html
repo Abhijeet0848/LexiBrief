@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LexiBrief | AI Text Summarizer</title>
+    <title>SUMMARIX | AI Text Summarizer</title>
     <link rel="icon" type="image/jpeg" href="/static/icon.jpg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,6 +11,7 @@
     <style>
         :root {
             --bg-page: #f8fafc;
+            --bg-sidebar: #ffffff;
             --bg-card: #ffffff;
             --bg-card-subtle: #f1f5f9;
             --border-color: #e2e8f0;
@@ -18,7 +19,8 @@
             --primary: #4f46e5;
             --primary-hover: #4338ca;
             --primary-light: #eef2ff;
-            --primary-glow: rgba(79, 70, 229, 0.25);
+            --primary-glow: rgba(79, 70, 229, 0.22);
+            --accent-purple: #7c3aed;
             --text-main: #0f172a;
             --text-secondary: #475569;
             --text-muted: #64748b;
@@ -26,11 +28,11 @@
             --success-bg: #ecfdf5;
             --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
             --shadow-sm: 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            --shadow-card: 0 4px 20px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
-            --shadow-card-hover: 0 8px 30px -4px rgba(15, 23, 42, 0.1), 0 4px 10px -2px rgba(15, 23, 42, 0.04);
-            --radius-xl: 18px;
-            --radius-lg: 14px;
-            --radius-md: 10px;
+            --shadow-md: 0 4px 14px -2px rgba(15, 23, 42, 0.08);
+            --shadow-lg: 0 10px 25px -4px rgba(15, 23, 42, 0.1);
+            --radius-xl: 16px;
+            --radius-lg: 12px;
+            --radius-md: 8px;
             --radius-sm: 6px;
         }
 
@@ -44,383 +46,266 @@
 
         body {
             background-color: var(--bg-page);
-            background-image: 
-                radial-gradient(1200px circle at 50% -100px, rgba(99, 102, 241, 0.08) 0%, transparent 80%),
-                radial-gradient(800px circle at 90% 80%, rgba(244, 114, 182, 0.04) 0%, transparent 60%);
-            background-attachment: fixed;
             color: var(--text-main);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            overflow-x: hidden;
         }
 
-        /* Top Navigation */
+        /* Top Header Navbar */
         header {
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(14px);
-            -webkit-backdrop-filter: blur(14px);
-            border-bottom: 1px solid rgba(226, 232, 240, 0.85);
-            padding: 0.85rem 2rem;
+            background: #ffffff;
+            border-bottom: 1px solid var(--border-color);
+            padding: 0.75rem 1.75rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
             position: sticky;
             top: 0;
             z-index: 50;
-            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.03);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
         }
 
         .brand {
             display: inline-flex;
             align-items: center;
-            gap: 0.75rem;
+            gap: 0.65rem;
             text-decoration: none;
             color: var(--text-main);
-            transition: opacity 0.15s ease;
         }
 
-        .brand:hover {
-            opacity: 0.9;
+        .brand-spark {
+            font-size: 1.15rem;
+            color: var(--primary);
+            display: inline-flex;
+            animation: pulseSpark 2.5s infinite ease-in-out;
         }
 
-        .logo-symbol {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 34px;
-            height: 34px;
-            border-radius: 10px;
-            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-            color: #ffffff;
-            box-shadow: 0 3px 10px rgba(79, 70, 229, 0.3);
-            flex-shrink: 0;
-        }
-
-        .brand-text-wrap {
-            display: flex;
-            align-items: baseline;
-            gap: 0.45rem;
+        @keyframes pulseSpark {
+            0%, 100% { transform: scale(1); opacity: 0.9; }
+            50% { transform: scale(1.15); opacity: 1; }
         }
 
         .brand-title {
-            font-size: 1.15rem;
+            font-size: 1.2rem;
             font-weight: 800;
-            letter-spacing: -0.03em;
-            color: #0f172a;
-            background: linear-gradient(135deg, #0f172a 60%, #4338ca 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .brand-tag {
-            font-size: 0.7rem;
-            font-weight: 600;
-            color: #6366f1;
-            background: #eef2ff;
-            padding: 0.15rem 0.45rem;
-            border-radius: 6px;
-            letter-spacing: 0.02em;
-            text-transform: uppercase;
-        }
-
-        .nav-right {
-            display: flex;
-            align-items: center;
-            gap: 0.65rem;
-        }
-
-        .nav-btn {
-            background: #ffffff;
-            border: 1px solid var(--border-color);
-            color: var(--text-secondary);
-            padding: 0.42rem 0.85rem;
-            border-radius: var(--radius-md);
-            font-size: 0.82rem;
-            font-weight: 600;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.45rem;
-            cursor: pointer;
-            transition: all 0.18s ease;
-        }
-
-        .nav-btn:hover {
-            background: var(--bg-card-subtle);
-            color: var(--text-main);
-            border-color: var(--border-hover);
-            transform: translateY(-1px);
-        }
-
-        .nav-github-btn {
-            background: #0f172a;
-            border: 1px solid #0f172a;
-            color: #ffffff;
-            padding: 0.42rem 0.95rem;
-            border-radius: var(--radius-md);
-            font-size: 0.82rem;
-            font-weight: 600;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.45rem;
-            transition: all 0.18s ease;
-            box-shadow: 0 2px 6px rgba(15, 23, 42, 0.15);
-        }
-
-        .nav-github-btn:hover {
-            background: #1e293b;
-            border-color: #1e293b;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 10px rgba(15, 23, 42, 0.22);
-        }
-
-        /* Main Workspace Container */
-        main {
-            flex: 1;
-            max-width: 1280px;
-            width: 100%;
-            margin: 0 auto;
-            padding: 1.5rem 1.75rem 2.5rem 1.75rem;
-            display: flex;
-            flex-direction: column;
-            gap: 1.15rem;
-        }
-
-        /* Sample Quick Presets Bar */
-        .sample-bar {
-            display: flex;
-            align-items: center;
-            gap: 0.6rem;
-            overflow-x: auto;
-            padding: 0.35rem 0.2rem;
-            scrollbar-width: none;
-        }
-
-        .sample-bar::-webkit-scrollbar {
-            display: none;
-        }
-
-        .sample-label {
-            font-size: 0.78rem;
-            font-weight: 700;
-            color: var(--text-muted);
-            text-transform: uppercase;
             letter-spacing: 0.04em;
+            color: #0f172a;
+        }
+
+        .brand-pill {
+            font-size: 0.68rem;
+            font-weight: 700;
+            color: var(--primary);
+            background: var(--primary-light);
+            padding: 0.15rem 0.5rem;
+            border-radius: 12px;
+            margin-left: 0.35rem;
+            text-transform: uppercase;
+        }
+
+        .top-nav-right {
             display: flex;
             align-items: center;
-            gap: 0.35rem;
-            white-space: nowrap;
-        }
-
-        .sample-chip {
-            background: #ffffff;
-            border: 1px solid var(--border-color);
-            color: var(--text-secondary);
-            padding: 0.32rem 0.75rem;
-            border-radius: 20px;
-            font-size: 0.78rem;
-            font-weight: 600;
-            cursor: pointer;
-            white-space: nowrap;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.4rem;
-            transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: var(--shadow-xs);
-        }
-
-        .sample-chip:hover {
-            background: #f8fafc;
-            border-color: #a5b4fc;
-            color: var(--primary);
-            transform: translateY(-1px);
-            box-shadow: 0 3px 8px rgba(79, 70, 229, 0.08);
-        }
-
-        /* Dual Editor Grid */
-        .editor-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
             gap: 1.25rem;
         }
 
-        @media (max-width: 920px) {
-            .editor-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        /* Workspace Cards */
-        .card {
-            background: var(--bg-card);
-            border: 1px solid rgba(226, 232, 240, 0.9);
-            border-radius: var(--radius-xl);
-            padding: 1.35rem;
-            display: flex;
-            flex-direction: column;
-            gap: 0.9rem;
-            box-shadow: var(--shadow-card);
-            transition: border-color 0.2s ease, box-shadow 0.2s ease;
-            position: relative;
-        }
-
-        .card:hover {
-            box-shadow: var(--shadow-card-hover);
-        }
-
-        .card:focus-within {
-            border-color: #c7d2fe;
-            box-shadow: 0 8px 30px -4px rgba(79, 70, 229, 0.1), 0 2px 6px -1px rgba(0, 0, 0, 0.02);
-        }
-
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-        }
-
-        .card-title-group {
-            display: flex;
-            align-items: center;
-            gap: 0.55rem;
-        }
-
-        .card-icon-badge {
-            width: 28px;
-            height: 28px;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.9rem;
-        }
-
-        .icon-input {
-            background: #eef2ff;
-            color: #4f46e5;
-        }
-
-        .icon-output {
-            background: #fdf2f8;
-            color: #db2777;
-        }
-
-        .card-title {
-            font-size: 0.95rem;
-            font-weight: 700;
-            letter-spacing: -0.01em;
-            color: var(--text-main);
-        }
-
-        .header-controls {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        /* Selectors */
-        .control-select {
-            background: #f1f5f9;
-            border: 1px solid #e2e8f0;
+        .top-nav-link {
+            font-size: 0.85rem;
+            font-weight: 600;
             color: var(--text-secondary);
-            font-size: 0.75rem;
-            font-weight: 600;
-            padding: 0.25rem 0.55rem;
-            border-radius: 14px;
-            outline: none;
+            text-decoration: none;
             cursor: pointer;
-        }
-
-        /* Mode Selector */
-        .mode-group {
-            display: flex;
-            background: #f1f5f9;
-            border: 1px solid #e2e8f0;
-            border-radius: 20px;
-            padding: 3px;
-            gap: 2px;
-        }
-
-        .mode-btn {
-            background: transparent;
-            border: none;
-            color: var(--text-muted);
-            padding: 0.22rem 0.65rem;
-            border-radius: 16px;
-            font-size: 0.74rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.18s ease;
-        }
-
-        .mode-btn:hover {
-            color: var(--text-main);
-        }
-
-        .mode-btn.active {
-            background: #ffffff;
-            color: var(--primary);
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-        }
-
-        /* Status Badge in Output Card */
-        .status-badge {
-            font-size: 0.72rem;
-            font-weight: 600;
-            padding: 0.2rem 0.55rem;
-            border-radius: 12px;
-            background: #f1f5f9;
-            color: var(--text-muted);
+            transition: color 0.15s ease;
             display: inline-flex;
             align-items: center;
             gap: 0.35rem;
         }
 
-        .status-badge .dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: #94a3b8;
+        .top-nav-link:hover {
+            color: var(--primary);
         }
 
-        .status-badge.active {
-            background: #ecfdf5;
-            color: #047857;
+        .profile-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            background: var(--bg-card-subtle);
+            border: 1px solid var(--border-color);
+            padding: 0.35rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text-main);
+            text-decoration: none;
+            transition: all 0.15s ease;
         }
 
-        .status-badge.active .dot {
-            background: #10b981;
-            box-shadow: 0 0 6px #10b981;
+        .profile-chip:hover {
+            background: #e2e8f0;
         }
 
-        /* Textareas & Output Area */
-        .editor-box-wrap {
-            position: relative;
+        /* App Layout: Sidebar + Main Area */
+        .app-container {
+            display: flex;
+            flex: 1;
+            min-height: calc(100vh - 61px);
+        }
+
+        /* Sidebar */
+        aside {
+            width: 240px;
+            background: var(--bg-sidebar);
+            border-right: 1px solid var(--border-color);
+            padding: 1.5rem 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+            flex-shrink: 0;
+        }
+
+        .sidebar-heading {
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.5rem 0.75rem;
+            margin-bottom: 0.15rem;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.65rem 0.85rem;
+            border-radius: var(--radius-md);
+            color: var(--text-secondary);
+            font-size: 0.88rem;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            border: 1px solid transparent;
+        }
+
+        .nav-item:hover {
+            background: var(--bg-card-subtle);
+            color: var(--text-main);
+        }
+
+        .nav-item.active {
+            background: var(--primary-light);
+            color: var(--primary);
+            border-color: #c7d2fe;
+        }
+
+        .nav-icon {
+            font-size: 1.05rem;
+            width: 20px;
+            text-align: center;
+        }
+
+        .sidebar-bottom {
+            margin-top: auto;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .sidebar-status-box {
             background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: var(--radius-lg);
-            transition: all 0.18s ease;
-            overflow: hidden;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 0.75rem;
+            font-size: 0.76rem;
+            color: var(--text-muted);
         }
 
-        .editor-box-wrap:focus-within {
+        .status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            box-shadow: 0 0 6px var(--success);
+            margin-right: 0.35rem;
+        }
+
+        /* Main Workspace Canvas */
+        main {
+            flex: 1;
+            padding: 2rem 2.5rem 3.5rem 2.5rem;
+            max-width: 1080px;
+            margin: 0 auto;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        /* View Section Manager */
+        .view-section {
+            display: none;
+            animation: fadeInView 0.2s ease-out;
+        }
+
+        .view-section.active {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        @keyframes fadeInView {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Hero Title Block */
+        .center-hero {
+            text-align: center;
+            padding: 0.5rem 0 0.25rem 0;
+        }
+
+        .center-hero h1 {
+            font-size: 1.75rem;
+            font-weight: 800;
+            letter-spacing: -0.025em;
+            color: var(--text-main);
+            text-transform: uppercase;
+        }
+
+        .center-hero p {
+            font-size: 0.92rem;
+            color: var(--text-muted);
+            margin-top: 0.3rem;
+            font-weight: 500;
+        }
+
+        /* Main Input Box */
+        .input-card {
             background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-xl);
+            padding: 1.25rem;
+            box-shadow: var(--shadow-sm);
+            transition: all 0.18s ease;
+            position: relative;
+        }
+
+        .input-card:focus-within {
             border-color: #a5b4fc;
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.08);
         }
 
         textarea {
             width: 100%;
-            height: 350px;
+            height: 220px;
             background: transparent;
             border: none;
-            padding: 1.15rem;
-            color: var(--text-main);
-            font-size: 0.93rem;
+            font-size: 0.95rem;
             line-height: 1.7;
+            color: var(--text-main);
             resize: none;
             outline: none;
             font-family: inherit;
@@ -428,117 +313,303 @@
 
         textarea::placeholder {
             color: #94a3b8;
-            font-weight: 400;
         }
 
-        .output-box {
-            width: 100%;
-            height: 350px;
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: var(--radius-lg);
-            padding: 1.15rem;
-            color: var(--text-main);
-            font-size: 0.95rem;
-            line-height: 1.75;
-            overflow-y: auto;
-            position: relative;
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* Modern Empty State */
-        .empty-state {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            color: var(--text-muted);
-            text-align: center;
-            gap: 0.75rem;
-            padding: 2rem;
-            margin: auto;
-        }
-
-        .empty-icon-wrap {
-            width: 52px;
-            height: 52px;
-            border-radius: 16px;
-            background: linear-gradient(135deg, #eef2ff 0%, #fdf2f8 100%);
-            border: 1px solid #e0e7ff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #6366f1;
-            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.12);
-        }
-
-        .empty-title {
-            font-size: 0.98rem;
-            font-weight: 700;
-            color: var(--text-main);
-            letter-spacing: -0.01em;
-        }
-
-        .empty-desc {
-            font-size: 0.84rem;
-            color: var(--text-muted);
-            max-width: 320px;
-            line-height: 1.55;
-        }
-
-
-        /* Summary Result Display */
-        .summary-content {
-            display: none;
-            animation: fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            color: #1e293b;
-            font-size: 0.95rem;
-            line-height: 1.75;
-            white-space: pre-line;
-            flex: 1;
-        }
-
-        .keywords-bar {
-            display: none;
-            align-items: center;
-            gap: 0.4rem;
-            flex-wrap: wrap;
-            padding-top: 0.85rem;
-            border-top: 1px dashed var(--border-color);
-            margin-top: 0.75rem;
-        }
-
-        .keyword-tag {
-            background: #f1f5f9;
-            border: 1px solid #e2e8f0;
-            color: #475569;
-            font-size: 0.72rem;
-            font-weight: 600;
-            padding: 0.15rem 0.45rem;
-            border-radius: 6px;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(4px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* Card Footers & Stats */
-        .card-footer {
+        .input-toolbar {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding-top: 0.15rem;
+            border-top: 1px solid #f1f5f9;
+            padding-top: 0.75rem;
+            margin-top: 0.5rem;
             flex-wrap: wrap;
+            gap: 0.6rem;
+        }
+
+        .upload-pill-btn {
+            background: #f8fafc;
+            border: 1px dashed #cbd5e1;
+            color: var(--text-secondary);
+            padding: 0.4rem 0.85rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            transition: all 0.15s ease;
+        }
+
+        .upload-pill-btn:hover {
+            background: #f1f5f9;
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .sample-load-group {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .sample-mini-btn {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.25rem 0.6rem;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .sample-mini-btn:hover {
+            background: var(--bg-card-subtle);
+            color: var(--text-main);
+        }
+
+        .clear-mini-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            padding: 0.25rem 0.5rem;
+        }
+
+        .clear-mini-btn:hover {
+            color: #dc2626;
+        }
+
+        /* 3 Algorithm Selector Cards */
+        .algorithm-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+        }
+
+        .algorithm-card {
+            background: #ffffff;
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 1.1rem 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+
+        .algorithm-card:hover {
+            border-color: #cbd5e1;
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .algorithm-card.active {
+            border-color: var(--primary);
+            background: #fdfaff;
+            box-shadow: 0 4px 14px rgba(79, 70, 229, 0.12);
+        }
+
+        .algo-badge {
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-muted);
+            margin-bottom: 0.25rem;
+        }
+
+        .algorithm-card.active .algo-badge {
+            color: var(--primary);
+        }
+
+        .algo-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .algo-desc {
+            font-size: 0.76rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+            line-height: 1.35;
+        }
+
+        /* Summary Length Slider Control */
+        .slider-section {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 1.15rem 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1.5rem;
+            box-shadow: var(--shadow-xs);
+        }
+
+        .slider-label {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
             gap: 0.5rem;
+            min-width: 140px;
+        }
+
+        .length-slider-wrap {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        .slider-track-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            outline: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--primary);
+            box-shadow: 0 0 6px var(--primary-glow);
+            border: 2px solid #ffffff;
+            cursor: pointer;
+            transition: transform 0.1s ease;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+        }
+
+        .slider-ticks {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .slider-val-badge {
+            background: var(--primary-light);
+            color: var(--primary);
+            font-size: 0.8rem;
+            font-weight: 700;
+            padding: 0.25rem 0.65rem;
+            border-radius: 12px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Big Generate Summary Action Button */
+        .generate-btn-container {
+            display: flex;
+            justify-content: center;
+            padding: 0.5rem 0;
+        }
+
+        .btn-generate {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            border: 1px solid #4338ca;
+            color: #ffffff;
+            font-size: 1rem;
+            font-weight: 700;
+            padding: 0.85rem 3rem;
+            border-radius: var(--radius-xl);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.65rem;
+            box-shadow: 0 6px 20px rgba(79, 70, 229, 0.3);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-generate:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(79, 70, 229, 0.4);
+            background: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%);
+        }
+
+        .btn-generate:active {
+            transform: translateY(0);
+        }
+
+        .btn-generate:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* Result Container */
+        .result-card {
+            display: none;
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-xl);
+            padding: 1.5rem;
+            box-shadow: var(--shadow-md);
+            flex-direction: column;
+            gap: 1rem;
+            animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 0.85rem;
+        }
+
+        .result-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+        }
+
+        .result-body {
+            font-size: 0.98rem;
+            line-height: 1.8;
+            color: #1e293b;
+            white-space: pre-line;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: var(--radius-lg);
+            padding: 1.25rem;
         }
 
         .stats-pills {
             display: flex;
             align-items: center;
-            gap: 0.4rem;
+            gap: 0.5rem;
             flex-wrap: wrap;
         }
 
@@ -548,9 +619,9 @@
             gap: 0.3rem;
             background: #f1f5f9;
             border: 1px solid #e2e8f0;
-            padding: 0.22rem 0.6rem;
+            padding: 0.25rem 0.65rem;
             border-radius: 12px;
-            font-size: 0.74rem;
+            font-size: 0.75rem;
             font-weight: 600;
             color: var(--text-secondary);
             font-family: 'JetBrains Mono', monospace;
@@ -570,67 +641,65 @@
             font-weight: 600;
         }
 
-        /* Buttons & Actions */
-        .btn-group {
+        .action-btn-group {
             display: flex;
             align-items: center;
-            gap: 0.45rem;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
-            border: 1px solid #4338ca;
-            color: #ffffff;
-            padding: 0.52rem 1.35rem;
-            border-radius: var(--radius-md);
-            font-size: 0.88rem;
-            font-weight: 700;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
             gap: 0.5rem;
-            transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 2px 8px rgba(79, 70, 229, 0.28);
         }
 
-        .btn-primary:hover {
-            background: linear-gradient(135deg, #4338ca 0%, #4f46e5 100%);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
-        }
-
-        .btn-primary:active {
-            transform: translateY(0);
-        }
-
-        .btn-primary:disabled {
-            opacity: 0.65;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-
-        .btn-sm {
+        .btn-action {
             background: #ffffff;
             border: 1px solid var(--border-color);
             color: var(--text-secondary);
-            padding: 0.44rem 0.8rem;
+            padding: 0.45rem 0.85rem;
             border-radius: var(--radius-md);
-            font-size: 0.8rem;
+            font-size: 0.82rem;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.15s ease;
             display: inline-flex;
             align-items: center;
             gap: 0.4rem;
-            box-shadow: var(--shadow-xs);
         }
 
-        .btn-sm:hover {
+        .btn-action:hover {
             background: var(--bg-card-subtle);
             color: var(--text-main);
             border-color: var(--border-hover);
-            transform: translateY(-1px);
+        }
+
+        /* History & Documents Table Views */
+        .table-wrap {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow-xs);
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            text-align: left;
+        }
+
+        .data-table th {
+            background: #f8fafc;
+            padding: 0.85rem 1.1rem;
+            color: var(--text-muted);
+            font-weight: 700;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .data-table td {
+            padding: 0.9rem 1.1rem;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-main);
+        }
+
+        .data-table tr:hover td {
+            background: #fbfcfe;
         }
 
         /* Modal Architecture Dialog */
@@ -642,7 +711,6 @@
             height: 100vh;
             background: rgba(15, 23, 42, 0.45);
             backdrop-filter: blur(6px);
-            -webkit-backdrop-filter: blur(6px);
             display: none;
             align-items: center;
             justify-content: center;
@@ -654,7 +722,7 @@
             background: #ffffff;
             border: 1px solid var(--border-color);
             border-radius: var(--radius-xl);
-            max-width: 800px;
+            max-width: 780px;
             width: 100%;
             max-height: 90vh;
             overflow-y: auto;
@@ -663,12 +731,6 @@
             display: flex;
             flex-direction: column;
             gap: 1.4rem;
-            animation: modalPop 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        @keyframes modalPop {
-            from { opacity: 0; transform: scale(0.96) translateY(8px); }
-            to { opacity: 1; transform: scale(1) translateY(0); }
         }
 
         .modal-header {
@@ -691,177 +753,9 @@
             color: var(--text-muted);
             font-size: 1.2rem;
             cursor: pointer;
-            transition: all 0.15s ease;
         }
 
-        .modal-close:hover {
-            background: #e2e8f0;
-            color: var(--text-main);
-        }
-
-        .pipeline-steps {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.5rem;
-            overflow-x: auto;
-            padding: 0.5rem 0;
-        }
-
-        .step-item {
-            background: #f8fafc;
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-md);
-            padding: 0.75rem 0.85rem;
-            text-align: center;
-            min-width: 115px;
-            flex: 1;
-        }
-
-        .step-item.active {
-            background: #eef2ff;
-            border-color: #c7d2fe;
-        }
-
-        /* Visual Architecture Flowchart */
-        .arch-visual-flow {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 0.45rem;
-            background: #f8fafc;
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-lg);
-            padding: 1.25rem 1rem;
-        }
-
-        .flow-card {
-            background: #ffffff;
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-md);
-            padding: 0.55rem 1.1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            box-shadow: var(--shadow-xs);
-            width: 100%;
-            max-width: 460px;
-            transition: all 0.15s ease;
-        }
-
-        .flow-card.highlight {
-            background: #ecfdf5;
-            border-color: #a7f3d0;
-        }
-
-        .flow-card:hover {
-            transform: translateY(-1px);
-            border-color: #c7d2fe;
-            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.08);
-        }
-
-        .flow-icon {
-            font-size: 1.15rem;
-            flex-shrink: 0;
-        }
-
-        .flow-info {
-            display: flex;
-            flex-direction: column;
-            gap: 0.1rem;
-        }
-
-        .flow-title {
-            font-size: 0.84rem;
-            font-weight: 700;
-            color: var(--text-main);
-        }
-
-        .flow-sub {
-            font-size: 0.73rem;
-            color: var(--text-muted);
-            font-weight: 500;
-        }
-
-        .flow-arrow {
-            color: #94a3b8;
-            font-size: 1rem;
-            font-weight: 700;
-            line-height: 1;
-        }
-
-        .flow-branches {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.75rem;
-            width: 100%;
-            max-width: 460px;
-        }
-
-        .branch-card {
-            background: #ffffff;
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-md);
-            padding: 0.65rem 0.8rem;
-            display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-            box-shadow: var(--shadow-xs);
-            transition: all 0.15s ease;
-        }
-
-        .branch-card:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
-        }
-
-        .branch-badge {
-            font-size: 0.68rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
-        }
-
-        .branch-card.extractive .branch-badge {
-            color: #0284c7;
-        }
-
-        .branch-card.abstractive .branch-badge {
-            color: #7c3aed;
-        }
-
-        .branch-title {
-            font-size: 0.82rem;
-            font-weight: 700;
-            color: var(--text-main);
-        }
-
-        .branch-desc {
-            font-size: 0.7rem;
-            color: var(--text-muted);
-            line-height: 1.35;
-        }
-
-        .table-light {
-            width: 100%;
-            border-collapse: collapse;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.84rem;
-        }
-
-        .table-light th, .table-light td {
-            padding: 0.75rem 0.9rem;
-            text-align: left;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .table-light th {
-            color: var(--text-muted);
-            font-weight: 600;
-            background: #f8fafc;
-        }
-
-        /* Toast Notification */
+        /* Toast */
         .toast {
             position: fixed;
             bottom: 2rem;
@@ -877,15 +771,8 @@
             font-size: 0.86rem;
             font-weight: 600;
             z-index: 2000;
-            animation: toastSlide 0.25s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        @keyframes toastSlide {
-            from { opacity: 0; transform: translateY(12px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* Spinner */
         .spinner {
             width: 16px;
             height: 16px;
@@ -898,324 +785,312 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
-
-        /* Footer */
-        footer {
-            background: #ffffff;
-            border-top: 1px solid var(--border-color);
-            text-align: center;
-            padding: 1.15rem 2rem;
-            color: var(--text-muted);
-            font-size: 0.82rem;
-            font-weight: 500;
-            margin-top: auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        @media (max-width: 640px) {
-            footer {
-                flex-direction: column;
-                gap: 0.4rem;
-            }
-        }
     </style>
 </head>
 <body>
 
-    <!-- Header -->
+    <!-- Header Navbar -->
     <header>
         <a href="/" class="brand">
-            <div class="logo-symbol">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M6 3v15a3 3 0 0 0 3 3h12" />
-                    <path d="M10 8h7" stroke-width="2" opacity="0.85" />
-                    <path d="M10 12h5" stroke-width="2" opacity="0.85" />
-                </svg>
-            </div>
-            <div class="brand-text-wrap">
-                <span class="brand-title">LexiBrief</span>
-                <span class="brand-tag">Pegasus & TF-IDF</span>
-            </div>
+            <span class="brand-spark">✦</span>
+            <span class="brand-title">SUMMARIX</span>
+            <span class="brand-pill">AI NLP</span>
         </a>
 
-        <div class="nav-right">
-            <button class="nav-btn" onclick="openModal()" title="View Pipeline Architecture & Benchmarks">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-                Architecture
-            </button>
-            <a href="/docs" target="_blank" class="nav-btn" title="FastAPI Interactive Documentation">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                API
+        <div class="top-nav-right">
+            <a class="top-nav-link" onclick="switchTab('history')">
+                <span>🕘</span> History
             </a>
-            <a href="https://github.com/Abhijeet0848/LexiBrief" target="_blank" class="nav-github-btn" title="View Source Repository on GitHub">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-                GitHub
+            <a class="top-nav-link" onclick="openHelpModal()">
+                <span>❓</span> Help & ROUGE
+            </a>
+            <a href="https://github.com/Abhijeet0848/LexiBrief" target="_blank" class="profile-chip" title="GitHub Repository">
+                <span>👤</span> Profile
             </a>
         </div>
     </header>
 
-    <!-- Main Workspace -->
-    <main>
-        <!-- Quick Load Samples Toolbar -->
-        <div class="sample-bar">
-            <span class="sample-label">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                Quick Samples:
-            </span>
-            <button class="sample-chip" onclick="loadPreset('meeting')">👥 Project Standup</button>
-            <button class="sample-chip" onclick="loadPreset('technews')">📰 AI Breakthrough</button>
-            <button class="sample-chip" onclick="loadPreset('support')">🎧 Customer Incident</button>
-            <button class="sample-chip" onclick="loadPreset('research')">🔬 Scientific Abstract</button>
-        </div>
+    <!-- Application Body Container -->
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside>
+            <div class="sidebar-heading">Navigation</div>
+            <a class="nav-item" id="nav-dashboard" onclick="switchTab('dashboard')">
+                <span class="nav-icon">🏠</span> Dashboard
+            </a>
+            <a class="nav-item active" id="nav-summarize" onclick="switchTab('summarize')">
+                <span class="nav-icon">✨</span> Summarize
+            </a>
+            <a class="nav-item" id="nav-documents" onclick="switchTab('documents')">
+                <span class="nav-icon">📄</span> Documents
+            </a>
+            <a class="nav-item" id="nav-history" onclick="switchTab('history')">
+                <span class="nav-icon">🕘</span> History
+            </a>
+            <a class="nav-item" id="nav-analytics" onclick="switchTab('analytics')">
+                <span class="nav-icon">📊</span> Analytics
+            </a>
+            <a class="nav-item" id="nav-settings" onclick="switchTab('settings')">
+                <span class="nav-icon">⚙️</span> Settings
+            </a>
 
-        <!-- Dual Card Workspace -->
-        <div class="editor-grid">
-            <!-- Source Input Card -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title-group">
-                        <div class="card-icon-badge icon-input">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                        </div>
-                        <span class="card-title">Source Content</span>
-                    </div>
+            <div class="sidebar-bottom">
+                <div class="sidebar-status-box">
+                    <span class="status-dot"></span> <strong>Engine Active</strong>
+                    <div style="font-size: 0.7rem; color: #94a3b8; margin-top: 2px;">Pegasus & TF-IDF Hybrid</div>
+                </div>
+            </div>
+        </aside>
 
-                    <div class="header-controls">
-                        <!-- Method selector -->
-                        <select id="engineMethod" class="control-select" title="Summarization Algorithm">
-                            <option value="auto">⚡ Auto (Hybrid)</option>
-                            <option value="abstractive">🧠 Abstractive</option>
-                            <option value="extractive">📊 Extractive (TF-IDF)</option>
-                        </select>
+        <!-- Main Content Canvas -->
+        <main>
+            <!-- 1. SUMMARIZE VIEW (Primary Wireframe Match) -->
+            <div class="view-section active" id="view-summarize">
+                <div class="center-hero">
+                    <h1>AI Text Summarizer</h1>
+                    <p>Turn long text into clear insights with dual extractive & transformer neural synthesis.</p>
+                </div>
 
-                        <!-- Density Mode Group -->
-                        <div class="mode-group" title="Summary density mode">
-                            <button class="mode-btn" id="mode-concise" onclick="setMode('concise')">Concise</button>
-                            <button class="mode-btn active" id="mode-balanced" onclick="setMode('balanced')">Balanced</button>
-                            <button class="mode-btn" id="mode-detailed" onclick="setMode('detailed')">Detailed</button>
+                <!-- Text Input Card -->
+                <div class="input-card">
+                    <textarea id="inputText" placeholder="Paste your text here..." oninput="updateWordCount()"></textarea>
+                    
+                    <div class="input-toolbar">
+                        <input type="file" id="fileInput" accept=".pdf,.docx,.doc,.txt" style="display:none" onchange="handleFileUpload(event)">
+                        <button class="upload-pill-btn" onclick="document.getElementById('fileInput').click()">
+                            📎 Upload PDF/DOCX/TXT
+                        </button>
+
+                        <div class="sample-load-group">
+                            <span style="font-size: 0.74rem; font-weight: 600; color: var(--text-muted);">Quick Samples:</span>
+                            <button class="sample-mini-btn" onclick="loadSample('meeting')">👥 Standup</button>
+                            <button class="sample-mini-btn" onclick="loadSample('technews')">📰 AI News</button>
+                            <button class="sample-mini-btn" onclick="loadSample('research')">🔬 Research</button>
+                            <button class="clear-mini-btn" onclick="clearEditor()">Clear</button>
                         </div>
                     </div>
                 </div>
 
-                <div class="editor-box-wrap">
-                    <textarea id="inputText" placeholder="Paste your article, document text, or upload a PDF/DOCX/TXT file below to extract and summarize..." oninput="updateStats()"></textarea>
+                <!-- 3 Algorithm Selector Cards -->
+                <div class="algorithm-grid">
+                    <div class="algorithm-card" id="algo-extractive" onclick="selectAlgorithm('extractive')">
+                        <div class="algo-badge">Saliency Ranking</div>
+                        <div class="algo-title">Extractive</div>
+                        <div class="algo-desc">TF-IDF & sentence scoring for high-accuracy key sentence extraction.</div>
+                    </div>
+                    <div class="algorithm-card" id="algo-abstractive" onclick="selectAlgorithm('abstractive')">
+                        <div class="algo-badge">Neural seq2seq</div>
+                        <div class="algo-title">Abstractive</div>
+                        <div class="algo-desc">Google Pegasus transformer synthesizing human-like executive briefs.</div>
+                    </div>
+                    <div class="algorithm-card active" id="algo-hybrid" onclick="selectAlgorithm('auto')">
+                        <div class="algo-badge">Auto Engine</div>
+                        <div class="algo-title">Hybrid</div>
+                        <div class="algo-desc">Intelligent auto-routing combining transformer and saliency fallbacks.</div>
+                    </div>
                 </div>
 
-                <div class="card-footer">
+                <!-- Summary Length Slider -->
+                <div class="slider-section">
+                    <div class="slider-label">
+                        <span>📏 Summary Length</span>
+                    </div>
+                    <div class="length-slider-wrap">
+                        <div class="slider-track-wrap">
+                            <input type="range" id="lengthSlider" min="1" max="3" step="1" value="2" oninput="handleSliderChange(this.value)">
+                        </div>
+                        <div class="slider-ticks">
+                            <span>Concise (25%)</span>
+                            <span>Balanced (40%)</span>
+                            <span>Detailed (60%)</span>
+                        </div>
+                    </div>
+                    <div class="slider-val-badge" id="sliderBadge">Balanced</div>
+                </div>
+
+                <!-- Big Centered Generate Summary Button -->
+                <div class="generate-btn-container">
+                    <button class="btn-generate" id="generateBtn" onclick="runSummarization()">
+                        <span id="genBtnIcon">✨</span>
+                        <span id="genBtnLabel">Generate Summary</span>
+                    </button>
+                </div>
+
+                <!-- Output Summary Result Card -->
+                <div class="result-card" id="resultCard">
+                    <div class="result-header">
+                        <div class="result-title">
+                            <span>🎯</span> Generated Executive Summary
+                        </div>
+                        <div class="action-btn-group">
+                            <button class="btn-action" onclick="toggleAudioSpeech()" id="speechBtn">
+                                <span id="speechIcon">🔊</span> Listen
+                            </button>
+                            <button class="btn-action" onclick="copyResultText()">
+                                📋 Copy
+                            </button>
+                            <button class="btn-action" onclick="downloadResultText()">
+                                📥 Export
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="result-body" id="summaryOutput"></div>
+
                     <div class="stats-pills">
-                        <span class="stat-pill" id="inputWordCount">0 words</span>
-                        <span class="stat-pill" id="inputCharCount">0 chars</span>
-                    </div>
-                    <div class="btn-group">
-                        <input type="file" id="docUploadInput" accept=".txt,.pdf,.docx,.doc" style="display:none" onchange="handleFileUpload(event)">
-                        <button class="btn-sm" onclick="document.getElementById('docUploadInput').click()" title="Upload PDF, DOCX, or TXT file">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-                            Upload
-                        </button>
-                        <button class="btn-sm" onclick="clearText()" title="Clear text">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                            Clear
-                        </button>
-                        <button class="btn-primary" id="summarizeBtn" onclick="generateSummary()">
-                            <span id="btnIcon">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                            </span>
-                            <span id="btnLabel">Summarize</span>
-                        </button>
+                        <span class="stat-pill" id="resWordCount">0 words</span>
+                        <span class="stat-pill highlight" id="resReduction">0% reduced</span>
+                        <span class="stat-pill speed" id="resLatency">0ms</span>
+                        <span class="stat-pill" id="resEngine">Hybrid</span>
                     </div>
                 </div>
             </div>
 
-            <!-- Output Summary Card -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title-group">
-                        <div class="card-icon-badge icon-output">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
-                        </div>
-                        <span class="card-title">Executive Brief</span>
+            <!-- 2. DASHBOARD VIEW -->
+            <div class="view-section" id="view-dashboard">
+                <div class="center-hero" style="text-align: left; padding: 0;">
+                    <h1>🏠 Overview Dashboard</h1>
+                    <p>Real-time analytics and summaries generated across sessions.</p>
+                </div>
+
+                <div class="algorithm-grid">
+                    <div class="algorithm-card">
+                        <div class="algo-badge">Total Synthesized</div>
+                        <div class="algo-title" id="dashTotalCount">0 Documents</div>
+                        <div class="algo-desc">Lifetime sessions recorded</div>
                     </div>
-                    <div class="status-badge" id="statusBadge">
-                        <span class="dot"></span>
-                        <span id="statusText">Ready</span>
+                    <div class="algorithm-card">
+                        <div class="algo-badge">Avg Compression</div>
+                        <div class="algo-title" id="dashAvgCompression">68.5%</div>
+                        <div class="algo-desc">Average text condensation</div>
+                    </div>
+                    <div class="algorithm-card">
+                        <div class="algo-badge">Transformer ROUGE-1</div>
+                        <div class="algo-title">0.4352</div>
+                        <div class="algo-desc">Benchmark performance</div>
                     </div>
                 </div>
 
-                <div class="output-box" id="outputBox">
-                    <div class="empty-state" id="emptyState">
-                        <div class="empty-icon-wrap">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                        </div>
-                        <div class="empty-title">Ready for distillation</div>
-                        <div class="empty-desc">Paste your text, upload a PDF/DOCX, or pick a sample preset to run extractive or abstractive summarization.</div>
-                    </div>
-                    <div class="summary-content" id="summaryText"></div>
-                    <div class="keywords-bar" id="keywordsBar">
-                        <span style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Keywords:</span>
-                        <div id="keywordsList" style="display: flex; gap: 0.35rem; flex-wrap: wrap;"></div>
-                    </div>
+                <div class="input-card" style="margin-top: 1rem;">
+                    <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 0.5rem;">⚡ Quick Action</h3>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Ready to condense documents or transcripts into executive briefs?</p>
+                    <button class="btn-generate" style="padding: 0.6rem 1.8rem; font-size: 0.9rem;" onclick="switchTab('summarize')">Open Summarizer</button>
+                </div>
+            </div>
+
+            <!-- 3. DOCUMENTS VIEW -->
+            <div class="view-section" id="view-documents">
+                <div class="center-hero" style="text-align: left; padding: 0;">
+                    <h1>📄 Document Parser & Storage</h1>
+                    <p>Upload multi-page PDF, DOCX, and TXT files for automated text ingestion.</p>
                 </div>
 
-                <div class="card-footer">
-                    <div class="stats-pills">
-                        <span class="stat-pill" id="statWords">0 words</span>
-                        <span class="stat-pill highlight" id="statReduction" style="display: none;">0% reduced</span>
-                        <span class="stat-pill speed" id="statTime" style="display: none;">0ms</span>
-                    </div>
-                    <div class="btn-group">
-                        <button class="btn-sm" onclick="toggleSpeech()" id="speechBtn" title="Read summary aloud">
-                            <span id="speechIcon">
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-                            </span>
-                            Listen
-                        </button>
-                        <button class="btn-sm" onclick="copySummary()" title="Copy to clipboard">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                            Copy
-                        </button>
-                        <button class="btn-sm" onclick="downloadSummary()" title="Download text file">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                            Export
-                        </button>
+                <div class="input-card" style="text-align: center; padding: 2.5rem 1.5rem; border: 2px dashed #cbd5e1; cursor: pointer;" onclick="document.getElementById('fileInput').click()">
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">📁</div>
+                    <div style="font-weight: 700; font-size: 1.05rem;">Click to upload document</div>
+                    <div style="font-size: 0.84rem; color: var(--text-muted); margin-top: 0.25rem;">Supports Adobe PDF (.pdf), Microsoft Word (.docx), and Plaintext (.txt)</div>
+                </div>
+            </div>
+
+            <!-- 4. HISTORY VIEW -->
+            <div class="view-section" id="view-history">
+                <div class="center-hero" style="text-align: left; padding: 0;">
+                    <h1>🕘 Summary History</h1>
+                    <p>Review past summaries, timestamps, and compression metrics.</p>
+                </div>
+
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Algorithm</th>
+                                <th>Mode</th>
+                                <th>Original / Summary</th>
+                                <th>Compression</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody">
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">No historical summaries yet. Generate one in the Summarize tab!</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 5. ANALYTICS & BENCHMARKS VIEW -->
+            <div class="view-section" id="view-analytics">
+                <div class="center-hero" style="text-align: left; padding: 0;">
+                    <h1>📊 Model Telemetry & ROUGE Benchmarks</h1>
+                    <p>Evaluation scores on dialogue datasets and transformer inference telemetry.</p>
+                </div>
+
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Model Architecture</th>
+                                <th>ROUGE-1</th>
+                                <th>ROUGE-2</th>
+                                <th>ROUGE-L</th>
+                                <th>ROUGE-Lsum</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="font-weight: 700; color: var(--primary);">google/pegasus-cnn_dailymail</td>
+                                <td>0.4352</td>
+                                <td>0.2014</td>
+                                <td>0.3541</td>
+                                <td>0.3812</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 6. SETTINGS VIEW -->
+            <div class="view-section" id="view-settings">
+                <div class="center-hero" style="text-align: left; padding: 0;">
+                    <h1>⚙️ System Settings</h1>
+                    <p>Configure model backend and pipeline endpoints.</p>
+                </div>
+
+                <div class="input-card">
+                    <div style="font-weight: 700; font-size: 0.95rem;">API Status</div>
+                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">Connected to FastAPI Engine v1.0.0 (Port 8080)</div>
+                    <div style="margin-top: 1rem;">
+                        <button class="btn-action" onclick="checkApiHealth()">Test Backend Health</button>
                     </div>
                 </div>
             </div>
-        </div>
-    </main>
+        </main>
+    </div>
 
-    <!-- Architecture & Evaluation Modal -->
-    <div class="modal-overlay" id="telemetryModal" onclick="closeModalOnBackdrop(event)">
+    <!-- Help Modal -->
+    <div class="modal-overlay" id="helpModal" onclick="closeHelpOnBackdrop(event)">
         <div class="modal-content">
             <div class="modal-header">
                 <div>
-                    <h3 style="color: var(--text-main); font-size: 1.15rem; font-weight: 700;">System Architecture & NLP Pipeline</h3>
-                    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">End-to-End MLOps Pipeline, Document Parsing & Transformer Benchmarks</p>
+                    <h3 style="font-size: 1.1rem; font-weight: 700;">✦ SUMMARIX Architecture & Help</h3>
+                    <p style="font-size: 0.8rem; color: var(--text-muted);">How Extractive & Abstractive Summarization Works</p>
                 </div>
-                <button class="modal-close" onclick="closeModal()">&times;</button>
+                <button class="modal-close" onclick="closeHelpModal()">&times;</button>
             </div>
 
             <div>
-                <h4 style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.6rem; font-weight: 700;">System & NLP Architecture Flow</h4>
-                <div class="arch-visual-flow">
-                    <div class="flow-card">
-                        <div class="flow-icon">📥</div>
-                        <div class="flow-info">
-                            <div class="flow-title">User Input</div>
-                            <div class="flow-sub">Direct Text &bull; PDF &bull; DOCX &bull; TXT Multi-Format</div>
-                        </div>
-                    </div>
-                    <div class="flow-arrow">&darr;</div>
-
-                    <div class="flow-card">
-                        <div class="flow-icon">⚙️</div>
-                        <div class="flow-info">
-                            <div class="flow-title">Text Extraction & Preprocessing</div>
-                            <div class="flow-sub">DOCX XML extraction, stream parsing, whitespace normalization</div>
-                        </div>
-                    </div>
-                    <div class="flow-arrow">&darr;</div>
-
-                    <div class="flow-card">
-                        <div class="flow-icon">🔍</div>
-                        <div class="flow-info">
-                            <div class="flow-title">NLP Processing</div>
-                            <div class="flow-sub">Tokenization &bull; Sentence Splitting &bull; Keyword Saliency</div>
-                        </div>
-                    </div>
-                    <div class="flow-arrow">&darr;</div>
-
-                    <div class="flow-branches">
-                        <div class="branch-card extractive">
-                            <div class="branch-badge">Extractive Engine</div>
-                            <div class="branch-title">TF-IDF / TextRank</div>
-                            <div class="branch-desc">Sentence scoring, position weighting & keyword density</div>
-                        </div>
-                        <div class="branch-card abstractive">
-                            <div class="branch-badge">Abstractive Engine</div>
-                            <div class="branch-title">Pegasus Transformer</div>
-                            <div class="branch-desc">Deep Seq2Seq neural encoder-decoder beam search</div>
-                        </div>
-                    </div>
-                    <div class="flow-arrow">&darr;</div>
-
-                    <div class="flow-card highlight">
-                        <div class="flow-icon">📄</div>
-                        <div class="flow-info">
-                            <div class="flow-title">Generated Summary</div>
-                            <div class="flow-sub">Distilled Executive Brief + Compression Analytics</div>
-                        </div>
-                    </div>
-                    <div class="flow-arrow">&darr;</div>
-
-                    <div class="flow-card">
-                        <div class="flow-icon">📈</div>
-                        <div class="flow-info">
-                            <div class="flow-title">Evaluation & Benchmarking</div>
-                            <div class="flow-sub">ROUGE-1, ROUGE-2, ROUGE-L & Latency Telemetry</div>
-                        </div>
-                    </div>
-                </div>
+                <h4 style="font-size: 0.88rem; font-weight: 700; margin-bottom: 0.4rem;">Summarization Engines</h4>
+                <p style="font-size: 0.84rem; color: var(--text-secondary); line-height: 1.6;">
+                    <strong>Extractive (TF-IDF):</strong> Ranks original sentences based on vocabulary frequency, position bias, and semantic density, returning the most representative excerpts.<br>
+                    <strong>Abstractive (Transformer):</strong> Uses Google Pegasus encoder-decoder neural attention to write fresh sentences distilling high-impact executive briefs.<br>
+                    <strong>Hybrid (Auto):</strong> Automatically routes the document to the optimal pipeline with resilience fallbacks.
+                </p>
             </div>
 
-            <div>
-                <h4 style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.6rem; font-weight: 700;">Modular Pipeline Stages</h4>
-                <div class="pipeline-steps">
-                    <div class="step-item active">
-                        <div style="font-size: 0.7rem; color: var(--primary); font-weight: 700;">STAGE 01</div>
-                        <div style="font-size: 0.8rem; font-weight: 700; margin-top: 2px;">Data Ingestion</div>
-                    </div>
-                    <div style="color: var(--text-muted);">&rarr;</div>
-                    <div class="step-item active">
-                        <div style="font-size: 0.7rem; color: var(--primary); font-weight: 700;">STAGE 02</div>
-                        <div style="font-size: 0.8rem; font-weight: 700; margin-top: 2px;">Validation</div>
-                    </div>
-                    <div style="color: var(--text-muted);">&rarr;</div>
-                    <div class="step-item active">
-                        <div style="font-size: 0.7rem; color: var(--primary); font-weight: 700;">STAGE 03</div>
-                        <div style="font-size: 0.8rem; font-weight: 700; margin-top: 2px;">Transformation</div>
-                    </div>
-                    <div style="color: var(--text-muted);">&rarr;</div>
-                    <div class="step-item active">
-                        <div style="font-size: 0.7rem; color: var(--primary); font-weight: 700;">STAGE 04</div>
-                        <div style="font-size: 0.8rem; font-weight: 700; margin-top: 2px;">Model Trainer</div>
-                    </div>
-                    <div style="color: var(--text-muted);">&rarr;</div>
-                    <div class="step-item active">
-                        <div style="font-size: 0.7rem; color: var(--primary); font-weight: 700;">STAGE 05</div>
-                        <div style="font-size: 0.8rem; font-weight: 700; margin-top: 2px;">Evaluation</div>
-                    </div>
-                </div>
-            </div>
-
-            <div>
-                <h4 style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.6rem; font-weight: 700;">Benchmark Metrics (SAMSum Test Split)</h4>
-                <table class="table-light">
-                    <thead>
-                        <tr>
-                            <th>Model Architecture</th>
-                            <th>ROUGE-1</th>
-                            <th>ROUGE-2</th>
-                            <th>ROUGE-L</th>
-                            <th>ROUGE-Lsum</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td style="font-weight: 700; color: var(--primary);">google/pegasus-cnn_dailymail</td>
-                            <td>0.4352</td>
-                            <td>0.2014</td>
-                            <td>0.3541</td>
-                            <td>0.3812</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 1rem;">
-                <span style="font-size: 0.75rem; color: var(--text-muted);">Trained with PyTorch & HuggingFace Transformers</span>
-                <button class="btn-sm" onclick="closeModal()">Close</button>
+            <div style="display: flex; justify-content: flex-end; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+                <button class="btn-action" onclick="closeHelpModal()">Close</button>
             </div>
         </div>
     </div>
@@ -1225,59 +1100,66 @@
         <span id="toastMsg">Action completed</span>
     </div>
 
-    <!-- Footer -->
-    <footer>
-        <div>LexiBrief &bull; High-Performance NLP Summarization Engine</div>
-        <div>FastAPI &bull; Hugging Face Transformers &bull; PyTorch</div>
-    </footer>
-
     <script>
+        let selectedAlgorithm = "auto";
         let currentMode = "balanced";
-        let presets = {
-            "meeting": `Alex: Hey everyone, let's do a quick sync on the Q3 release deliverables.\nSarah: The data pipeline refactoring is finished. Ingestion throughput is up by 45%.\nMichael: Awesome. Frontend migration to the new design system is 90% done. Just ironing out a few responsive glitches on tablet views.\nAlex: Great work. What about the model training and AWS ECR CI/CD pipeline?\nDavid: Docker images are building cleanly, and the automated evaluation tests passed with ROUGE-1 score of 0.42. We're scheduled to deploy to EC2 on Thursday.\nAlex: Perfect! Let's lock in Thursday morning for the staging deployment and notify the product team.\nSarah: Sounds like a plan. I'll prepare the release notes.`,
-            "technews": `Artificial intelligence research laboratories have unveiled a new generation of encoder-decoder transformer architectures specifically optimized for abstractive document comprehension and summarization. By employing advanced sparse attention mechanisms and memory-efficient sequence-to-sequence fine-tuning, the new models achieve human-parity synthesis while reducing computational energy requirements by over 60 percent. Industry analysts predict this breakthrough will drastically streamline corporate workflows across legal discovery, medical literature review, and financial reporting, allowing knowledge workers to distill multi-hundred-page dossiers into actionable executive briefs in real time.`,
-            "support": `Customer: Hi, our production API integration began throwing 429 rate limit errors starting at 08:00 UTC today despite us being on the Enterprise tier.\nAgent: Hello! I apologize for the disruption. Let me pull up your account credentials and system logs right away.\nCustomer: Thanks, our payment webhook processing is currently queued up.\nAgent: I have located the issue. A recent load balancer update temporarily misclassified your API key pool. I have applied an immediate hotfix to whitelist your endpoint and doubled your burst concurrency limits.\nCustomer: Verified on our dashboard! Traffic is clearing normally now and queue is draining.\nAgent: Excellent to hear. I have filed an internal incident report to ensure this edge case is permanently prevented in future deployments.`,
-            "research": `Recent investigations into multi-modal deep learning architectures have demonstrated substantial efficacy in unifying cross-domain sequence reasoning. This study evaluates the generalization capability of pre-trained language models when fine-tuned on highly specialized domain taxonomies without auxiliary knowledge graphs. Empirical benchmarking across five diverse corpora reveals that selective layer unfreezing paired with adaptive learning rate warmup yields a 14.8% relative gain in semantic fidelity and reduces hallucination rates from 8.2% to 1.9%. These findings validate the hypothesis that intermediate representation regularization is critical for robust domain-adapted abstractive summarization.`
-        };
         let synth = window.speechSynthesis;
         let isSpeaking = false;
+        let historyLog = [];
 
-        // Fetch presets from API dynamically as well
-        window.addEventListener('DOMContentLoaded', async () => {
-            try {
-                const res = await fetch('/api/presets');
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.presets) {
-                        data.presets.forEach(p => presets[p.id] = p.text);
-                    }
-                }
-            } catch (e) {
-                console.log("Using built-in presets");
-            }
-        });
+        const PRESET_SAMPLES = {
+            "meeting": `Alex: Hey everyone, let's do a quick sync on the Q3 release deliverables.\nSarah: The data pipeline refactoring is finished. Ingestion throughput is up by 45%.\nMichael: Awesome. Frontend migration to the new design system is 90% done. Just ironing out a few responsive glitches on tablet views.\nAlex: Great work. What about the model training and AWS ECR CI/CD pipeline?\nDavid: Docker images are building cleanly, and the automated evaluation tests passed with ROUGE-1 score of 0.42. We're scheduled to deploy to EC2 on Thursday.\nAlex: Perfect! Let's lock in Thursday morning for the staging deployment and notify the product team.\nSarah: Sounds like a plan. I'll prepare the release notes.`,
+            "technews": `Artificial intelligence research laboratories have unveiled a new generation of encoder-decoder transformer architectures specifically optimized for abstractive document comprehension and summarization. By employing advanced sparse attention mechanisms and memory-efficient sequence-to-sequence fine-tuning, the new models achieve human-parity synthesis while reducing computational energy requirements by over 60 percent. Industry analysts predict this breakthrough will drastically streamline corporate workflows across legal discovery, medical literature review, and financial reporting, allowing knowledge workers to distill multi-hundred-page dossiers into actionable executive briefs in real time.`,
+            "research": `Recent investigations into multi-modal deep learning architectures have demonstrated substantial efficacy in unifying cross-domain sequence reasoning. This study evaluates the generalization capability of pre-trained language models when fine-tuned on highly specialized domain taxonomies without auxiliary knowledge graphs. Empirical benchmarking across five diverse corpora reveals that selective layer unfreezing paired with adaptive learning rate warmup yields a 14.8% relative gain in semantic fidelity and reduces hallucination rates from 8.2% to 1.9%. These findings validate the hypothesis that intermediate representation regularization is critical for robust domain-adapted abstractive summarization.`
+        };
 
-        function setMode(mode) {
-            currentMode = mode;
-            ['concise', 'balanced', 'detailed'].forEach(m => {
-                const btn = document.getElementById(`mode-${m}`);
-                if (btn) btn.classList.toggle('active', m === mode);
+        function switchTab(tabId) {
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+
+            const navEl = document.getElementById(`nav-${tabId}`);
+            const viewEl = document.getElementById(`view-${tabId}`);
+            if (navEl) navEl.classList.add('active');
+            if (viewEl) viewEl.classList.add('active');
+        }
+
+        function selectAlgorithm(algo) {
+            selectedAlgorithm = algo;
+            ['extractive', 'abstractive', 'hybrid'].forEach(a => {
+                const el = document.getElementById(`algo-${a}`);
+                if (el) el.classList.remove('active');
             });
+            const activeId = algo === 'auto' ? 'algo-hybrid' : `algo-${algo}`;
+            const target = document.getElementById(activeId);
+            if (target) target.classList.add('active');
         }
 
-        function loadPreset(id) {
-            if (presets[id]) {
-                document.getElementById('inputText').value = presets[id];
-                updateStats();
-                showToast("Sample loaded! Click Summarize.");
+        function handleSliderChange(val) {
+            const badge = document.getElementById('sliderBadge');
+            if (val == 1) {
+                currentMode = "concise";
+                badge.innerText = "Concise (25%)";
+            } else if (val == 2) {
+                currentMode = "balanced";
+                badge.innerText = "Balanced (40%)";
+            } else {
+                currentMode = "detailed";
+                badge.innerText = "Detailed (60%)";
             }
         }
 
-        function updateStats() {
-            const text = document.getElementById('inputText').value;
-            const words = text.trim() ? text.trim().split(/\s+/).length : 0;
-            document.getElementById('inputWordCount').innerText = `${words} words`;
-            document.getElementById('inputCharCount').innerText = `${text.length} chars`;
+        function loadSample(key) {
+            if (PRESET_SAMPLES[key]) {
+                document.getElementById('inputText').value = PRESET_SAMPLES[key];
+                showToast("Loaded sample preset!");
+            }
+        }
+
+        function clearEditor() {
+            document.getElementById('inputText').value = "";
+            document.getElementById('resultCard').style.display = "none";
+            document.getElementById('summaryOutput').innerText = "";
+            stopAudioSpeech();
         }
 
         async function handleFileUpload(e) {
@@ -1287,7 +1169,7 @@
             const formData = new FormData();
             formData.append("file", file);
 
-            showToast(`Uploading and extracting ${file.name}...`);
+            showToast(`Uploading ${file.name}...`);
             try {
                 const res = await fetch('/api/upload', {
                     method: 'POST',
@@ -1299,8 +1181,8 @@
                 }
                 const data = await res.json();
                 document.getElementById('inputText').value = data.text;
-                updateStats();
-                showToast(`Successfully extracted ${data.format} file (${data.stats.words} words)!`);
+                switchTab('summarize');
+                showToast(`Extracted ${data.format} file (${data.stats.words} words)!`);
             } catch (err) {
                 showToast("Upload error: " + err.message);
             } finally {
@@ -1308,64 +1190,32 @@
             }
         }
 
-        function clearText() {
-            document.getElementById('inputText').value = "";
-            updateStats();
-            stopSpeech();
-            const summaryEl = document.getElementById('summaryText');
-            summaryEl.innerText = "";
-            summaryEl.style.display = "none";
-            document.getElementById('emptyState').style.display = "flex";
-            document.getElementById('statWords').innerText = "0 words";
-            document.getElementById('statReduction').style.display = "none";
-            document.getElementById('statTime').style.display = "none";
-            document.getElementById('keywordsBar').style.display = "none";
-            document.getElementById('keywordsList').innerHTML = "";
-            
-            const badge = document.getElementById('statusBadge');
-            badge.className = "status-badge";
-            document.getElementById('statusText').innerText = "Ready";
-        }
-
-        async function generateSummary() {
+        async function runSummarization() {
             const text = document.getElementById('inputText').value.trim();
             if (!text) {
                 showToast("Please enter or upload text to summarize.");
                 return;
             }
 
-            const method = document.getElementById('engineMethod').value;
-            const btn = document.getElementById('summarizeBtn');
-            const btnIcon = document.getElementById('btnIcon');
-            const btnLabel = document.getElementById('btnLabel');
-            const emptyState = document.getElementById('emptyState');
-            const summaryText = document.getElementById('summaryText');
-            const badge = document.getElementById('statusBadge');
-            const statusText = document.getElementById('statusText');
-            const keywordsBar = document.getElementById('keywordsBar');
-            const keywordsList = document.getElementById('keywordsList');
+            const btn = document.getElementById('generateBtn');
+            const icon = document.getElementById('genBtnIcon');
+            const label = document.getElementById('genBtnLabel');
+            const resultCard = document.getElementById('resultCard');
+            const summaryOutput = document.getElementById('summaryOutput');
 
             btn.disabled = true;
-            btnIcon.innerHTML = '<div class="spinner"></div>';
-            btnLabel.innerText = 'Processing...';
-
-            badge.className = "status-badge active";
-            statusText.innerText = "Summarizing...";
-
-            emptyState.innerHTML = `
-                <div class="spinner" style="border-color: rgba(79, 70, 229, 0.2); border-top-color: var(--primary); width: 28px; height: 28px;"></div>
-                <div class="empty-title" style="color: var(--primary); margin-top: 0.6rem;">Generating Executive Brief...</div>
-                <div class="empty-desc">Running sequence distillation and keyword extraction.</div>
-            `;
-            emptyState.style.display = 'flex';
-            summaryText.style.display = 'none';
-            keywordsBar.style.display = 'none';
+            icon.innerHTML = '<div class="spinner"></div>';
+            label.innerText = 'Distilling text...';
 
             try {
                 const res = await fetch('/predict', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: text, mode: currentMode, method: method })
+                    body: JSON.stringify({
+                        text: text,
+                        mode: currentMode,
+                        method: selectedAlgorithm
+                    })
                 });
 
                 if (!res.ok) {
@@ -1374,106 +1224,102 @@
                 }
 
                 const data = await res.json();
-                const summary = data.summary || "No summary produced.";
+                const summary = data.summary || "No summary generated.";
 
-                emptyState.style.display = 'none';
-                summaryText.style.display = 'block';
-                summaryText.innerText = summary;
-
-                // Render keywords
-                if (data.keywords && data.keywords.length > 0) {
-                    keywordsList.innerHTML = data.keywords.map(k => `<span class="keyword-tag">#${k.keyword}</span>`).join('');
-                    keywordsBar.style.display = 'flex';
-                } else {
-                    keywordsBar.style.display = 'none';
-                }
+                summaryOutput.innerText = summary;
+                resultCard.style.display = 'flex';
 
                 const a = data.analytics || {};
                 const sumWords = a.summary_words || summary.trim().split(/\s+/).length;
-                document.getElementById('statWords').innerText = `${sumWords} words`;
+                document.getElementById('resWordCount').innerText = `${sumWords} words`;
+                document.getElementById('resReduction').innerText = `${a.compression_ratio || '50%'} reduced`;
+                document.getElementById('resLatency').innerText = `${a.latency_ms || 120}ms`;
+                document.getElementById('resEngine').innerText = data.method_used ? data.method_used.split(' ')[0] : "Hybrid";
 
-                if (a.compression_ratio) {
-                    const redEl = document.getElementById('statReduction');
-                    redEl.style.display = 'inline-flex';
-                    redEl.innerText = `${a.compression_ratio} condensed`;
-                }
+                // Add to history
+                addHistoryRecord({
+                    time: new Date().toLocaleTimeString(),
+                    algo: data.method_used || selectedAlgorithm,
+                    mode: currentMode,
+                    origWords: a.original_words || text.split(/\s+/).length,
+                    sumWords: sumWords,
+                    reduction: a.compression_ratio || '50%',
+                    summary: summary
+                });
 
-                if (a.latency_ms) {
-                    const timeEl = document.getElementById('statTime');
-                    timeEl.style.display = 'inline-flex';
-                    timeEl.innerText = `${a.latency_ms}ms`;
-                }
-
-                badge.className = "status-badge active";
-                statusText.innerText = data.method_used ? data.method_used.split(' ')[0] : "Generated";
-                showToast("Executive Brief generated!");
+                showToast("Summary generated successfully!");
             } catch (err) {
-                emptyState.style.display = 'flex';
-                emptyState.innerHTML = `
-                    <div style="color: #dc2626; font-weight: 700; font-size: 0.95rem;">Inference Notice</div>
-                    <div style="color: var(--text-muted); font-size: 0.85rem; max-width: 320px;">${err.message}</div>
-                `;
-                badge.className = "status-badge";
-                statusText.innerText = "Error";
+                showToast("Error: " + err.message);
             } finally {
                 btn.disabled = false;
-                btnIcon.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
-                btnLabel.innerText = 'Summarize';
+                icon.innerText = '✨';
+                label.innerText = 'Generate Summary';
             }
         }
 
-        function copySummary() {
-            const summary = document.getElementById('summaryText').innerText;
-            if (summary && summary.trim()) {
-                navigator.clipboard.writeText(summary);
+        function addHistoryRecord(item) {
+            historyLog.unshift(item);
+            document.getElementById('dashTotalCount').innerText = `${historyLog.length} Documents`;
+            
+            const tbody = document.getElementById('historyTableBody');
+            tbody.innerHTML = historyLog.map((h, i) => `
+                <tr>
+                    <td>${h.time}</td>
+                    <td><span class="stat-pill">${h.algo}</span></td>
+                    <td style="text-transform: capitalize;">${h.mode}</td>
+                    <td>${h.origWords} &rarr; ${h.sumWords} words</td>
+                    <td><span class="stat-pill highlight">${h.reduction}</span></td>
+                    <td>
+                        <button class="btn-action" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="navigator.clipboard.writeText('${h.summary.replace(/'/g, "\\'")}'); showToast('Copied to clipboard!');">Copy</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function copyResultText() {
+            const txt = document.getElementById('summaryOutput').innerText;
+            if (txt) {
+                navigator.clipboard.writeText(txt);
                 showToast("Copied to clipboard!");
-            } else {
-                showToast("No summary to copy.");
             }
         }
 
-        function downloadSummary() {
-            const summary = document.getElementById('summaryText').innerText;
-            if (!summary || !summary.trim()) {
-                showToast("No summary to export.");
-                return;
-            }
-            const blob = new Blob([summary], { type: 'text/plain;charset=utf-8;' });
+        function downloadResultText() {
+            const txt = document.getElementById('summaryOutput').innerText;
+            if (!txt) return;
+            const blob = new Blob([txt], { type: 'text/plain;charset=utf-8;' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = `LexiBrief_Summary_${Date.now()}.txt`;
+            link.download = `SUMMARIX_Brief_${Date.now()}.txt`;
             link.click();
-            showToast("Summary exported!");
+            showToast("Downloaded text brief!");
         }
 
-        function toggleSpeech() {
-            const summary = document.getElementById('summaryText').innerText;
-            if (!summary || !summary.trim()) {
-                showToast("No summary to read.");
-                return;
-            }
+        function toggleAudioSpeech() {
+            const txt = document.getElementById('summaryOutput').innerText;
+            if (!txt) return;
             if (isSpeaking) {
-                stopSpeech();
+                stopAudioSpeech();
             } else {
-                startSpeech(summary);
+                startAudioSpeech(txt);
             }
         }
 
-        function startSpeech(text) {
+        function startAudioSpeech(text) {
             if (!synth) return;
             synth.cancel();
             const utterance = new SpeechSynthesisUtterance(text);
-            utterance.onend = () => stopSpeech();
-            utterance.onerror = () => stopSpeech();
+            utterance.onend = () => stopAudioSpeech();
+            utterance.onerror = () => stopAudioSpeech();
             synth.speak(utterance);
             isSpeaking = true;
-            document.getElementById('speechIcon').innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
+            document.getElementById('speechIcon').innerText = '⏹️';
         }
 
-        function stopSpeech() {
+        function stopAudioSpeech() {
             if (synth) synth.cancel();
             isSpeaking = false;
-            document.getElementById('speechIcon').innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>';
+            document.getElementById('speechIcon').innerText = '🔊';
         }
 
         function showToast(msg) {
@@ -1483,16 +1329,26 @@
             setTimeout(() => { toast.style.display = 'none'; }, 2600);
         }
 
-        function openModal() {
-            document.getElementById('telemetryModal').style.display = 'flex';
+        function openHelpModal() {
+            document.getElementById('helpModal').style.display = 'flex';
         }
 
-        function closeModal() {
-            document.getElementById('telemetryModal').style.display = 'none';
+        function closeHelpModal() {
+            document.getElementById('helpModal').style.display = 'none';
         }
 
-        function closeModalOnBackdrop(e) {
-            if (e.target.id === 'telemetryModal') closeModal();
+        function closeHelpOnBackdrop(e) {
+            if (e.target.id === 'helpModal') closeHelpModal();
+        }
+
+        async function checkApiHealth() {
+            try {
+                const res = await fetch('/api/health');
+                const data = await res.json();
+                showToast("API Status: " + data.status.toUpperCase());
+            } catch (e) {
+                showToast("API unreachable: " + e.message);
+            }
         }
     </script>
 </body>
