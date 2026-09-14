@@ -61,36 +61,47 @@ class TextExtractor:
 
     @staticmethod
     def extract_from_pdf(file_bytes: bytes) -> Tuple[str, int]:
-        """Extracts text from PDF files using pypdf if available or regex text stream parsing. Returns (text, page_count)."""
-        # Try pypdf if installed
+        """Extracts text from PDF files using pypdf with per-page resilience and regex stream fallback. Returns (text, page_count)."""
+        # 1. Primary extractor: pypdf with resilient per-page extraction
         try:
             import pypdf
-            reader = pypdf.PdfReader(io.BytesIO(file_bytes))
+            reader = pypdf.PdfReader(io.BytesIO(file_bytes), strict=False)
+            if getattr(reader, "is_encrypted", False):
+                try:
+                    reader.decrypt("")
+                except Exception:
+                    pass
             pages = []
-            page_count = len(reader.pages)
-            for page in reader.pages:
-                text = page.extract_text()
-                if text:
-                    pages.append(text)
+            page_count = len(reader.pages) if hasattr(reader, "pages") else 1
+            for idx, page in enumerate(reader.pages):
+                try:
+                    text = page.extract_text()
+                    if text and text.strip():
+                        pages.append(text.strip())
+                except Exception as p_err:
+                    logger.debug(f"pypdf page {idx+1} extract notice: {p_err}")
             if pages:
                 return "\n\n".join(pages), max(1, page_count)
-            return "", max(1, page_count)
         except ImportError:
             pass
         except Exception as e:
-            logger.warning(f"pypdf extraction notice: {e}")
+            logger.warning(f"pypdf extraction error: {e}")
 
-        # Stream extraction fallback for PDF text blocks
+        # 2. Resilient fallback for raw text streams
         try:
             content = file_bytes.decode('latin-1', errors='ignore')
             text_blocks = _RE_PDF_TEXT_BLOCKS.findall(content)
             if text_blocks:
-                return " ".join(text_blocks), 1
+                cleaned_blocks = [b.strip() for b in text_blocks if len(b.strip()) > 1]
+                if cleaned_blocks:
+                    return " ".join(cleaned_blocks), 1
             cleaned = _RE_NON_PRINTABLE_PDF.sub('', content)
             readable = _RE_READABLE_CHUNKS.findall(cleaned)
-            return " ".join(readable), 1
+            if readable:
+                return " ".join(readable), 1
+            return file_bytes.decode('utf-8', errors='ignore'), 1
         except Exception as e:
-            logger.error(f"PDF extraction error: {e}")
+            logger.error(f"PDF stream fallback error: {e}")
             return file_bytes.decode('utf-8', errors='ignore'), 1
 
     @classmethod

@@ -220,7 +220,7 @@ class MongoDBManager:
             "characters": doc_data.get("stats", {}).get("characters", 0),
             "sentences": doc_data.get("stats", {}).get("sentences", 0),
             "readability_score": doc_data.get("stats", {}).get("readability_score", 0),
-            "keywords": [k.get("keyword", "") for k in doc_data.get("keywords", [])],
+            "keywords": [k.get("keyword", "") if isinstance(k, dict) else str(k) for k in doc_data.get("keywords", [])],
             "uploaded_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         }
 

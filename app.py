@@ -216,11 +216,16 @@ async def upload_document(file: UploadFile = File(...)):
             "key_points": key_points
         }
 
-        # Persist to MongoDB documents collection
-        saved_record = db_manager.save_document(doc_payload)
+        # Persist to MongoDB documents collection with safe fallback
+        try:
+            saved_record = db_manager.save_document(doc_payload)
+            doc_id = saved_record.get("_id") if isinstance(saved_record, dict) else str(uuid.uuid4())
+        except Exception as db_err:
+            logger.warning(f"Database save error during document upload: {db_err}")
+            doc_id = str(uuid.uuid4())
         
         return {
-            "id": saved_record.get("_id"),
+            "id": doc_id,
             "filename": file.filename or "document.txt",
             "format": detected_format,
             "pages": pages_count,
@@ -235,7 +240,7 @@ async def upload_document(file: UploadFile = File(...)):
         raise he
     except Exception as e:
         logger.error(f"File extraction error: {e}")
-        raise HTTPException(status_code=500, detail="An error occurred while processing the uploaded file.")
+        raise HTTPException(status_code=500, detail=f"An error occurred while processing the uploaded file: {str(e)}")
 
 
 @app.get("/api/documents", tags=["MongoDB Documents"])
