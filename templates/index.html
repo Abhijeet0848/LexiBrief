@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LexiBrief | AI Text Summarizer</title>
+    <link rel="icon" type="image/jpeg" href="/static/icon.jpg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-page: #f8fafc;
+            --bg-card: #ffffff;
+            --bg-card-subtle: #f1f5f9;
+            --border-color: #e2e8f0;
+            --border-hover: #cbd5e1;
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --primary-light: #eef2ff;
+            --text-main: #0f172a;
+            --text-secondary: #475569;
+            --text-muted: #64748b;
+            --success: #10b981;
+            --success-bg: #ecfdf5;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+            --radius-lg: 14px;
+            --radius-md: 8px;
+            --radius-sm: 6px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            background-color: var(--bg-page);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Clean Light Header */
+        header {
+            background: #ffffff;
+            border-bottom: 1px solid var(--border-color);
+            padding: 0.9rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.65rem;
+            text-decoration: none;
+            color: var(--text-main);
+            transition: opacity 0.15s ease;
+        }
+
+        .brand:hover {
+            opacity: 0.88;
+        }
+
+        .logo-symbol {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: #ffffff;
+            box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);
+            flex-shrink: 0;
+        }
+
+        .brand-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+            color: var(--text-main);
+        }
+
+        .brand-subtitle {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            font-weight: 500;
+            margin-left: 2px;
+        }
+
+        .nav-items {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            background: var(--success-bg);
+            color: #047857;
+            border: 1px solid #a7f3d0;
+            padding: 0.3rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.78rem;
+            font-weight: 600;
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            background: var(--success);
+            border-radius: 50%;
+        }
+
+        .btn-outline {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 0.45rem 0.9rem;
+            border-radius: var(--radius-md);
+            font-size: 0.85rem;
+            font-weight: 500;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .btn-outline:hover {
+            background: var(--bg-card-subtle);
+            color: var(--text-main);
+            border-color: var(--border-hover);
+        }
+
+        /* Main Workspace Container */
+        main {
+            flex: 1;
+            max-width: 1240px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 1.75rem 1.5rem 2.5rem 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+
+
+        /* Dual Editor Grid */
+        .editor-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.25rem;
+        }
+
+        @media (max-width: 860px) {
+            .editor-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.85rem;
+            box-shadow: var(--shadow-sm);
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .card:focus-within {
+            border-color: #a5b4fc;
+            box-shadow: var(--shadow-md);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        /* Mode Selector */
+        .mode-group {
+            display: flex;
+            background: var(--bg-card-subtle);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 2px;
+        }
+
+        .mode-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 0.25rem 0.75rem;
+            border-radius: 16px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .mode-btn.active {
+            background: #ffffff;
+            color: var(--primary);
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* Textareas & Output Area */
+        textarea {
+            width: 100%;
+            height: 340px;
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 1rem;
+            color: var(--text-main);
+            font-size: 0.92rem;
+            line-height: 1.65;
+            resize: none;
+            outline: none;
+            transition: border-color 0.15s ease;
+        }
+
+        textarea:focus {
+            border-color: var(--primary);
+        }
+
+        textarea::placeholder {
+            color: #94a3b8;
+        }
+
+        .output-box {
+            width: 100%;
+            height: 340px;
+            background: #f8fafc;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 1rem;
+            color: var(--text-main);
+            font-size: 0.95rem;
+            line-height: 1.7;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #94a3b8;
+            text-align: center;
+            gap: 0.5rem;
+        }
+
+        .empty-icon {
+            font-size: 1.8rem;
+            opacity: 0.6;
+        }
+
+        .card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 0.25rem;
+        }
+
+        .stats-text {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 0.85rem;
+        }
+
+        .stats-text span {
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        /* Buttons */
+        .btn-primary {
+            background: var(--primary);
+            border: 1px solid var(--primary);
+            color: #ffffff;
+            padding: 0.55rem 1.4rem;
+            border-radius: var(--radius-md);
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            transition: all 0.15s ease;
+            box-shadow: 0 2px 4px rgba(79, 70, 229, 0.2);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(79, 70, 229, 0.3);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-group {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+        }
+
+        .btn-sm {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 0.45rem 0.75rem;
+            border-radius: var(--radius-md);
+            font-size: 0.82rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .btn-sm:hover {
+            background: var(--bg-card-subtle);
+            color: var(--text-main);
+            border-color: var(--border-hover);
+        }
+
+        /* Bottom Analytics Cards */
+        .analytics-strip {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .analytics-strip {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .metric-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 1rem 1.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .metric-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            margin-bottom: 0.2rem;
+        }
+
+        .metric-val {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .metric-icon {
+            font-size: 1.25rem;
+            background: var(--bg-card-subtle);
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Clean Light Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(15, 23, 42, 0.4);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 1rem;
+        }
+
+        .modal-content {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            max-width: 760px;
+            width: 100%;
+            padding: 1.75rem;
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.75rem;
+        }
+
+        .modal-close {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.4rem;
+            cursor: pointer;
+        }
+
+        .pipeline-steps {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            overflow-x: auto;
+            padding: 0.75rem 0;
+        }
+
+        .step-item {
+            background: var(--bg-card-subtle);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 0.65rem 0.85rem;
+            text-align: center;
+            min-width: 110px;
+        }
+
+        .step-item.active {
+            background: var(--primary-light);
+            border-color: #c7d2fe;
+        }
+
+        .table-light {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+        }
+
+        .table-light th, .table-light td {
+            padding: 0.65rem 0.85rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .table-light th {
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            background: #0f172a;
+            color: #ffffff;
+            padding: 0.75rem 1.25rem;
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-lg);
+            display: none;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            font-weight: 500;
+            z-index: 2000;
+        }
+
+        /* Spinner */
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #ffffff;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Footer */
+        footer {
+            background: #ffffff;
+            border-top: 1px solid var(--border-color);
+            text-align: center;
+            padding: 1.25rem;
+            color: var(--text-muted);
+            font-size: 0.82rem;
+            margin-top: auto;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Light Clean Header -->
+    <header>
+        <a href="/" class="brand">
+            <div class="logo-symbol">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6 3v15a3 3 0 0 0 3 3h12" />
+                    <path d="M10 8h7" stroke-width="2" opacity="0.85" />
+                    <path d="M10 12h5" stroke-width="2" opacity="0.85" />
+                </svg>
+            </div>
+            <span class="brand-title">LexiBrief</span>
+        </a>
+    </header>
+
+    <!-- Main Workspace -->
+    <main>
+
+
+        <!-- Dual Card Workspace -->
+        <div class="editor-grid">
+            <!-- Source Input Card -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">📝 Input Text</span>
+                    <div class="mode-group">
+                        <button class="mode-btn" id="mode-concise" onclick="setMode('concise')">Concise</button>
+                        <button class="mode-btn active" id="mode-balanced" onclick="setMode('balanced')">Balanced</button>
+                        <button class="mode-btn" id="mode-detailed" onclick="setMode('detailed')">Detailed</button>
+                    </div>
+                </div>
+
+                <textarea id="inputText" placeholder="Paste your article, meeting notes, conversation, or document text here..." oninput="updateStats()"></textarea>
+
+                <div class="card-footer">
+                    <div class="stats-text">
+                        <div>Words: <span id="inputWordCount">0</span></div>
+                        <div>Characters: <span id="inputCharCount">0</span></div>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn-sm" onclick="clearText()" title="Clear">Clear</button>
+                        <button class="btn-primary" id="summarizeBtn" onclick="generateSummary()">
+                            <span id="btnIcon">⚡</span>
+                            <span id="btnLabel">Summarize</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Output Summary Card -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">🎯 Summary</span>
+                </div>
+
+                <div class="output-box" id="outputBox">
+                    <div class="empty-state" id="emptyState">
+                        <div class="empty-icon">📄</div>
+                        <div style="font-weight: 600; color: var(--text-secondary);">No summary yet</div>
+                        <div style="font-size: 0.82rem;">Click a sample above or enter text and click Summarize.</div>
+                    </div>
+                    <div id="summaryText" style="display: none; white-space: pre-line;"></div>
+                </div>
+
+                <div class="card-footer">
+                    <div class="stats-text">
+                        <div>Summary Words: <span id="summaryWordCount">0</span></div>
+                        <div>Time: <span id="latencyText">0ms</span></div>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn-sm" onclick="toggleSpeech()" id="speechBtn" title="Read summary aloud">
+                            <span id="speechIcon">🔊</span> Listen
+                        </button>
+                        <button class="btn-sm" onclick="copySummary()" title="Copy to clipboard">
+                            📋 Copy
+                        </button>
+                        <button class="btn-sm" onclick="downloadSummary()" title="Download text">
+                            💾 Export
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Metric Analytics Cards -->
+        <div class="analytics-strip">
+            <div class="metric-card">
+                <div>
+                    <div class="metric-label">Reduction Ratio</div>
+                    <div class="metric-val" id="compressionVal">0%</div>
+                </div>
+                <div class="metric-icon">📉</div>
+            </div>
+
+            <div class="metric-card">
+                <div>
+                    <div class="metric-label">Reading Time Saved</div>
+                    <div class="metric-val" id="timeSavedVal">0s</div>
+                </div>
+                <div class="metric-icon">⏳</div>
+            </div>
+
+            <div class="metric-card">
+                <div>
+                    <div class="metric-label">Inference Latency</div>
+                    <div class="metric-val" id="latencyVal">0ms</div>
+                </div>
+                <div class="metric-icon">⚡</div>
+            </div>
+
+            <div class="metric-card">
+                <div>
+                    <div class="metric-label">Model Pipeline</div>
+                    <div class="metric-val" style="color: #059669; font-size: 1.1rem;">Active</div>
+                </div>
+                <div class="metric-icon">🛡️</div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Architecture Modal -->
+    <div class="modal-overlay" id="telemetryModal" onclick="closeModalOnBackdrop(event)">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h3 style="color: var(--text-main);">Pipeline Architecture & ROUGE Scores</h3>
+                    <p style="font-size: 0.8rem; color: var(--text-muted);">End-to-End NLP Transformer Workflow</p>
+                </div>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+
+            <div>
+                <h4 style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Pipeline Stages</h4>
+                <div class="pipeline-steps">
+                    <div class="step-item active">
+                        <div style="font-size: 0.72rem; color: var(--primary); font-weight: 600;">Stage 01</div>
+                        <div style="font-size: 0.82rem; font-weight: 600;">Data Ingestion</div>
+                    </div>
+                    <div>&rarr;</div>
+                    <div class="step-item active">
+                        <div style="font-size: 0.72rem; color: var(--primary); font-weight: 600;">Stage 02</div>
+                        <div style="font-size: 0.82rem; font-weight: 600;">Validation</div>
+                    </div>
+                    <div>&rarr;</div>
+                    <div class="step-item active">
+                        <div style="font-size: 0.72rem; color: var(--primary); font-weight: 600;">Stage 03</div>
+                        <div style="font-size: 0.82rem; font-weight: 600;">Transformation</div>
+                    </div>
+                    <div>&rarr;</div>
+                    <div class="step-item active">
+                        <div style="font-size: 0.72rem; color: var(--primary); font-weight: 600;">Stage 04</div>
+                        <div style="font-size: 0.82rem; font-weight: 600;">Model Trainer</div>
+                    </div>
+                    <div>&rarr;</div>
+                    <div class="step-item active">
+                        <div style="font-size: 0.72rem; color: var(--primary); font-weight: 600;">Stage 05</div>
+                        <div style="font-size: 0.82rem; font-weight: 600;">Evaluation</div>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <h4 style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Evaluation Metrics (SAMSum Dataset)</h4>
+                <table class="table-light">
+                    <thead>
+                        <tr>
+                            <th>Model</th>
+                            <th>ROUGE-1</th>
+                            <th>ROUGE-2</th>
+                            <th>ROUGE-L</th>
+                            <th>ROUGE-Lsum</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="font-weight: 600; color: var(--primary);">google/pegasus-cnn_dailymail</td>
+                            <td>0.4352</td>
+                            <td>0.2014</td>
+                            <td>0.3541</td>
+                            <td>0.3812</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+                <button class="btn-outline" onclick="closeModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">
+        <span id="toastMsg">Action completed</span>
+    </div>
+
+    <footer>
+        <p>LexiBrief &bull; Built with Transformers, PyTorch, and FastAPI</p>
+    </footer>
+
+    <script>
+        let currentMode = "balanced";
+        let presets = {};
+        let synth = window.speechSynthesis;
+        let isSpeaking = false;
+
+        // Load Presets
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const res = await fetch('/api/presets');
+                const data = await res.json();
+                if (data.presets) {
+                    data.presets.forEach(p => presets[p.id] = p.text);
+                }
+            } catch (e) {
+                console.error("Presets error:", e);
+            }
+        });
+
+        function setMode(mode) {
+            currentMode = mode;
+            ['concise', 'balanced', 'detailed'].forEach(m => {
+                const btn = document.getElementById(`mode-${m}`);
+                if (btn) btn.classList.toggle('active', m === mode);
+            });
+        }
+
+        function loadPreset(id) {
+            if (presets[id]) {
+                document.getElementById('inputText').value = presets[id];
+                updateStats();
+                showToast("Sample loaded! Click Summarize.");
+            }
+        }
+
+        function updateStats() {
+            const text = document.getElementById('inputText').value;
+            const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+            document.getElementById('inputWordCount').innerText = words;
+            document.getElementById('inputCharCount').innerText = text.length;
+        }
+
+        function clearText() {
+            document.getElementById('inputText').value = "";
+            updateStats();
+            stopSpeech();
+        }
+
+        async function generateSummary() {
+            const text = document.getElementById('inputText').value.trim();
+            if (!text) {
+                showToast("Please enter some text to summarize.");
+                return;
+            }
+
+            const btn = document.getElementById('summarizeBtn');
+            const btnIcon = document.getElementById('btnIcon');
+            const btnLabel = document.getElementById('btnLabel');
+            const emptyState = document.getElementById('emptyState');
+            const summaryText = document.getElementById('summaryText');
+
+            btn.disabled = true;
+            btnIcon.innerHTML = '<div class="spinner"></div>';
+            btnLabel.innerText = 'Summarizing...';
+
+            emptyState.innerHTML = `
+                <div class="spinner" style="border-color: rgba(79, 70, 229, 0.2); border-top-color: var(--primary); width: 24px; height: 24px;"></div>
+                <div style="font-weight: 600; color: var(--primary); margin-top: 0.5rem;">Generating summary...</div>
+            `;
+            emptyState.style.display = 'flex';
+            summaryText.style.display = 'none';
+
+            try {
+                const res = await fetch('/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: text, mode: currentMode })
+                });
+
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || 'Failed to summarize');
+                }
+
+                const data = await res.json();
+                const summary = data.summary || "No summary produced.";
+
+                emptyState.style.display = 'none';
+                summaryText.style.display = 'block';
+                summaryText.innerText = summary;
+
+                const a = data.analytics || {};
+                document.getElementById('summaryWordCount').innerText = a.summary_words || summary.trim().split(/\s+/).length;
+                document.getElementById('latencyText').innerText = `${a.latency_ms || 0}ms`;
+                document.getElementById('compressionVal').innerText = a.compression_ratio || "0%";
+                document.getElementById('timeSavedVal').innerText = a.estimated_read_time_saved || "0s";
+                document.getElementById('latencyVal').innerText = `${a.latency_ms || 0}ms`;
+
+                const engineEl = document.getElementById('engineLabel');
+                if (engineEl && data.model_source) {
+                    engineEl.innerHTML = `Model: <span style="color: var(--primary);">${data.model_source}</span>`;
+                }
+
+                showToast("Summary generated successfully!");
+            } catch (err) {
+                emptyState.style.display = 'flex';
+                emptyState.innerHTML = `<div style="color: #dc2626; font-weight: 500;">Error: ${err.message}</div>`;
+            } finally {
+                btn.disabled = false;
+                btnIcon.innerText = '⚡';
+                btnLabel.innerText = 'Summarize';
+            }
+        }
+
+        function copySummary() {
+            const summary = document.getElementById('summaryText').innerText;
+            if (summary && summary.trim()) {
+                navigator.clipboard.writeText(summary);
+                showToast("Copied to clipboard!");
+            } else {
+                showToast("No summary to copy.");
+            }
+        }
+
+        function downloadSummary() {
+            const summary = document.getElementById('summaryText').innerText;
+            if (!summary || !summary.trim()) {
+                showToast("No summary to export.");
+                return;
+            }
+            const blob = new Blob([summary], { type: 'text/plain;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `LexiBrief_Summary_${Date.now()}.txt`;
+            link.click();
+            showToast("Summary downloaded!");
+        }
+
+        function toggleSpeech() {
+            const summary = document.getElementById('summaryText').innerText;
+            if (!summary || !summary.trim()) {
+                showToast("No summary to read.");
+                return;
+            }
+            if (isSpeaking) {
+                stopSpeech();
+            } else {
+                startSpeech(summary);
+            }
+        }
+
+        function startSpeech(text) {
+            if (!synth) return;
+            synth.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.onend = () => stopSpeech();
+            utterance.onerror = () => stopSpeech();
+            synth.speak(utterance);
+            isSpeaking = true;
+            document.getElementById('speechIcon').innerText = '⏹️';
+        }
+
+        function stopSpeech() {
+            if (synth) synth.cancel();
+            isSpeaking = false;
+            document.getElementById('speechIcon').innerText = '🔊';
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMsg').innerText = msg;
+            toast.style.display = 'flex';
+            setTimeout(() => { toast.style.display = 'none'; }, 2500);
+        }
+
+        function openModal() {
+            document.getElementById('telemetryModal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('telemetryModal').style.display = 'none';
+        }
+
+        function closeModalOnBackdrop(e) {
+            if (e.target.id === 'telemetryModal') closeModal();
+        }
+
+        async function triggerTraining() {
+            if (!confirm("Start model training pipeline?")) return;
+            const btn = document.getElementById('trainBtn');
+            btn.disabled = true;
+            btn.innerText = 'Training...';
+            showToast("Pipeline started in background...");
+            try {
+                const res = await fetch('/train');
+                const data = await res.json();
+                alert(data.message || "Training finished!");
+            } catch (e) {
+                alert("Notice: " + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = '🔄 Train Model';
+            }
+        }
+    </script>
+</body>
+</html>
