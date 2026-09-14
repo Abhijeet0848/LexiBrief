@@ -44,25 +44,25 @@
 ## 🏗️ System & Database Architecture
 
 ```text
-                 AI TEXT SUMMARIZER
-                         │
-             ┌───────────┴───────────┐
-             │                       │
-             ▼                       ▼
-        NLP / AI Engine          MongoDB
-             │                       │
-             │                ┌──────┴──────┐
-             │                │             │
-             │           Summaries      Documents
-             │
-             ▼
-        Generated Summary
+                    TEXT SUMMARIZER
+                          │
+              ┌───────────┴───────────┐
+              │                       │
+              ▼                       ▼
+         NLP Engine                MongoDB
+              │                       │
+              │                ┌──────┴──────┐
+              │                │             │
+              │           Summaries      Documents
+              │
+              ▼
+         Generated Summary
 ```
 
 ```mermaid
 flowchart TD
-    APP["✨ AI Text Summarizer (FastAPI / Web UI)"]
-    APP --> NLP["🧠 NLP / AI Engine (Pegasus & TF-IDF)"]
+    APP["✨ Text Summarizer (FastAPI / Web UI)"]
+    APP --> NLP["🧠 NLP Engine (Pegasus & TF-IDF)"]
     APP --> DB[("🍃 MongoDB Database")]
     NLP --> OUT["📄 Generated Summary"]
     OUT --> DB
@@ -209,7 +209,7 @@ pytest -v
 ### Example Response:
 ```json
 {
-  "summary": "AI research labs have unveiled next-generation transformer architectures for abstractive summarization, expected to streamline legal and financial workflows.",
+  "summary": "Research labs have unveiled next-generation transformer architectures for abstractive summarization, expected to streamline legal and financial workflows.",
   "mode": "balanced",
   "model_source": "google/pegasus-cnn_dailymail",
   "analytics": {

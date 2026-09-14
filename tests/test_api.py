@@ -45,9 +45,9 @@ def test_metrics_endpoint():
 
 def test_text_extractor_and_nlp_processor():
     """Verify text extractor and NLP preprocessing components."""
-    sample_raw = "  This is an AI summary test! It extracts key concepts, computes ROUGE metrics, and extracts key takeaways.  "
+    sample_raw = "  This is an NLP summary test! It extracts key concepts, computes ROUGE metrics, and extracts key takeaways.  "
     cleaned = TextExtractor.clean_text(sample_raw)
-    assert cleaned.startswith("This is an AI summary test!")
+    assert cleaned.startswith("This is an NLP summary test!")
     
     tokens = NLPProcessor.tokenize_words(cleaned)
     assert "summary" in tokens
