@@ -30,7 +30,9 @@ class NLPProcessor:
         'very', 'was', 'wasn\'t', 'we', 'we\'d', 'we\'ll', 'we\'re', 'we\'ve', 'were', 'weren\'t',
         'what', 'what\'s', 'when', 'when\'s', 'where', 'where\'s', 'which', 'while', 'who', 'who\'s',
         'whom', 'why', 'why\'s', 'with', 'won\'t', 'would', 'wouldn\'t', 'you', 'you\'d', 'you\'ll',
-        'you\'re', 'you\'ve', 'your', 'yours', 'yourself', 'yourselves'
+        'you\'re', 'you\'ve', 'your', 'yours', 'yourself', 'yourselves', 'uses', 'used', 'using',
+        'also', 'such', 'major', 'large', 'different', 'examples', 'combines', 'improved', 'process',
+        'tasks', 'learn', 'complex', 'patterns', 'component', 'provides', 'based'
     }
 
     @classmethod
@@ -50,28 +52,87 @@ class NLPProcessor:
         return _RE_WORDS.findall(text.lower())
 
     @classmethod
-    def extract_keywords(cls, text: str, top_k: int = 8, precomputed_tokens: List[str] = None) -> List[Dict[str, Any]]:
-        """Extracts salient domain keywords with rapid single-pass frequency counting."""
-        tokens = precomputed_tokens if precomputed_tokens is not None else cls.tokenize_words(text)
+    def extract_keywords(cls, text: str, top_k: int = 12, precomputed_tokens: List[str] = None) -> List[Dict[str, Any]]:
+        """
+        Extracts salient domain keyphrases, technical multi-word concepts, and acronyms
+        with rapid single-pass clause tokenization and canonical casing.
+        """
+        if not text:
+            return []
+
         stopwords = cls.STOPWORDS
-        filtered = [t for t in tokens if t not in stopwords and not t.isdigit() and len(t) >= 3]
-        if not filtered:
+        # Split by punctuation and line breaks into discrete candidate clauses
+        clauses = re.split(r'[,;.!?()\n]+', text)
+        casing_map: Dict[str, str] = {}
+        phrase_counts = Counter()
+        multi_word_pool = set()
+
+        for cl in clauses:
+            words = _RE_WORDS.findall(cl)
+            cur = []
+            for w in words:
+                w_lower = w.lower()
+                if w_lower in stopwords or w.isdigit() or len(w) < 2:
+                    if cur:
+                        cls._process_keyword_candidate(cur, phrase_counts, casing_map, multi_word_pool, stopwords)
+                        cur = []
+                else:
+                    cur.append(w)
+            if cur:
+                cls._process_keyword_candidate(cur, phrase_counts, casing_map, multi_word_pool, stopwords)
+
+        if not phrase_counts:
             return []
 
-        counts = Counter(filtered)
-        top_items = counts.most_common(top_k)
-        if not top_items:
-            return []
+        # Filter out standalone sub-words if they only exist as fragments of an extracted multi-word phrase
+        filtered_items = []
+        max_freq = max(phrase_counts.values()) if phrase_counts else 1.0
 
-        max_freq = top_items[0][1]
-        return [
-            {
-                "keyword": word,
-                "count": count,
-                "importance": round(count / max_freq, 2)
-            }
-            for word, count in top_items
-        ]
+        for norm_phrase, count in phrase_counts.most_common():
+            words_in_p = norm_phrase.split()
+            display_name = casing_map.get(norm_phrase, norm_phrase.title())
+
+            if len(words_in_p) == 1:
+                is_fragment = any(norm_phrase in other_p.split() and norm_phrase != other_p for other_p in multi_word_pool)
+                # Keep standalone if it's an acronym, entity or distinct term
+                if is_fragment and not (display_name.isupper() or any(c.isdigit() for c in display_name) or len(norm_phrase) <= 3 or display_name in ['Transformer', 'Pegasus', 'BERT', 'BART', 'T5']):
+                    continue
+
+            filtered_items.append({
+                "keyword": display_name,
+                "count": int(count),
+                "importance": round(min(1.0, count / max_freq), 2)
+            })
+            if len(filtered_items) >= top_k:
+                break
+
+        return filtered_items
+
+    @classmethod
+    def _process_keyword_candidate(cls, words: List[str], counter: Counter, casing_map: Dict[str, str], pool: set, stopwords: set):
+        if not words:
+            return
+        # Register full multi-word phrase (up to 3 words)
+        if len(words) <= 3:
+            norm_full = ' '.join(w.lower() for w in words)
+            display_full = ' '.join(
+                w.upper() if (w.isupper() or (len(w) <= 3 and any(c.isdigit() for c in w)))
+                else w.capitalize()
+                for w in words
+            )
+            casing_map[norm_full] = display_full
+            counter[norm_full] += 2.0 if len(words) > 1 else 1.0
+            if len(words) > 1:
+                pool.add(norm_full)
+
+        # Register prominent standalone terms / acronyms / entities
+        for w in words:
+            nw = w.lower()
+            if nw not in stopwords and len(nw) >= 2:
+                dw = w.upper() if (w.isupper() or (len(w) <= 3 and any(c.isdigit() for c in w))) else w.capitalize()
+                casing_map[nw] = dw
+                if len(words) == 1 or dw.isupper() or any(c.isdigit() for c in dw) or dw in ['Transformer', 'Pegasus', 'BERT', 'BART', 'T5']:
+                    counter[nw] += 1.0
 
     @classmethod
     def extract_key_points(cls, text: str, top_k: int = 4, precomputed_sentences: List[str] = None) -> List[str]:
