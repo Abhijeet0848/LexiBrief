@@ -106,4 +106,9 @@ class AbstractiveSummarizer:
         else:
             outputs = model.generate(**inputs, **gen_kwargs)
 
-        return tokenizer.decode(outputs[0], skip_special_tokens=True)
+        raw_summary = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        # Clean special sentence markers like <n> used by Pegasus
+        clean_summary = raw_summary.replace("<n>", " ").strip()
+        import re
+        clean_summary = re.sub(r'\s+', ' ', clean_summary)
+        return clean_summary
