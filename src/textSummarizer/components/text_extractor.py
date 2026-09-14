@@ -61,8 +61,39 @@ class TextExtractor:
 
     @staticmethod
     def extract_from_pdf(file_bytes: bytes) -> Tuple[str, int]:
-        """Extracts text from PDF files using pypdf with per-page resilience and regex stream fallback. Returns (text, page_count)."""
-        # 1. Primary extractor: pypdf with resilient per-page extraction
+        """
+        High-fidelity PDF text extraction.
+        Uses PyMuPDF (fitz) with automatic OCR fallback for scanned forms and image PDFs,
+        with resilient pypdf and raw text stream fallbacks. Returns (text, page_count).
+        """
+        # 1. State-of-the-art: PyMuPDF with structured layout parsing & OCR fallback
+        try:
+            import pymupdf
+            doc = pymupdf.open(stream=file_bytes, filetype="pdf")
+            pages = []
+            page_count = len(doc)
+            for idx, page in enumerate(doc):
+                page_text = page.get_text("text")
+                if page_text and page_text.strip():
+                    pages.append(page_text.strip())
+                else:
+                    # Automatic OCR extraction for scanned forms, application photos, and image-only PDFs
+                    try:
+                        tp = page.get_textpage_ocr(language="eng", dpi=150)
+                        ocr_text = page.get_text(textpage=tp)
+                        if ocr_text and ocr_text.strip():
+                            pages.append(ocr_text.strip())
+                    except Exception:
+                        pass
+            doc.close()
+            if pages:
+                return "\n\n".join(pages), max(1, page_count)
+        except ImportError:
+            pass
+        except Exception as e:
+            logger.warning(f"PyMuPDF parser notice: {e}")
+
+        # 2. Secondary extractor: pypdf with per-page resilience
         try:
             import pypdf
             reader = pypdf.PdfReader(io.BytesIO(file_bytes), strict=False)
@@ -87,7 +118,7 @@ class TextExtractor:
         except Exception as e:
             logger.warning(f"pypdf extraction error: {e}")
 
-        # 2. Resilient fallback for raw text streams
+        # 3. Resilient fallback for raw text streams
         try:
             content = file_bytes.decode('latin-1', errors='ignore')
             text_blocks = _RE_PDF_TEXT_BLOCKS.findall(content)
