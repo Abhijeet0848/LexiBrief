@@ -98,22 +98,33 @@ class MongoDBManager:
 
     def save_summary(self, summary_data: Dict[str, Any]) -> Dict[str, Any]:
         """Saves a generated summary to the 'summaries' collection."""
+        title = summary_data.get("title")
+        if not title:
+            raw_text = summary_data.get("text", "").strip()
+            first_line = raw_text.split('\n')[0].strip() if raw_text else ""
+            title = first_line[:60] if first_line else "Document Summary"
+
+        orig_words = summary_data.get("analytics", {}).get("original_words") or summary_data.get("word_count_original") or len(summary_data.get("text", "").split())
+        sum_words = summary_data.get("analytics", {}).get("summary_words") or summary_data.get("word_count_summary") or len(summary_data.get("summary", "").split())
+
         record = {
             "_id": str(uuid.uuid4()),
+            "title": title,
             "text_snippet": summary_data.get("text", "")[:150] + ("..." if len(summary_data.get("text", "")) > 150 else ""),
             "full_text": summary_data.get("text", ""),
             "summary": summary_data.get("summary", ""),
             "key_points": summary_data.get("key_points", []),
             "keywords": summary_data.get("keywords", []),
             "mode": summary_data.get("mode", "balanced"),
-            "method": summary_data.get("method_used", "Auto"),
+            "method": summary_data.get("method", summary_data.get("method_used", "Auto")),
+            "method_used": summary_data.get("method_used", "Auto"),
             "model_source": summary_data.get("model_source", "hybrid"),
             "rouge": summary_data.get("rouge", {}),
-            "word_count_original": summary_data.get("analytics", {}).get("original_words", 0),
-            "word_count_summary": summary_data.get("analytics", {}).get("summary_words", 0),
+            "word_count_original": orig_words,
+            "word_count_summary": sum_words,
             "compression_ratio": summary_data.get("analytics", {}).get("compression_ratio", "0%"),
             "latency_ms": summary_data.get("analytics", {}).get("latency_ms", 0),
-            "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+            "created_at": datetime.now(timezone.utc).strftime("%B %d, %Y")
         }
 
         if self.use_mongo and self.db is not None:

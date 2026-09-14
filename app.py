@@ -12,7 +12,7 @@ for path in [BASE_DIR, SRC_DIR]:
     if path not in sys.path:
         sys.path.insert(0, path)
 
-from fastapi import FastAPI, Request, Form, HTTPException, UploadFile, File, Response, BackgroundTasks
+from fastapi import FastAPI, Request, Form, HTTPException, UploadFile, File, Response, BackgroundTasks, Body
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -238,6 +238,13 @@ async def delete_document_item(doc_id: str):
     valid_id = validate_entity_id(doc_id)
     success = db_manager.delete_document(valid_id)
     return {"success": success, "deleted_id": valid_id}
+
+
+@app.post("/api/summaries", tags=["MongoDB Summaries"])
+async def save_summary_endpoint(summary_payload: Dict[str, Any] = Body(...)):
+    """Manually saves a summary record to MongoDB."""
+    saved = db_manager.save_summary(summary_payload)
+    return {"success": True, "summary": saved}
 
 
 @app.get("/api/summaries", tags=["MongoDB Summaries"])
