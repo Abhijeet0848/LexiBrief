@@ -14,3 +14,4 @@ python-box>=6.0.2
 ensure>=1.0.2
 tqdm>=4.64.0
 gTTS>=2.3.0
+requests>=2.28.0

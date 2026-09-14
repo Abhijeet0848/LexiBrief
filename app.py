@@ -22,6 +22,7 @@ import uvicorn
 import subprocess
 import time
 import io
+import requests
 import pandas as pd
 from gtts import gTTS
 
@@ -40,6 +41,24 @@ app = FastAPI(
 MAX_UPLOAD_SIZE = 15 * 1024 * 1024   # 15 MB max file upload
 MAX_INPUT_CHARS = 150_000            # 150,000 max input character limit
 ADMIN_SECRET_KEY = os.getenv("ADMIN_SECRET_KEY")
+ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
+
+# ElevenLabs High-Definition Voice Catalog
+ELEVENLABS_VOICE_MAP = {
+    "aria": {"id": "9BWtsMINqrJLrRacOk9x", "name": "Aria (Hyper-realistic Female)"},
+    "rishi": {"id": "pqHfZKP75CvOlQylNhV4", "name": "Rishi (Indian Male)"},
+    "indian_female": {"id": "EXAVITQu4vr4xnSDxMaL", "name": "Indian Female"},
+    "sarah": {"id": "EXAVITQu4vr4xnSDxMaL", "name": "Sarah (News Anchor)"},
+    "george": {"id": "JBFqnCBsd6RMkjVDRZzb", "name": "George (Storyteller)"},
+    "charlie": {"id": "IKne3meq5aSn9XLyUdCD", "name": "Charlie (Conversational)"}
+}
+
+
+class TTSRequest(BaseModel):
+    text: str = Field(..., description="Text to synthesize to speech")
+    voice: Optional[str] = Field("aria", description="Voice identifier ('aria', 'rishi', 'indian_female', 'google', or custom ElevenLabs voice ID)")
+    api_key: Optional[str] = Field(None, description="Optional ElevenLabs API key override")
+    speed: Optional[float] = Field(1.0, description="Speech rate multiplier")
 
 # Enable Secure CORS for API endpoints
 app.add_middleware(
@@ -398,10 +417,10 @@ async def training(request: Request):
 
 
 @app.post("/api/tts", tags=["Text-to-Speech"])
-async def text_to_speech(req: TTSRequest):
+async def text_to_speech(req: TTSRequest, request: Request):
     """
-    Synthesizes studio-quality, natural Indian English voice audio using Google Neural TTS.
-    Returns audio/mpeg stream directly for browser playback.
+    Synthesizes hyper-realistic neural voice audio using ElevenLabs API (with automatic fallback to Google Neural TTS).
+    Supports 'aria' (Hyper-realistic Female), 'rishi' (Indian Male), 'indian_female', 'sarah', 'george', or custom ElevenLabs voice IDs.
     """
     try:
         text_content = req.text.strip()
@@ -415,18 +434,76 @@ async def text_to_speech(req: TTSRequest):
         if len(clean_text) > 8000:
             clean_text = clean_text[:8000]
 
-        # Use Indian English (en) with tld='co.in' for authentic, pleasant accent
+        # Check for ElevenLabs API Key in request body, custom header, or environment
+        api_key = req.api_key or request.headers.get("xi-api-key") or os.getenv("ELEVENLABS_API_KEY")
+        selected_voice_key = (req.voice or "aria").lower().strip()
+
+        # If user explicitly requested Google Neural, or if no ElevenLabs API key is configured
+        if selected_voice_key == "google" or not api_key:
+            fp = io.BytesIO()
+            tts = gTTS(text=clean_text, lang='en', tld='co.in', slow=False)
+            tts.write_to_fp(fp)
+            fp.seek(0)
+            return StreamingResponse(
+                fp,
+                media_type="audio/mpeg",
+                headers={
+                    "Content-Disposition": "inline; filename=speech_google_neural.mp3",
+                    "X-Voice-Engine": "Google-Neural-en-IN"
+                }
+            )
+
+        # Resolve ElevenLabs Voice ID
+        voice_id = ELEVENLABS_VOICE_MAP.get(selected_voice_key, {}).get("id", req.voice)
+        if not voice_id or len(voice_id) < 5:
+            voice_id = "9BWtsMINqrJLrRacOk9x"  # Default to Aria
+
+        # Call ElevenLabs API
+        elevenlabs_url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+        headers = {
+            "Accept": "audio/mpeg",
+            "Content-Type": "application/json",
+            "xi-api-key": api_key.strip()
+        }
+        payload = {
+            "text": clean_text,
+            "model_id": "eleven_multilingual_v2",
+            "voice_settings": {
+                "stability": 0.50,
+                "similarity_boost": 0.80,
+                "style": 0.05,
+                "use_speaker_boost": True
+            }
+        }
+
+        try:
+            resp = requests.post(elevenlabs_url, json=payload, headers=headers, timeout=25)
+            if resp.status_code == 200:
+                audio_stream = io.BytesIO(resp.content)
+                return StreamingResponse(
+                    audio_stream,
+                    media_type="audio/mpeg",
+                    headers={
+                        "Content-Disposition": f"inline; filename=elevenlabs_{selected_voice_key}.mp3",
+                        "X-Voice-Engine": f"ElevenLabs-{selected_voice_key}"
+                    }
+                )
+            else:
+                logger.warning(f"ElevenLabs API returned {resp.status_code}: {resp.text}. Falling back to Google Neural TTS.")
+        except Exception as api_err:
+            logger.warning(f"ElevenLabs request error: {api_err}. Falling back to Google Neural TTS.")
+
+        # Seamless Fallback to Google Neural Indian English
         fp = io.BytesIO()
         tts = gTTS(text=clean_text, lang='en', tld='co.in', slow=False)
         tts.write_to_fp(fp)
         fp.seek(0)
-
         return StreamingResponse(
             fp,
             media_type="audio/mpeg",
             headers={
-                "Content-Disposition": "inline; filename=summary_speech.mp3",
-                "Cache-Control": "public, max-age=3600"
+                "Content-Disposition": "inline; filename=speech_fallback.mp3",
+                "X-Voice-Engine": "Google-Neural-Fallback"
             }
         )
     except HTTPException as he:

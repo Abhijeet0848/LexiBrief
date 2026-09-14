@@ -287,11 +287,29 @@
       const [rougeScores, setRougeScores] = useState(null);
       const [rougeLoading, setRougeLoading] = useState(false);
 
-      // Speech Synthesis Voice State & Audio Streaming Player
+      // Speech Synthesis & ElevenLabs Voice State
       const [isSpeaking, setIsSpeaking] = useState(false);
       const [audioLoading, setAudioLoading] = useState(false);
+      const [selectedVoice, setSelectedVoice] = useState(() => {
+        try { return localStorage.getItem('lexibrief_voice') || 'aria'; } catch(e) { return 'aria'; }
+      });
+      const [elevenLabsKey, setElevenLabsKey] = useState(() => {
+        try { return localStorage.getItem('lexibrief_elevenlabs_key') || ''; } catch(e) { return ''; }
+      });
+      const [showVoiceSettings, setShowVoiceSettings] = useState(false);
       const [voices, setVoices] = useState([]);
       const audioRef = useRef(null);
+
+      const handleSaveVoicePreference = (voiceId) => {
+        setSelectedVoice(voiceId);
+        try { localStorage.setItem('lexibrief_voice', voiceId); } catch(e) {}
+      };
+
+      const handleSaveElevenLabsKey = (key) => {
+        setElevenLabsKey(key);
+        try { localStorage.setItem('lexibrief_elevenlabs_key', key); } catch(e) {}
+        showToast(key ? "✓ ElevenLabs API Key saved!" : "ElevenLabs Key cleared", "success");
+      };
 
       const showToast = (msg, type = 'info') => setToast({ message: msg, type });
 
@@ -606,7 +624,7 @@
         showToast("Cleared evaluator inputs.", "info");
       };
 
-      // Text to Speech with Studio-Quality Natural Indian English Voice (via Google Neural TTS Stream)
+      // Text to Speech with ElevenLabs Hyper-Realistic & Google Neural Voice Streaming
       const handleSpeak = async (text) => {
         if (!text || !text.trim()) return;
 
@@ -636,17 +654,25 @@
         setAudioLoading(true);
 
         try {
-          // Call high-definition neural Indian English backend TTS
+          // Call high-definition ElevenLabs / Neural backend TTS
           const res = await fetch('/api/tts', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: cleanText })
+            headers: { 
+              'Content-Type': 'application/json',
+              ...(elevenLabsKey ? { 'xi-api-key': elevenLabsKey } : {})
+            },
+            body: JSON.stringify({ 
+              text: cleanText,
+              voice: selectedVoice,
+              api_key: elevenLabsKey || undefined
+            })
           });
 
           if (!res.ok) {
             throw new Error(`TTS server response error: ${res.status}`);
           }
 
+          const engineUsed = res.headers.get('x-voice-engine') || selectedVoice;
           const blob = await res.blob();
           const audioUrl = URL.createObjectURL(blob);
           const audio = new Audio(audioUrl);
@@ -673,7 +699,11 @@
           };
 
           await audio.play();
-          showToast("🎙️ Playing natural Indian English narration", "info");
+          
+          const voiceLabel = selectedVoice === 'rishi' ? 'Rishi (Indian Male)' :
+                             selectedVoice === 'indian_female' ? 'Indian Female' :
+                             selectedVoice === 'aria' ? 'Aria (ElevenLabs)' : 'Google Neural';
+          showToast(`🎙️ Speaking with ${voiceLabel}`, "info");
         } catch (err) {
           console.warn("Backend TTS stream fallback to browser speech synthesis:", err);
           // Fallback to browser SpeechSynthesis if network or server error
@@ -1229,7 +1259,7 @@
                                   ? 'bg-rose-50 text-rose-600 border-rose-200 shadow-sm ring-1 ring-rose-200' 
                                   : 'text-slate-700'
                               } ${audioLoading ? 'opacity-70 cursor-wait' : ''}`}
-                              title={isSpeaking ? "Stop playback" : "Listen in studio-quality Indian English voice"}
+                              title={isSpeaking ? "Stop playback" : "Listen in studio-quality neural voice"}
                             >
                               {audioLoading ? (
                                 <>
@@ -1250,6 +1280,18 @@
                                   <span className="hidden sm:inline">Listen</span>
                                 </>
                               )}
+                            </button>
+
+                            <button
+                              onClick={() => setShowVoiceSettings(true)}
+                              className="btn-3d-secondary py-2 px-2 rounded-xl text-slate-700 font-semibold flex items-center gap-1 cursor-pointer text-xs"
+                              title="Voice Model Settings (ElevenLabs Aria, Rishi, Google Neural)"
+                            >
+                              <span>🎙️</span>
+                              <span className="hidden md:inline text-[11px] font-bold text-indigo-600">
+                                {selectedVoice === 'aria' ? 'Aria' : selectedVoice === 'rishi' ? 'Rishi' : selectedVoice === 'indian_female' ? 'Ind. Female' : 'Google'}
+                              </span>
+                              <span className="text-[8px] text-slate-400">⚙️</span>
                             </button>
 
                             <button
@@ -2146,6 +2188,162 @@
             )}
 
           </main>
+
+          {/* ElevenLabs & Neural Voice Settings Modal */}
+          {showVoiceSettings && (
+            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+              <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
+                {/* Header */}
+                <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-indigo-50/70 via-purple-50/50 to-white">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-bold text-lg shadow-md shadow-indigo-200">
+                      🎙️
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900 font-heading">
+                        Voice & Audio Settings
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        ElevenLabs Hyper-Realistic & Neural Voice Models
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setShowVoiceSettings(false)}
+                    className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center text-sm font-bold transition"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* Body */}
+                <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+                  {/* Voice Options */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-2 font-heading">
+                      Select Neural Voice Model
+                    </label>
+                    <div className="space-y-2">
+                      {[
+                        {
+                          id: 'aria',
+                          name: 'Aria (ElevenLabs)',
+                          badge: 'Hyper-Realistic Female',
+                          desc: 'Expressive, warm voice with natural breathing inflections.',
+                          tag: 'Top Pick 🌟'
+                        },
+                        {
+                          id: 'rishi',
+                          name: 'Rishi (ElevenLabs)',
+                          badge: 'Indian Male',
+                          desc: 'Authentic Indian English accent with natural cadence.',
+                          tag: 'Indian Accent 🇮🇳'
+                        },
+                        {
+                          id: 'indian_female',
+                          name: 'Indian Female (ElevenLabs)',
+                          badge: 'Indian Female',
+                          desc: 'Clear, crisp, professional conversational tone.',
+                          tag: 'Indian Accent 🇮🇳'
+                        },
+                        {
+                          id: 'google',
+                          name: 'Google Neural en-IN',
+                          badge: 'Free / Zero Config',
+                          desc: 'Built-in studio-quality Google Indian English. No API key needed.',
+                          tag: 'Built-in ⚡'
+                        }
+                      ].map(v => (
+                        <div
+                          key={v.id}
+                          onClick={() => handleSaveVoicePreference(v.id)}
+                          className={`p-3.5 rounded-2xl border-2 transition cursor-pointer flex items-center justify-between gap-3 ${
+                            selectedVoice === v.id
+                              ? 'border-indigo-600 bg-indigo-50/50 shadow-xs'
+                              : 'border-slate-200 hover:border-indigo-200 bg-white'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="radio"
+                              name="voiceChoice"
+                              checked={selectedVoice === v.id}
+                              onChange={() => handleSaveVoicePreference(v.id)}
+                              className="w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                            />
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-slate-900">{v.name}</span>
+                                <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded-md border border-indigo-100">
+                                  {v.tag}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-500 mt-0.5">{v.desc}</p>
+                            </div>
+                          </div>
+                          <span className="text-lg">
+                            {v.id === 'aria' ? '👩' : v.id === 'rishi' ? '👨' : v.id === 'indian_female' ? '👩' : '🌐'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* ElevenLabs API Key Config */}
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5 font-heading">
+                        <span>🔑</span> ElevenLabs API Key (Optional)
+                      </span>
+                      {elevenLabsKey ? (
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                          ✓ Key Configured
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-medium text-slate-400">
+                          Using built-in neural fallback
+                        </span>
+                      )}
+                    </div>
+                    
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      Enter your personal ElevenLabs API key for unrestricted hyper-realistic generation. Your key is stored securely in your browser's local storage.
+                    </p>
+
+                    <div className="flex gap-2 pt-1">
+                      <input
+                        type="password"
+                        value={elevenLabsKey}
+                        onChange={(e) => setElevenLabsKey(e.target.value)}
+                        placeholder="sk_..."
+                        className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-mono focus:outline-none focus:border-indigo-500"
+                      />
+                      <button
+                        onClick={() => handleSaveElevenLabsKey(elevenLabsKey)}
+                        className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition shadow-xs"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                  <span className="text-[11px] text-slate-400">
+                    Selected: <b>{selectedVoice.toUpperCase()}</b>
+                  </span>
+                  <button
+                    onClick={() => setShowVoiceSettings(false)}
+                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Document Full-Text Preview Modal */}
           {previewDoc && (
