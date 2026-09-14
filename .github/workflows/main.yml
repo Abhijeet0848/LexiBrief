@@ -4,10 +4,6 @@ on:
   push:
     branches:
       - main
-    paths-ignore:
-      - 'README.md'
-      - 'LICENSE'
-      - '.gitignore'
   pull_request:
     branches:
       - main
@@ -19,7 +15,7 @@ permissions:
 jobs:
   # 1. Continuous Integration (Lint, Test, Build Validation)
   ci-pipeline:
-    name: Continuous Integration & Automated Testing
+    name: Continuous Integration & Testing
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -50,7 +46,9 @@ jobs:
   build-and-push-ecr:
     name: Build & Push to AWS ECR
     needs: ci-pipeline
-    if: ${{ github.event_name == 'push' && secrets.AWS_ACCESS_KEY_ID != '' && secrets.AWS_SECRET_ACCESS_KEY != '' }}
+    if: github.event_name == 'push' && env.HAVE_AWS_SECRETS == 'true'
+    env:
+      HAVE_AWS_SECRETS: ${{ secrets.AWS_ACCESS_KEY_ID != '' && secrets.AWS_SECRET_ACCESS_KEY != '' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -80,7 +78,9 @@ jobs:
   deploy-to-ec2:
     name: Deploy Container to EC2
     needs: build-and-push-ecr
-    if: ${{ github.event_name == 'push' && secrets.AWS_ACCESS_KEY_ID != '' && secrets.AWS_SECRET_ACCESS_KEY != '' && secrets.AWS_ECR_LOGIN_URI != '' }}
+    if: github.event_name == 'push' && env.HAVE_EC2_SECRETS == 'true'
+    env:
+      HAVE_EC2_SECRETS: ${{ secrets.AWS_ACCESS_KEY_ID != '' && secrets.AWS_SECRET_ACCESS_KEY != '' && secrets.AWS_ECR_LOGIN_URI != '' }}
     runs-on: self-hosted
     steps:
       - name: Checkout Code
