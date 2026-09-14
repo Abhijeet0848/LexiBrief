@@ -469,6 +469,17 @@
         });
       }, [documentsList, docSearch, docFormatFilter]);
 
+      // Sample Text Ingestion Helpers
+      const handleLoadSample = () => {
+        setInputText("Artificial intelligence (AI) and Natural Language Processing (NLP) are revolutionizing modern text comprehension. Deep neural transformer models like Google Pegasus and BART Seq2Seq excel at capturing contextual nuances and long-range semantic dependencies. Unlike legacy extractive systems that merely splice sentences, abstractive summarizers generate coherent, human-like summaries that condense dense documents by up to 80% while preserving crucial information.");
+        showToast("✓ Loaded sample NLP article into editor", "info");
+      };
+
+      const handleLoadResearchSample = () => {
+        setInputText("Recent advancements in Large Language Models (LLMs) have demonstrated emergent reasoning capabilities across diverse NLP benchmarks. However, high computational costs and memory latency during autoregressive decoding remain key bottlenecks for edge deployments. In this work, we evaluate hybrid quantization algorithms and model distillation techniques, achieving a 3.4x speedup with minimal degradation in ROUGE-1 and ROUGE-L evaluation scores.");
+        showToast("✓ Loaded AI research paper snippet", "info");
+      };
+
       // Summarize
       const handleSummarize = async () => {
         if (!inputText.trim() || !/[a-zA-Z0-9]/.test(inputText)) {
@@ -817,41 +828,72 @@
 
                 </div>
 
-                {/* 2-Column Clean Workspace */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {/* 2-Column Clean Workspace with 3D Glassmorphism & Hover Effects */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   
-                  {/* Left Column: Source Text Input */}
-                  <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 flex flex-col justify-between space-y-4 card-shadow">
+                  {/* Left Column: Source Document Card */}
+                  <div className="bg-white/95 backdrop-blur-xl border border-slate-200/90 rounded-3xl p-5 sm:p-6 flex flex-col justify-between space-y-4 shadow-sm hover:shadow-xl hover:shadow-indigo-500/10 hover:border-indigo-300/80 transition-all duration-300 relative group">
+                    {/* Hover Ambient Top Accent Line */}
+                    <div className="absolute top-0 left-8 right-8 h-[2px] bg-gradient-to-r from-transparent via-indigo-500 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+
                     <div>
-                      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
-                          <span className="text-sm font-bold text-slate-800 font-heading tracking-tight">Source Document</span>
+                      {/* Header Bar */}
+                      <div className="flex flex-wrap items-center justify-between gap-2.5 mb-3.5">
+                        <div className="flex items-center gap-2.5">
+                          <span className="relative flex h-2.5 w-2.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-indigo-600"></span>
+                          </span>
+                          <span className="text-sm sm:text-base font-bold text-slate-900 font-heading tracking-tight">Source Document</span>
+                          <span className="text-[10px] font-semibold text-slate-500 bg-slate-100/90 px-2 py-0.5 rounded-full border border-slate-200/60 hidden sm:inline-block">
+                            Input Editor
+                          </span>
                         </div>
                         
-                        {/* Upload Button */}
-                        <label className="btn-3d-secondary cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-700">
-                          <span>{uploadLoading ? '⏳ Reading...' : '📄 Upload PDF / DOCX / TXT'}</span>
+                        {/* Upload Button with 3D Tactile Hover */}
+                        <label className="btn-3d-secondary cursor-pointer inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-700 select-none">
+                          <DocumentIcon className="w-3.5 h-3.5 text-indigo-600" />
+                          <span>{uploadLoading ? '⏳ Reading...' : 'Upload PDF / DOCX / TXT'}</span>
                           <input type="file" accept=".pdf,.docx,.txt" onChange={handleFileUpload} disabled={uploadLoading} className="hidden" />
                         </label>
                       </div>
 
+                      {/* Quick Sample Text Chips if empty */}
+                      {!inputText.trim() && !uploadedDocInfo && (
+                        <div className="flex flex-wrap items-center gap-1.5 mb-2.5 animate-fadeIn">
+                          <span className="text-[11px] font-medium text-slate-600">Try samples:</span>
+                          <button
+                            onClick={handleLoadSample}
+                            className="btn-3d-secondary px-2.5 py-1 rounded-lg text-[11px] font-semibold text-indigo-700 flex items-center gap-1 cursor-pointer hover:bg-indigo-50"
+                          >
+                            <SparklesIcon className="w-3 h-3 text-amber-500" />
+                            <span>NLP Article</span>
+                          </button>
+                          <button
+                            onClick={handleLoadResearchSample}
+                            className="btn-3d-secondary px-2.5 py-1 rounded-lg text-[11px] font-semibold text-slate-700 flex items-center gap-1 cursor-pointer hover:bg-slate-100"
+                          >
+                            <span>🔬 Research Abstract</span>
+                          </button>
+                        </div>
+                      )}
+
                       {/* Uploaded Document Info Card */}
                       {uploadedDocInfo && (
-                        <div className="mb-3.5 p-3.5 rounded-xl bg-slate-900 text-white border border-slate-800 shadow-md animate-fadeIn">
+                        <div className="mb-3.5 p-3.5 rounded-2xl bg-slate-900 text-white border border-slate-800 shadow-md animate-fadeIn">
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-xs">
-                              <span>✓</span> <span>Document uploaded</span>
+                              <span>✓</span> <span>Document Ingested Successfully</span>
                             </div>
                             <button 
                               onClick={() => setUploadedDocInfo(null)}
-                              className="text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded hover:bg-slate-800 transition"
+                              className="text-slate-400 hover:text-white text-xs px-2 py-0.5 rounded hover:bg-slate-800 transition"
                               title="Dismiss card"
                             >
                               ✕
                             </button>
                           </div>
-                          <div className="grid grid-cols-2 gap-y-1 text-xs text-slate-300 font-mono">
+                          <div className="grid grid-cols-2 gap-y-1.5 text-xs text-slate-300 font-mono">
                             <div><span className="text-slate-400 font-sans">File:</span> <span className="text-white font-bold">{uploadedDocInfo.filename}</span></div>
                             <div><span className="text-slate-400 font-sans">Type:</span> <span className="text-indigo-300 font-bold">{uploadedDocInfo.format}</span></div>
                             <div><span className="text-slate-400 font-sans">Pages:</span> <span className="text-white font-bold">{uploadedDocInfo.pages}</span></div>
@@ -860,7 +902,7 @@
                           <button
                             onClick={handleSummarize}
                             disabled={isLoading}
-                            className="btn-3d-primary mt-3 w-full py-2 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
+                            className="btn-3d-primary mt-3 w-full py-2.5 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
                           >
                             <SparklesIcon className="w-4 h-4 text-amber-300" />
                             <span>Summarize This Document</span>
@@ -868,22 +910,27 @@
                         </div>
                       )}
 
+                      {/* Textarea Editor with Smooth Focus & Hover Glow */}
                       <textarea
                         value={inputText}
                         onChange={(e) => setInputText(e.target.value)}
-                        placeholder="Paste or type text to summarize here..."
-                        className="w-full h-[380px] sm:h-[450px] min-h-[320px] sm:min-h-[420px] p-3.5 sm:p-4 rounded-xl bg-slate-50/70 border border-slate-200 text-slate-800 text-sm leading-relaxed placeholder-slate-400 focus:bg-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 resize-y transition shadow-2xs font-sans"
+                        placeholder="Paste or type text to summarize here... or click one of the sample buttons above to try immediately."
+                        className="w-full h-[380px] sm:h-[430px] min-h-[320px] p-4 sm:p-5 rounded-2xl bg-slate-50/60 hover:bg-slate-50/90 border border-slate-200/90 text-slate-800 text-sm leading-relaxed placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-y transition-all duration-200 shadow-inner font-sans"
                       />
                     </div>
 
-                    {/* Footer Stats & Summarize Button */}
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-slate-100">
-                      <div className="flex items-center gap-2 sm:gap-3 text-xs text-slate-600 font-medium">
-                        <span><b>{stats.words}</b> words</span>
-                        <span>•</span>
-                        <span><b>{stats.chars}</b> chars</span>
-                        <span>•</span>
-                        <span>~<b>{stats.readingTime}</b>s read</span>
+                    {/* Footer Stats & Primary Summarize Button */}
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3.5 border-t border-slate-100">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs text-slate-600 font-medium">
+                        <span className="px-2.5 py-1 rounded-lg bg-slate-100/80 border border-slate-200/60 font-mono text-[11px]">
+                          <b>{stats.words}</b> words
+                        </span>
+                        <span className="px-2.5 py-1 rounded-lg bg-slate-100/80 border border-slate-200/60 font-mono text-[11px]">
+                          <b>{stats.chars}</b> chars
+                        </span>
+                        <span className="px-2.5 py-1 rounded-lg bg-slate-100/80 border border-slate-200/60 font-mono text-[11px]">
+                          ~<b>{stats.readingTime}</b>s read
+                        </span>
                       </div>
 
                       <button
@@ -919,13 +966,23 @@
                     </div>
                   </div>
 
-                  {/* Right Column: Generated Summary Result */}
-                  <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 flex flex-col justify-between space-y-4 card-shadow">
+                  {/* Right Column: Generated Summary Card with AI Studio Empty State */}
+                  <div className="bg-white/95 backdrop-blur-xl border border-slate-200/90 rounded-3xl p-5 sm:p-6 flex flex-col justify-between space-y-4 shadow-sm hover:shadow-xl hover:shadow-emerald-500/10 hover:border-emerald-300/80 transition-all duration-300 relative group">
+                    {/* Hover Ambient Top Accent Line */}
+                    <div className="absolute top-0 left-8 right-8 h-[2px] bg-gradient-to-r from-transparent via-emerald-500 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+
                     <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                          <span className="text-sm font-bold text-slate-800 font-heading tracking-tight">Generated Summary</span>
+                      {/* Header Bar */}
+                      <div className="flex items-center justify-between mb-3.5">
+                        <div className="flex items-center gap-2.5">
+                          <span className="relative flex h-2.5 w-2.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                          </span>
+                          <span className="text-sm sm:text-base font-bold text-slate-900 font-heading tracking-tight">Generated Summary</span>
+                          <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 hidden sm:inline-block">
+                            AI Output
+                          </span>
                         </div>
                         {summaryResult && (
                           <span className="text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-md">
@@ -935,15 +992,15 @@
                       </div>
 
                       {summaryResult ? (
-                        <div className="space-y-4">
+                        <div className="space-y-4 animate-fadeIn">
                           
                           {/* Summary Metadata & Compression Banner */}
-                          <div className="p-3 rounded-xl bg-slate-900 text-white border border-slate-800 shadow-sm space-y-2">
+                          <div className="p-3.5 rounded-2xl bg-slate-900 text-white border border-slate-800 shadow-md space-y-2">
                             <div className="flex items-center gap-1.5 text-xs text-indigo-300 font-bold">
                               <span>🏷️</span>
                               <span>{summaryResult.method_used || 'Abstractive Transformer'}</span>
                             </div>
-                            <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-800 text-xs">
+                            <div className="grid grid-cols-3 gap-2 pt-1.5 border-t border-slate-800 text-xs">
                               <div>
                                 <span className="text-[10px] uppercase text-slate-400 font-semibold block">Original Words</span>
                                 <span className="font-bold text-sm text-white">
@@ -970,13 +1027,13 @@
                           </div>
 
                           {/* Summary Output Box */}
-                          <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200 text-slate-800 text-sm leading-relaxed min-h-[180px]">
+                          <div className="p-4 sm:p-5 rounded-2xl bg-slate-50/70 border border-slate-200 text-slate-800 text-sm sm:text-base leading-relaxed min-h-[180px] shadow-inner font-sans">
                             {summaryResult.summary}
                           </div>
 
                           {/* Key Points Takeaways */}
                           {summaryResult.key_points && summaryResult.key_points.length > 0 && (
-                            <div className="p-3.5 rounded-xl bg-indigo-50/50 border border-indigo-100/80 space-y-2">
+                            <div className="p-4 rounded-2xl bg-indigo-50/50 border border-indigo-100/80 space-y-2">
                               <span className="text-xs font-bold text-indigo-900 flex items-center gap-1.5 font-heading">
                                 <span>📌</span> Key Takeaways
                               </span>
@@ -997,7 +1054,7 @@
                               <span className="text-xs font-bold text-slate-600 block">Keywords:</span>
                               <div className="flex flex-wrap gap-1.5">
                                 {summaryResult.keywords.map((kw, i) => (
-                                  <span key={i} className="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-700 text-xs rounded-lg font-medium">
+                                  <span key={i} className="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-700 text-xs rounded-lg font-medium tab-3d">
                                     #{kw.keyword} <span className="text-slate-400 text-[10px] ml-1">{kw.count}x</span>
                                   </span>
                                 ))}
@@ -1008,15 +1065,15 @@
                           {/* ROUGE Scores */}
                           {summaryResult.rouge && (
                             <div className="grid grid-cols-3 gap-2.5 text-center pt-1">
-                              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 tab-3d">
                                 <span className="text-[11px] text-slate-500 font-semibold block">ROUGE-1 F1</span>
                                 <span className="text-base font-bold text-indigo-600">{(summaryResult.rouge.rouge1.f1 * 100).toFixed(1)}%</span>
                               </div>
-                              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 tab-3d">
                                 <span className="text-[11px] text-slate-500 font-semibold block">ROUGE-2 F1</span>
                                 <span className="text-base font-bold text-indigo-600">{(summaryResult.rouge.rouge2.f1 * 100).toFixed(1)}%</span>
                               </div>
-                              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 tab-3d">
                                 <span className="text-[11px] text-slate-500 font-semibold block">ROUGE-L F1</span>
                                 <span className="text-base font-bold text-emerald-600">{(summaryResult.rouge.rougeL.f1 * 100).toFixed(1)}%</span>
                               </div>
@@ -1025,12 +1082,41 @@
 
                         </div>
                       ) : (
-                        <div className="h-[380px] sm:h-[450px] min-h-[320px] sm:min-h-[420px] flex flex-col items-center justify-center text-center p-6 sm:p-8 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 bg-slate-50/40">
-                          <span className="text-4xl mb-3">📄</span>
-                          <span className="text-sm font-bold text-slate-700">Summary will appear here</span>
-                          <span className="text-xs text-slate-500 max-w-xs mt-1.5 leading-relaxed">
-                            Type or paste your text on the left, then click Summarize to generate an abstractive or extractive summary.
+                        /* AI Studio Empty State Hub */
+                        <div className="h-[380px] sm:h-[430px] min-h-[320px] flex flex-col items-center justify-center text-center p-6 sm:p-8 rounded-2xl border-2 border-dashed border-indigo-200/80 bg-gradient-to-b from-indigo-50/40 via-purple-50/20 to-transparent relative overflow-hidden group/empty hover:border-indigo-400/90 transition-all duration-300">
+                          {/* 3D Animated AI Sparkle Orb */}
+                          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/30 flex items-center justify-center mb-3.5 transform group-hover/empty:scale-110 group-hover/empty:rotate-6 transition-all duration-300">
+                            <SparklesIcon className="w-8 h-8 text-amber-300 drop-shadow-sm" />
+                          </div>
+                          
+                          <span className="text-sm sm:text-base font-bold text-slate-800 font-heading">
+                            Summary will appear here
                           </span>
+                          <p className="text-xs text-slate-500 max-w-xs mt-1.5 leading-relaxed">
+                            Type or paste your text on the left, or upload a document to generate an abstractive or extractive summary.
+                          </p>
+
+                          {/* High-tech feature badges */}
+                          <div className="flex flex-wrap items-center justify-center gap-2 mt-4">
+                            <span className="px-2.5 py-1 rounded-lg bg-white/90 border border-slate-200/80 text-[11px] font-semibold text-slate-600 shadow-2xs">
+                              🤖 Seq2Seq & TF-IDF
+                            </span>
+                            <span className="px-2.5 py-1 rounded-lg bg-white/90 border border-slate-200/80 text-[11px] font-semibold text-slate-600 shadow-2xs">
+                              📊 ROUGE Scoring
+                            </span>
+                            <span className="px-2.5 py-1 rounded-lg bg-white/90 border border-slate-200/80 text-[11px] font-semibold text-slate-600 shadow-2xs">
+                              💾 Cloud History
+                            </span>
+                          </div>
+
+                          {/* 1-Click Load Sample Demo Button */}
+                          <button
+                            onClick={handleLoadSample}
+                            className="btn-3d-secondary mt-4 px-4 py-2 rounded-xl text-xs font-bold text-indigo-700 flex items-center gap-1.5 cursor-pointer shadow-xs"
+                          >
+                            <SparklesIcon className="w-3.5 h-3.5 text-amber-500" />
+                            <span>Load Sample & Test</span>
+                          </button>
                         </div>
                       )}
                     </div>
