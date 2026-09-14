@@ -4,12 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>LexiBrief - AI Text Summarizer</title>
-  <meta name="description" content="Simple, fast, and powerful AI text summarization with Extractive & Transformer engines, MongoDB persistence, and ROUGE evaluation." />
+  <meta name="description" content="AI Text Summarizer powered by Extractive TF-IDF & Deep Transformers with live MongoDB Cloud persistence." />
 
-  <!-- Google Fonts -->
+  <!-- Premium Typography Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -17,18 +17,19 @@
     tailwind.config = {
       theme: {
         extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+            heading: ['"Outfit"', '"Plus Jakarta Sans"', 'sans-serif']
+          },
           colors: {
             brand: {
               50: '#eef2ff',
               100: '#e0e7ff',
+              200: '#c7d2fe',
               500: '#6366f1',
               600: '#4f46e5',
               700: '#4338ca',
             }
-          },
-          fontFamily: {
-            sans: ['Inter', 'system-ui', 'sans-serif'],
-            mono: ['"JetBrains Mono"', 'monospace']
           }
         }
       }
@@ -41,28 +42,40 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <style>
+    * {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
     body {
-      font-family: 'Inter', sans-serif;
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
       background-color: #f8fafc;
       color: #0f172a;
       min-height: 100vh;
     }
-    .custom-shadow {
-      box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+    .card-shadow {
+      box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
     }
-    .custom-shadow-md {
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+    .card-shadow-md {
+      box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
+    }
+    textarea {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      letter-spacing: -0.01em;
+    }
+    ::placeholder {
+      color: #94a3b8 !important;
+      opacity: 1 !important;
     }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-900 antialiased selection:bg-indigo-500 selection:text-white">
+<body class="bg-slate-50 text-slate-900 antialiased selection:bg-indigo-600 selection:text-white">
   <div id="root"></div>
 
   <!-- React Application -->
   <script type="text/babel">
     const { useState, useEffect, useMemo, useRef } = React;
 
-    // Lightweight Toast
+    // Toast Notification
     function Toast({ message, type, onClose }) {
       useEffect(() => {
         const t = setTimeout(onClose, 3500);
@@ -71,21 +84,21 @@
 
       const bg = type === 'error' ? 'bg-rose-600 text-white' :
                  type === 'success' ? 'bg-emerald-600 text-white' :
-                 'bg-slate-800 text-white';
+                 'bg-slate-900 text-white';
 
       return (
-        <div className={`fixed bottom-5 right-5 z-50 flex items-center gap-3 px-4 py-2.5 rounded-lg shadow-lg text-xs font-medium ${bg} transition-all`}>
+        <div className={`fixed bottom-5 right-5 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl text-sm font-medium ${bg} transition-all`}>
           <span>{message}</span>
-          <button onClick={onClose} className="opacity-80 hover:opacity-100 font-bold ml-1">✕</button>
+          <button onClick={onClose} className="opacity-80 hover:opacity-100 font-bold ml-2">✕</button>
         </div>
       );
     }
 
     function App() {
       // Navigation
-      const [activeTab, setActiveTab] = useState('summarize'); // summarize, documents, history, benchmarks
+      const [activeTab, setActiveTab] = useState('summarize');
 
-      // Editor State
+      // Editor & Output State
       const [inputText, setInputText] = useState('');
       const [summaryResult, setSummaryResult] = useState(null);
       const [isLoading, setIsLoading] = useState(false);
@@ -93,14 +106,13 @@
       const [toast, setToast] = useState(null);
 
       // Model Settings
-      const [engineMethod, setEngineMethod] = useState('auto'); // auto, abstractive, extractive
-      const [modelChoice, setModelChoice] = useState('bart'); // bart, t5, pegasus
-      const [summaryMode, setSummaryMode] = useState('balanced'); // concise, balanced, detailed
+      const [engineMethod, setEngineMethod] = useState('auto');
+      const [modelChoice, setModelChoice] = useState('bart');
+      const [summaryMode, setSummaryMode] = useState('balanced');
 
-      // Data Lists
+      // Lists
       const [summariesList, setSummariesList] = useState([]);
       const [documentsList, setDocumentsList] = useState([]);
-      const [presets, setPresets] = useState([]);
       const [historySearch, setHistorySearch] = useState('');
 
       // Standalone ROUGE
@@ -108,26 +120,15 @@
       const [rougeCand, setRougeCand] = useState('');
       const [rougeScores, setRougeScores] = useState(null);
 
-      // Speech TTS
+      // Speech Synthesis
       const [isSpeaking, setIsSpeaking] = useState(false);
 
       const showToast = (msg, type = 'info') => setToast({ message: msg, type });
 
       useEffect(() => {
-        fetchPresets();
         fetchSummaries();
         fetchDocuments();
       }, []);
-
-      const fetchPresets = async () => {
-        try {
-          const res = await fetch('/api/presets');
-          if (res.ok) {
-            const d = await res.json();
-            setPresets(d.presets || []);
-          }
-        } catch (e) {}
-      };
 
       const fetchSummaries = async () => {
         try {
@@ -149,10 +150,10 @@
         } catch (e) {}
       };
 
-      // Execute Summarization
+      // Summarize
       const handleSummarize = async () => {
         if (!inputText.trim()) {
-          showToast("Please enter text or upload a document to summarize.", "error");
+          showToast("Please enter text or upload a document.", "error");
           return;
         }
 
@@ -171,12 +172,12 @@
 
           if (!res.ok) {
             const err = await res.json();
-            throw new Error(err.detail || "Summarization failed");
+            throw new Error(err.detail || "Summarization request failed");
           }
 
           const data = await res.json();
           setSummaryResult(data);
-          showToast("Summary created & saved to database!", "success");
+          showToast("Summary generated successfully!", "success");
           fetchSummaries();
         } catch (e) {
           showToast(e.message, "error");
@@ -235,7 +236,7 @@
         } catch (err) {}
       };
 
-      // Standalone ROUGE
+      // Compute ROUGE
       const handleComputeRouge = async () => {
         if (!rougeRef.trim() || !rougeCand.trim()) {
           showToast("Please provide reference and summary text.", "error");
@@ -284,7 +285,7 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `Summary_${new Date().toISOString().slice(0, 10)}.txt`;
+        a.download = `LexiBrief_Summary.txt`;
         a.click();
         URL.revokeObjectURL(url);
         showToast("Downloaded TXT file.", "success");
@@ -295,13 +296,13 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `LexiBrief_Data_${new Date().toISOString().slice(0, 10)}.json`;
+        a.download = `LexiBrief_Data.json`;
         a.click();
         URL.revokeObjectURL(url);
         showToast("Exported JSON.", "success");
       };
 
-      // Input Stats
+      // Computed Input Stats
       const stats = useMemo(() => {
         const words = inputText.trim() ? inputText.trim().split(/\s+/).length : 0;
         const chars = inputText.length;
@@ -321,27 +322,31 @@
       }, [summariesList, historySearch]);
 
       return (
-        <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800">
+        <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
           
-          {/* Clean Light Navbar */}
-          <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+          {/* Top Clean Header */}
+          <header className="bg-white border-b border-slate-200 sticky top-0 z-30 card-shadow">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
               
               {/* Brand Logo */}
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-base shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-500 flex items-center justify-center text-white font-bold text-lg shadow-sm">
                   L
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-base font-bold text-slate-900 tracking-tight">LexiBrief</span>
-                  <span className="text-[11px] font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
-                    AI Summarizer
-                  </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg font-bold text-slate-900 tracking-tight font-heading">
+                      LexiBrief
+                    </span>
+                    <span className="text-xs font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100">
+                      AI Summarizer
+                    </span>
+                  </div>
                 </div>
               </div>
 
               {/* Navigation Tabs */}
-              <nav className="flex items-center gap-1">
+              <nav className="flex items-center gap-1.5">
                 {[
                   { id: 'summarize', label: 'Summarize', icon: '✨' },
                   { id: 'documents', label: 'Documents', icon: '📄', count: documentsList.length },
@@ -351,16 +356,16 @@
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+                    className={`px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition ${
                       activeTab === tab.id
-                        ? 'bg-slate-100 text-indigo-700 font-bold'
+                        ? 'bg-slate-100 text-indigo-600 font-bold'
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                     }`}
                   >
                     <span>{tab.icon}</span>
                     <span>{tab.label}</span>
                     {tab.count !== undefined && tab.count > 0 && (
-                      <span className="text-[10px] px-1.5 py-0.2 bg-slate-200 text-slate-700 rounded-full font-mono">
+                      <span className="text-[11px] px-1.5 py-0.2 bg-slate-200 text-slate-700 rounded-full font-semibold">
                         {tab.count}
                       </span>
                     )}
@@ -376,21 +381,21 @@
 
             {/* TAB 1: SUMMARIZE */}
             {activeTab === 'summarize' && (
-              <div className="space-y-4">
+              <div className="space-y-5">
                 
-                {/* Simplified Controls Bar */}
-                <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+                {/* Control Toolbar */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 flex flex-wrap items-center justify-between gap-4 card-shadow">
                   
-                  {/* Left: Engine & Mode */}
-                  <div className="flex flex-wrap items-center gap-3">
+                  {/* Left: Engine & Mode Controls */}
+                  <div className="flex flex-wrap items-center gap-4">
                     
                     {/* Method Selector */}
-                    <div className="flex items-center gap-1.5 text-xs">
-                      <span className="text-slate-500 font-medium">Method:</span>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-slate-600 font-semibold">Method:</span>
                       <select
                         value={engineMethod}
                         onChange={(e) => setEngineMethod(e.target.value)}
-                        className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-medium py-1 px-2 rounded-lg focus:outline-none focus:border-indigo-500 cursor-pointer"
+                        className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 text-xs font-medium py-1.5 px-3 rounded-lg focus:outline-none focus:border-indigo-500 focus:bg-white cursor-pointer transition"
                       >
                         <option value="auto">Auto (Hybrid)</option>
                         <option value="extractive">Extractive (TF-IDF Saliency)</option>
@@ -398,32 +403,32 @@
                       </select>
                     </div>
 
-                    {/* Transformer Model */}
+                    {/* Transformer Model Selector */}
                     {(engineMethod === 'abstractive' || engineMethod === 'auto') && (
-                      <div className="flex items-center gap-1.5 text-xs">
-                        <span className="text-slate-500 font-medium">Model:</span>
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-slate-600 font-semibold">Model:</span>
                         <select
                           value={modelChoice}
                           onChange={(e) => setModelChoice(e.target.value)}
-                          className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-medium py-1 px-2 rounded-lg focus:outline-none focus:border-indigo-500 cursor-pointer"
+                          className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 text-xs font-medium py-1.5 px-3 rounded-lg focus:outline-none focus:border-indigo-500 focus:bg-white cursor-pointer transition"
                         >
                           <option value="bart">BART (DistilBART-CNN)</option>
-                          <option value="bart-large">BART Large (Facebook)</option>
+                          <option value="bart-large">BART Large (Facebook CNN)</option>
                           <option value="t5">Google T5 (T5-Small)</option>
                           <option value="pegasus">Google Pegasus</option>
                         </select>
                       </div>
                     )}
 
-                    {/* Mode Toggle */}
-                    <div className="flex items-center gap-1.5 text-xs">
-                      <span className="text-slate-500 font-medium">Length:</span>
+                    {/* Mode Length Pill Switcher */}
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-slate-600 font-semibold">Length:</span>
                       <div className="inline-flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
                         {['concise', 'balanced', 'detailed'].map(m => (
                           <button
                             key={m}
                             onClick={() => setSummaryMode(m)}
-                            className={`px-2.5 py-1 text-xs font-medium capitalize rounded-md transition ${
+                            className={`px-3 py-1 text-xs font-medium capitalize rounded-md transition ${
                               summaryMode === m
                                 ? 'bg-white text-indigo-700 font-bold shadow-xs'
                                 : 'text-slate-600 hover:text-slate-900'
@@ -441,8 +446,8 @@
                   <div>
                     <button
                       onClick={() => { setInputText(''); setSummaryResult(null); }}
-                      className="text-xs text-slate-400 hover:text-slate-700 px-2.5 py-1 rounded-md border border-slate-200 hover:bg-slate-100 transition"
-                      title="Clear Text"
+                      className="text-xs font-semibold text-slate-500 hover:text-slate-800 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 transition"
+                      title="Clear Editor"
                     >
                       Clear
                     </button>
@@ -451,16 +456,19 @@
                 </div>
 
                 {/* 2-Column Clean Workspace */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                   
-                  {/* Left: Input Text Card */}
-                  <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col justify-between space-y-3 shadow-xs">
+                  {/* Left Column: Source Text Input */}
+                  <div className="bg-white border border-slate-200/80 rounded-2xl p-5 flex flex-col justify-between space-y-4 card-shadow">
                     <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">Source Document</span>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
+                          <span className="text-sm font-bold text-slate-800 font-heading tracking-tight">Source Document</span>
+                        </div>
                         
-                        {/* Upload File */}
-                        <label className="cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-200 text-xs font-semibold text-slate-700 transition">
+                        {/* Upload Button */}
+                        <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-200 text-xs font-semibold text-slate-700 transition">
                           <span>{uploadLoading ? '⏳ Reading...' : '📄 Upload PDF / DOCX / TXT'}</span>
                           <input type="file" accept=".pdf,.docx,.txt" onChange={handleFileUpload} disabled={uploadLoading} className="hidden" />
                         </label>
@@ -470,20 +478,24 @@
                         value={inputText}
                         onChange={(e) => setInputText(e.target.value)}
                         placeholder="Paste or type text to summarize here..."
-                        className="w-full h-80 p-3.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 text-sm placeholder-slate-400 focus:bg-white focus:outline-none focus:border-indigo-500 leading-relaxed resize-none transition"
+                        className="w-full h-84 p-4 rounded-xl bg-slate-50/70 border border-slate-200 text-slate-800 text-sm leading-relaxed placeholder-slate-400 focus:bg-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 resize-none transition"
                       />
                     </div>
 
-                    {/* Footer Stats & Button */}
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                      <div className="text-xs text-slate-500 font-mono">
-                        {stats.words} words • {stats.chars} chars • ~{stats.readingTime}s read
+                    {/* Footer Stats & Summarize Button */}
+                    <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                      <div className="flex items-center gap-3 text-xs text-slate-600 font-medium">
+                        <span><b>{stats.words}</b> words</span>
+                        <span>•</span>
+                        <span><b>{stats.chars}</b> chars</span>
+                        <span>•</span>
+                        <span>~<b>{stats.readingTime}</b>s read</span>
                       </div>
 
                       <button
                         onClick={handleSummarize}
                         disabled={isLoading || !inputText.trim()}
-                        className={`px-5 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 shadow-xs ${
+                        className={`px-6 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-sm ${
                           isLoading || !inputText.trim()
                             ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                             : 'bg-indigo-600 hover:bg-indigo-700 text-white active:scale-98'
@@ -491,7 +503,7 @@
                       >
                         {isLoading ? (
                           <>
-                            <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
+                            <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
                             <span>Summarizing...</span>
                           </>
                         ) : (
@@ -501,35 +513,38 @@
                     </div>
                   </div>
 
-                  {/* Right: Summary Result Card */}
-                  <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col justify-between space-y-3 shadow-xs">
+                  {/* Right Column: Generated Summary Result */}
+                  <div className="bg-white border border-slate-200/80 rounded-2xl p-5 flex flex-col justify-between space-y-4 card-shadow">
                     <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">Generated Summary</span>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                          <span className="text-sm font-bold text-slate-800 font-heading tracking-tight">Generated Summary</span>
+                        </div>
                         {summaryResult && (
-                          <span className="text-[11px] font-mono font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded">
+                          <span className="text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-md">
                             {summaryResult.method_used}
                           </span>
                         )}
                       </div>
 
                       {summaryResult ? (
-                        <div className="space-y-3">
+                        <div className="space-y-4">
                           
-                          {/* Summary Text */}
-                          <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 text-sm leading-relaxed min-h-[140px]">
+                          {/* Summary Output Box */}
+                          <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200 text-slate-800 text-sm leading-relaxed min-h-[140px]">
                             {summaryResult.summary}
                           </div>
 
                           {/* Key Points Takeaways */}
                           {summaryResult.key_points && summaryResult.key_points.length > 0 && (
-                            <div className="p-3 rounded-lg bg-indigo-50/70 border border-indigo-100 space-y-1.5">
-                              <span className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+                            <div className="p-3.5 rounded-xl bg-indigo-50/50 border border-indigo-100/80 space-y-2">
+                              <span className="text-xs font-bold text-indigo-900 flex items-center gap-1.5 font-heading">
                                 <span>📌</span> Key Takeaways
                               </span>
-                              <ul className="text-xs text-slate-700 space-y-1 pl-1">
+                              <ul className="text-xs text-slate-700 space-y-1.5 pl-1">
                                 {summaryResult.key_points.map((pt, i) => (
-                                  <li key={i} className="flex items-start gap-1.5">
+                                  <li key={i} className="flex items-start gap-2">
                                     <span className="text-indigo-600 font-bold">•</span>
                                     <span>{pt}</span>
                                   </li>
@@ -540,58 +555,59 @@
 
                           {/* Domain Keywords */}
                           {summaryResult.keywords && summaryResult.keywords.length > 0 && (
-                            <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                              <span className="text-[11px] font-bold text-slate-500 uppercase mr-1">Keywords:</span>
-                              {summaryResult.keywords.map((kw, i) => (
-                                <span key={i} className="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 text-[11px] rounded font-mono">
-                                  #{kw.keyword} <span className="text-slate-400 text-[9px]">{kw.count}x</span>
-                                </span>
-                              ))}
+                            <div className="space-y-1.5 pt-1">
+                              <span className="text-xs font-bold text-slate-600 block">Keywords:</span>
+                              <div className="flex flex-wrap gap-1.5">
+                                {summaryResult.keywords.map((kw, i) => (
+                                  <span key={i} className="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-700 text-xs rounded-lg font-medium">
+                                    #{kw.keyword} <span className="text-slate-400 text-[10px] ml-1">{kw.count}x</span>
+                                  </span>
+                                ))}
+                              </div>
                             </div>
                           )}
 
-                          {/* ROUGE Mini Score Bar */}
+                          {/* ROUGE Scores */}
                           {summaryResult.rouge && (
-                            <div className="grid grid-cols-3 gap-2 text-center pt-1">
-                              <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
-                                <span className="text-[10px] text-slate-500 font-semibold block">ROUGE-1 F1</span>
-                                <span className="text-sm font-bold text-indigo-600">{(summaryResult.rouge.rouge1.f1 * 100).toFixed(1)}%</span>
+                            <div className="grid grid-cols-3 gap-2.5 text-center pt-1">
+                              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                                <span className="text-[11px] text-slate-500 font-semibold block">ROUGE-1 F1</span>
+                                <span className="text-base font-bold text-indigo-600">{(summaryResult.rouge.rouge1.f1 * 100).toFixed(1)}%</span>
                               </div>
-                              <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
-                                <span className="text-[10px] text-slate-500 font-semibold block">ROUGE-2 F1</span>
-                                <span className="text-sm font-bold text-indigo-600">{(summaryResult.rouge.rouge2.f1 * 100).toFixed(1)}%</span>
+                              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                                <span className="text-[11px] text-slate-500 font-semibold block">ROUGE-2 F1</span>
+                                <span className="text-base font-bold text-indigo-600">{(summaryResult.rouge.rouge2.f1 * 100).toFixed(1)}%</span>
                               </div>
-                              <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
-                                <span className="text-[10px] text-slate-500 font-semibold block">ROUGE-L F1</span>
-                                <span className="text-sm font-bold text-emerald-600">{(summaryResult.rouge.rougeL.f1 * 100).toFixed(1)}%</span>
+                              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                                <span className="text-[11px] text-slate-500 font-semibold block">ROUGE-L F1</span>
+                                <span className="text-base font-bold text-emerald-600">{(summaryResult.rouge.rougeL.f1 * 100).toFixed(1)}%</span>
                               </div>
                             </div>
                           )}
 
                         </div>
                       ) : (
-                        <div className="h-80 flex flex-col items-center justify-center text-center p-6 border border-dashed border-slate-200 rounded-lg text-slate-400">
-                          <span className="text-2xl mb-1">📄</span>
-                          <span className="text-xs font-semibold text-slate-600">Summary will appear here</span>
-                          <span className="text-[11px] text-slate-400 max-w-xs mt-0.5">
-                            Enter text on the left and click Summarize to generate an abstractive or extractive summary.
+                        <div className="h-84 flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-slate-200 rounded-xl text-slate-400">
+                          <span className="text-3xl mb-2">📄</span>
+                          <span className="text-sm font-bold text-slate-700">Summary will appear here</span>
+                          <span className="text-xs text-slate-500 max-w-xs mt-1">
+                            Type or paste your text on the left, then click Summarize to generate an abstractive or extractive summary.
                           </span>
                         </div>
                       )}
                     </div>
 
-                    {/* Actions & Export Toolbar */}
+                    {/* Toolbar Actions */}
                     {summaryResult && (
-                      <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
-                        <div className="text-slate-500 font-mono text-[11px]">
-                          📉 <span className="text-emerald-700 font-semibold">{summaryResult.analytics?.compression_ratio}</span> compressed • {summaryResult.analytics?.latency_ms}ms
+                      <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs">
+                        <div className="text-slate-600 font-medium">
+                          📉 <span className="text-emerald-700 font-bold">{summaryResult.analytics?.compression_ratio}</span> compressed • {summaryResult.analytics?.latency_ms}ms
                         </div>
 
-                        <div className="flex items-center gap-1.5">
-                          {/* Audio */}
+                        <div className="flex items-center gap-2">
                           <button
                             onClick={() => handleSpeak(summaryResult.summary)}
-                            className={`px-2.5 py-1 rounded border text-xs font-medium transition ${
+                            className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition ${
                               isSpeaking ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
                             }`}
                             title="Listen"
@@ -599,29 +615,23 @@
                             {isSpeaking ? '⏹️ Stop' : '🔊 Listen'}
                           </button>
 
-                          {/* Copy */}
                           <button
                             onClick={() => copyToClipboard(summaryResult.summary)}
-                            className="px-2.5 py-1 rounded bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-medium transition"
-                            title="Copy Summary"
+                            className="px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold transition"
                           >
                             📋 Copy
                           </button>
 
-                          {/* Download TXT */}
                           <button
                             onClick={() => exportTxt(summaryResult.summary)}
-                            className="px-2.5 py-1 rounded bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-medium transition"
-                            title="Download TXT"
+                            className="px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold transition"
                           >
                             📥 TXT
                           </button>
 
-                          {/* Export JSON */}
                           <button
                             onClick={() => exportJson(summaryResult)}
-                            className="px-2.5 py-1 rounded bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-medium transition"
-                            title="Export JSON"
+                            className="px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold transition"
                           >
                             💾 JSON
                           </button>
@@ -632,32 +642,32 @@
 
                 </div>
 
-                {/* NLP Statistics Bar */}
+                {/* NLP Comparison Statistics */}
                 {summaryResult && (
-                  <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-xs">
-                    <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-2">
+                  <div className="bg-white border border-slate-200/80 rounded-2xl p-4 card-shadow">
+                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-3 font-heading">
                       📊 NLP Comparison Statistics
                     </span>
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center text-xs">
-                      <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
-                        <span className="text-slate-400 text-[10px] block">Source Words</span>
-                        <span className="font-bold text-slate-800 text-sm">{summaryResult.analytics?.original_words}</span>
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center text-xs">
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                        <span className="text-slate-500 text-xs block mb-1">Source Words</span>
+                        <span className="font-bold text-slate-900 text-base">{summaryResult.analytics?.original_words}</span>
                       </div>
-                      <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
-                        <span className="text-slate-400 text-[10px] block">Summary Words</span>
-                        <span className="font-bold text-indigo-600 text-sm">{summaryResult.analytics?.summary_words}</span>
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                        <span className="text-slate-500 text-xs block mb-1">Summary Words</span>
+                        <span className="font-bold text-indigo-600 text-base">{summaryResult.analytics?.summary_words}</span>
                       </div>
-                      <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
-                        <span className="text-slate-400 text-[10px] block">Time Saved</span>
-                        <span className="font-bold text-emerald-600 text-sm">{summaryResult.analytics?.estimated_read_time_saved}</span>
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                        <span className="text-slate-500 text-xs block mb-1">Time Saved</span>
+                        <span className="font-bold text-emerald-600 text-base">{summaryResult.analytics?.estimated_read_time_saved}</span>
                       </div>
-                      <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
-                        <span className="text-slate-400 text-[10px] block">Source Readability</span>
-                        <span className="font-bold text-slate-800 text-sm">{summaryResult.nlp_stats?.readability_score || 72.5}</span>
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                        <span className="text-slate-500 text-xs block mb-1">Source Readability</span>
+                        <span className="font-bold text-slate-900 text-base">{summaryResult.nlp_stats?.readability_score || 72.5}</span>
                       </div>
-                      <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
-                        <span className="text-slate-400 text-[10px] block">Summary Readability</span>
-                        <span className="font-bold text-indigo-600 text-sm">{summaryResult.summary_stats?.readability_score || 78.0}</span>
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                        <span className="text-slate-500 text-xs block mb-1">Summary Readability</span>
+                        <span className="font-bold text-indigo-600 text-base">{summaryResult.summary_stats?.readability_score || 78.0}</span>
                       </div>
                     </div>
                   </div>
@@ -668,32 +678,32 @@
 
             {/* TAB 2: DOCUMENTS */}
             {activeTab === 'documents' && (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Uploaded Documents</h2>
+                  <h2 className="text-base font-bold text-slate-900 font-heading">Uploaded Documents</h2>
                   
-                  <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition shadow-xs">
+                  <label className="cursor-pointer px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition shadow-sm">
                     <span>+ Upload Document</span>
                     <input type="file" accept=".pdf,.docx,.txt" onChange={handleFileUpload} className="hidden" />
                   </label>
                 </div>
 
                 {documentsList.length === 0 ? (
-                  <div className="bg-white border border-slate-200 rounded-xl p-8 text-center text-xs text-slate-400">
+                  <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center text-sm text-slate-500 card-shadow">
                     No documents uploaded yet.
                   </div>
                 ) : (
-                  <div className="bg-white border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 shadow-xs">
+                  <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-100 card-shadow">
                     {documentsList.map(doc => (
-                      <div key={doc._id} className="p-3.5 flex items-center justify-between gap-4 hover:bg-slate-50 transition">
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-2">
-                            <span className="px-1.5 py-0.2 bg-slate-100 border border-slate-200 text-slate-700 font-mono text-[10px] font-bold rounded">
+                      <div key={doc._id} className="p-4 flex items-center justify-between gap-4 hover:bg-slate-50 transition">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2.5">
+                            <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold rounded-md">
                               {doc.format || 'TXT'}
                             </span>
-                            <span className="text-xs font-bold text-slate-900">{doc.filename}</span>
+                            <span className="text-sm font-bold text-slate-900">{doc.filename}</span>
                           </div>
-                          <div className="text-[11px] text-slate-400 font-mono">
+                          <div className="text-xs text-slate-500 font-medium">
                             {doc.words} words • {doc.sentences} sentences • {doc.uploaded_at}
                           </div>
                         </div>
@@ -709,13 +719,13 @@
                                 showToast(`Loaded ${doc.filename}`, "info");
                               } catch (e) {}
                             }}
-                            className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-medium transition"
+                            className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-semibold transition"
                           >
                             Summarize
                           </button>
                           <button
                             onClick={(e) => handleDeleteDoc(doc._id, e)}
-                            className="p-1 text-slate-400 hover:text-rose-600 rounded transition"
+                            className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition"
                             title="Delete"
                           >
                             🗑️
@@ -730,36 +740,36 @@
 
             {/* TAB 3: HISTORY */}
             {activeTab === 'history' && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Summary History</h2>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-4">
+                  <h2 className="text-base font-bold text-slate-900 font-heading">Summary History</h2>
                   
                   <input
                     type="text"
                     value={historySearch}
                     onChange={(e) => setHistorySearch(e.target.value)}
                     placeholder="Search history..."
-                    className="bg-white border border-slate-200 text-slate-800 text-xs px-3 py-1.5 rounded-lg focus:outline-none focus:border-indigo-500 w-56"
+                    className="bg-white border border-slate-200 text-slate-800 text-xs px-3.5 py-2 rounded-xl focus:outline-none focus:border-indigo-500 w-64 card-shadow"
                   />
                 </div>
 
                 {filteredSummaries.length === 0 ? (
-                  <div className="bg-white border border-slate-200 rounded-xl p-8 text-center text-xs text-slate-400">
+                  <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center text-sm text-slate-500 card-shadow">
                     No summary history found.
                   </div>
                 ) : (
-                  <div className="bg-white border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 shadow-xs">
+                  <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-100 card-shadow">
                     {filteredSummaries.map(item => (
-                      <div key={item._id} className="p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:bg-slate-50 transition">
-                        <div className="space-y-1 max-w-xl">
-                          <div className="flex items-center gap-2 text-[11px] text-slate-500 font-mono">
-                            <span className="font-semibold text-indigo-600">{item.method || 'Auto'}</span>
+                      <div key={item._id} className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:bg-slate-50 transition">
+                        <div className="space-y-1.5 max-w-xl">
+                          <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                            <span className="font-bold text-indigo-600">{item.method || 'Auto'}</span>
                             <span>•</span>
                             <span>{item.created_at}</span>
                             <span>•</span>
-                            <span className="text-emerald-600">{item.compression_ratio} compression</span>
+                            <span className="text-emerald-700 font-bold">{item.compression_ratio} compression</span>
                           </div>
-                          <p className="text-xs text-slate-800 line-clamp-2 leading-relaxed">{item.summary}</p>
+                          <p className="text-xs text-slate-800 line-clamp-2 leading-relaxed font-sans">{item.summary}</p>
                         </div>
 
                         <div className="flex items-center gap-2 self-end sm:self-center">
@@ -774,14 +784,14 @@
                                 showToast("Loaded into editor", "info");
                               } catch (e) {}
                             }}
-                            className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded transition"
+                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-lg transition"
                           >
                             Re-Open
                           </button>
 
                           <button
                             onClick={() => exportTxt(item.summary)}
-                            className="p-1 text-slate-400 hover:text-slate-700 rounded transition"
+                            className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition"
                             title="Download TXT"
                           >
                             📥
@@ -789,7 +799,7 @@
 
                           <button
                             onClick={(e) => handleDeleteSummary(item._id, e)}
-                            className="p-1 text-slate-400 hover:text-rose-600 rounded transition"
+                            className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition"
                             title="Delete"
                           >
                             🗑️
@@ -804,96 +814,96 @@
 
             {/* TAB 4: ROUGE BENCHMARKS */}
             {activeTab === 'benchmarks' && (
-              <div className="space-y-4">
-                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">ROUGE Benchmark Evaluator</h2>
+              <div className="space-y-5">
+                <h2 className="text-base font-bold text-slate-900 font-heading">ROUGE Benchmark Evaluator</h2>
 
                 {/* Pretrained Benchmark Scores */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
-                    <span className="text-xs font-bold text-slate-800 block mb-2">BART Seq2Seq (SAMSum)</span>
-                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                      <div className="p-2 bg-slate-50 rounded-lg">
-                        <span className="text-slate-400 text-[10px] block">ROUGE-1</span>
-                        <span className="font-bold text-indigo-600">44.2%</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="bg-white border border-slate-200 rounded-2xl p-5 card-shadow">
+                    <span className="text-sm font-bold text-slate-900 block mb-3 font-heading">BART Seq2Seq (SAMSum)</span>
+                    <div className="grid grid-cols-3 gap-2.5 text-center text-xs">
+                      <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                        <span className="text-slate-500 text-xs block mb-1">ROUGE-1</span>
+                        <span className="font-bold text-indigo-600 text-base">44.2%</span>
                       </div>
-                      <div className="p-2 bg-slate-50 rounded-lg">
-                        <span className="text-slate-400 text-[10px] block">ROUGE-2</span>
-                        <span className="font-bold text-indigo-600">21.8%</span>
+                      <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                        <span className="text-slate-500 text-xs block mb-1">ROUGE-2</span>
+                        <span className="font-bold text-indigo-600 text-base">21.8%</span>
                       </div>
-                      <div className="p-2 bg-slate-50 rounded-lg">
-                        <span className="text-slate-400 text-[10px] block">ROUGE-L</span>
-                        <span className="font-bold text-emerald-600">36.8%</span>
+                      <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                        <span className="text-slate-500 text-xs block mb-1">ROUGE-L</span>
+                        <span className="font-bold text-emerald-600 text-base">36.8%</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
-                    <span className="text-xs font-bold text-slate-800 block mb-2">Google Pegasus (CNN/DailyMail)</span>
-                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                      <div className="p-2 bg-slate-50 rounded-lg">
-                        <span className="text-slate-400 text-[10px] block">ROUGE-1</span>
-                        <span className="font-bold text-indigo-600">43.5%</span>
+                  <div className="bg-white border border-slate-200 rounded-2xl p-5 card-shadow">
+                    <span className="text-sm font-bold text-slate-900 block mb-3 font-heading">Google Pegasus (CNN/DailyMail)</span>
+                    <div className="grid grid-cols-3 gap-2.5 text-center text-xs">
+                      <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                        <span className="text-slate-500 text-xs block mb-1">ROUGE-1</span>
+                        <span className="font-bold text-indigo-600 text-base">43.5%</span>
                       </div>
-                      <div className="p-2 bg-slate-50 rounded-lg">
-                        <span className="text-slate-400 text-[10px] block">ROUGE-2</span>
-                        <span className="font-bold text-indigo-600">20.1%</span>
+                      <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                        <span className="text-slate-500 text-xs block mb-1">ROUGE-2</span>
+                        <span className="font-bold text-indigo-600 text-base">20.1%</span>
                       </div>
-                      <div className="p-2 bg-slate-50 rounded-lg">
-                        <span className="text-slate-400 text-[10px] block">ROUGE-L</span>
-                        <span className="font-bold text-emerald-600">35.4%</span>
+                      <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                        <span className="text-slate-500 text-xs block mb-1">ROUGE-L</span>
+                        <span className="font-bold text-emerald-600 text-base">35.4%</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Custom Pair Calculator */}
-                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3 shadow-xs">
-                  <span className="text-xs font-bold text-slate-800 block">Custom Pair Evaluator</span>
+                <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 card-shadow">
+                  <span className="text-sm font-bold text-slate-900 block font-heading">Custom Pair Evaluator</span>
                   
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                     <div>
-                      <label className="text-slate-500 font-medium mb-1 block">Reference Text:</label>
+                      <label className="text-slate-600 font-semibold mb-1.5 block">Reference Text:</label>
                       <textarea
                         value={rougeRef}
                         onChange={(e) => setRougeRef(e.target.value)}
                         placeholder="Paste reference text here..."
-                        className="w-full h-28 p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 resize-none"
+                        className="w-full h-32 p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm leading-relaxed focus:bg-white focus:outline-none focus:border-indigo-500 resize-none transition"
                       />
                     </div>
                     <div>
-                      <label className="text-slate-500 font-medium mb-1 block">Summary Candidate:</label>
+                      <label className="text-slate-600 font-semibold mb-1.5 block">Summary Candidate:</label>
                       <textarea
                         value={rougeCand}
                         onChange={(e) => setRougeCand(e.target.value)}
                         placeholder="Paste summary candidate here..."
-                        className="w-full h-28 p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 resize-none"
+                        className="w-full h-32 p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm leading-relaxed focus:bg-white focus:outline-none focus:border-indigo-500 resize-none transition"
                       />
                     </div>
                   </div>
 
                   <button
                     onClick={handleComputeRouge}
-                    className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition"
+                    className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-sm"
                   >
                     Compute ROUGE Scores
                   </button>
 
                   {rougeScores && (
-                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 grid grid-cols-3 gap-2 text-center text-xs">
+                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 grid grid-cols-3 gap-3 text-center text-xs">
                       <div>
-                        <span className="text-slate-400 text-[10px] block font-semibold">ROUGE-1 (Unigram)</span>
-                        <span className="text-base font-bold text-indigo-600">{(rougeScores.rouge1.f1 * 100).toFixed(1)}% F1</span>
-                        <span className="text-[10px] text-slate-500 block">P: {(rougeScores.rouge1.precision * 100).toFixed(1)}% • R: {(rougeScores.rouge1.recall * 100).toFixed(1)}%</span>
+                        <span className="text-slate-500 text-xs block font-semibold mb-1">ROUGE-1 (Unigram)</span>
+                        <span className="text-lg font-bold text-indigo-600 block mb-0.5">{(rougeScores.rouge1.f1 * 100).toFixed(1)}% F1</span>
+                        <span className="text-[11px] text-slate-500 block">P: {(rougeScores.rouge1.precision * 100).toFixed(1)}% • R: {(rougeScores.rouge1.recall * 100).toFixed(1)}%</span>
                       </div>
                       <div>
-                        <span className="text-slate-400 text-[10px] block font-semibold">ROUGE-2 (Bigram)</span>
-                        <span className="text-base font-bold text-indigo-600">{(rougeScores.rouge2.f1 * 100).toFixed(1)}% F1</span>
-                        <span className="text-[10px] text-slate-500 block">P: {(rougeScores.rouge2.precision * 100).toFixed(1)}% • R: {(rougeScores.rouge2.recall * 100).toFixed(1)}%</span>
+                        <span className="text-slate-500 text-xs block font-semibold mb-1">ROUGE-2 (Bigram)</span>
+                        <span className="text-lg font-bold text-indigo-600 block mb-0.5">{(rougeScores.rouge2.f1 * 100).toFixed(1)}% F1</span>
+                        <span className="text-[11px] text-slate-500 block">P: {(rougeScores.rouge2.precision * 100).toFixed(1)}% • R: {(rougeScores.rouge2.recall * 100).toFixed(1)}%</span>
                       </div>
                       <div>
-                        <span className="text-slate-400 text-[10px] block font-semibold">ROUGE-L (LCS)</span>
-                        <span className="text-base font-bold text-emerald-600">{(rougeScores.rougeL.f1 * 100).toFixed(1)}% F1</span>
-                        <span className="text-[10px] text-slate-500 block">P: {(rougeScores.rougeL.precision * 100).toFixed(1)}% • R: {(rougeScores.rougeL.recall * 100).toFixed(1)}%</span>
+                        <span className="text-slate-500 text-xs block font-semibold mb-1">ROUGE-L (LCS)</span>
+                        <span className="text-lg font-bold text-emerald-600 block mb-0.5">{(rougeScores.rougeL.f1 * 100).toFixed(1)}% F1</span>
+                        <span className="text-[11px] text-slate-500 block">P: {(rougeScores.rougeL.precision * 100).toFixed(1)}% • R: {(rougeScores.rougeL.recall * 100).toFixed(1)}%</span>
                       </div>
                     </div>
                   )}
@@ -914,8 +924,8 @@
           )}
 
           {/* Clean Footer */}
-          <footer className="border-t border-slate-200 bg-white py-3 text-center text-xs text-slate-400">
-            LexiBrief NLP Engine • Fast, Extractive & Abstractive Text Summarization
+          <footer className="border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-500 font-medium">
+            LexiBrief NLP Platform • Connected to MongoDB Atlas
           </footer>
 
         </div>
