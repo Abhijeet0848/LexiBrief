@@ -397,55 +397,33 @@
             border-color: var(--border-hover);
         }
 
-        /* Bottom Analytics Cards */
-        .analytics-strip {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1rem;
-        }
-
-        @media (max-width: 768px) {
-            .analytics-strip {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-
-        .metric-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-lg);
-            padding: 1rem 1.2rem;
+        /* Sleek Inline Stat Pills */
+        .stats-pills {
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            box-shadow: var(--shadow-sm);
+            gap: 0.4rem;
+            flex-wrap: wrap;
         }
 
-        .metric-label {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            font-weight: 600;
-            letter-spacing: 0.04em;
-            margin-bottom: 0.2rem;
-        }
-
-        .metric-val {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 1.25rem;
-            font-weight: 700;
-            color: var(--text-main);
-        }
-
-        .metric-icon {
-            font-size: 1.25rem;
+        .stat-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
             background: var(--bg-card-subtle);
-            width: 36px;
-            height: 36px;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            border: 1px solid var(--border-color);
+            padding: 0.2rem 0.55rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .stat-pill.highlight {
+            background: #ecfdf5;
+            border-color: #a7f3d0;
+            color: #047857;
+            font-weight: 600;
         }
 
         /* Clean Light Modal */
@@ -630,14 +608,16 @@
                 <textarea id="inputText" placeholder="Paste your article, meeting notes, conversation, or document text here..." oninput="updateStats()"></textarea>
 
                 <div class="card-footer">
-                    <div class="stats-text">
-                        <div>Words: <span id="inputWordCount">0</span></div>
-                        <div>Characters: <span id="inputCharCount">0</span></div>
+                    <div class="stats-pills">
+                        <span class="stat-pill" id="inputWordCount">0 words</span>
+                        <span class="stat-pill" id="inputCharCount">0 chars</span>
                     </div>
                     <div class="btn-group">
-                        <button class="btn-sm" onclick="clearText()" title="Clear">Clear</button>
+                        <button class="btn-sm" onclick="clearText()" title="Clear text">Clear</button>
                         <button class="btn-primary" id="summarizeBtn" onclick="generateSummary()">
-                            <span id="btnIcon">⚡</span>
+                            <span id="btnIcon">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                            </span>
                             <span id="btnLabel">Summarize</span>
                         </button>
                     </div>
@@ -653,64 +633,35 @@
                 <div class="output-box" id="outputBox">
                     <div class="empty-state" id="emptyState">
                         <div class="empty-icon">📄</div>
-                        <div style="font-weight: 600; color: var(--text-secondary);">No summary yet</div>
-                        <div style="font-size: 0.82rem;">Click a sample above or enter text and click Summarize.</div>
+                        <div style="font-weight: 600; color: var(--text-secondary);">No summary generated</div>
+                        <div style="font-size: 0.82rem;">Enter or paste your text on the left and click Summarize.</div>
                     </div>
                     <div id="summaryText" style="display: none; white-space: pre-line;"></div>
                 </div>
 
                 <div class="card-footer">
-                    <div class="stats-text">
-                        <div>Summary Words: <span id="summaryWordCount">0</span></div>
-                        <div>Time: <span id="latencyText">0ms</span></div>
+                    <div class="stats-pills">
+                        <span class="stat-pill" id="statWords">0 words</span>
+                        <span class="stat-pill highlight" id="statReduction" style="display: none;">0% reduced</span>
+                        <span class="stat-pill" id="statTime" style="display: none;">0ms</span>
                     </div>
                     <div class="btn-group">
                         <button class="btn-sm" onclick="toggleSpeech()" id="speechBtn" title="Read summary aloud">
-                            <span id="speechIcon">🔊</span> Listen
+                            <span id="speechIcon">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                            </span>
+                            Listen
                         </button>
                         <button class="btn-sm" onclick="copySummary()" title="Copy to clipboard">
-                            📋 Copy
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                            Copy
                         </button>
-                        <button class="btn-sm" onclick="downloadSummary()" title="Download text">
-                            💾 Export
+                        <button class="btn-sm" onclick="downloadSummary()" title="Download text file">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            Export
                         </button>
                     </div>
                 </div>
-            </div>
-        </div>
-
-        <!-- Metric Analytics Cards -->
-        <div class="analytics-strip">
-            <div class="metric-card">
-                <div>
-                    <div class="metric-label">Reduction Ratio</div>
-                    <div class="metric-val" id="compressionVal">0%</div>
-                </div>
-                <div class="metric-icon">📉</div>
-            </div>
-
-            <div class="metric-card">
-                <div>
-                    <div class="metric-label">Reading Time Saved</div>
-                    <div class="metric-val" id="timeSavedVal">0s</div>
-                </div>
-                <div class="metric-icon">⏳</div>
-            </div>
-
-            <div class="metric-card">
-                <div>
-                    <div class="metric-label">Inference Latency</div>
-                    <div class="metric-val" id="latencyVal">0ms</div>
-                </div>
-                <div class="metric-icon">⚡</div>
-            </div>
-
-            <div class="metric-card">
-                <div>
-                    <div class="metric-label">Model Pipeline</div>
-                    <div class="metric-val" style="color: #059669; font-size: 1.1rem;">Active</div>
-                </div>
-                <div class="metric-icon">🛡️</div>
             </div>
         </div>
     </main>
@@ -833,14 +784,20 @@
         function updateStats() {
             const text = document.getElementById('inputText').value;
             const words = text.trim() ? text.trim().split(/\s+/).length : 0;
-            document.getElementById('inputWordCount').innerText = words;
-            document.getElementById('inputCharCount').innerText = text.length;
+            document.getElementById('inputWordCount').innerText = `${words} words`;
+            document.getElementById('inputCharCount').innerText = `${text.length} chars`;
         }
 
         function clearText() {
             document.getElementById('inputText').value = "";
             updateStats();
             stopSpeech();
+            document.getElementById('summaryText').innerText = "";
+            document.getElementById('summaryText').style.display = "none";
+            document.getElementById('emptyState').style.display = "flex";
+            document.getElementById('statWords').innerText = "0 words";
+            document.getElementById('statReduction').style.display = "none";
+            document.getElementById('statTime').style.display = "none";
         }
 
         async function generateSummary() {
@@ -861,7 +818,7 @@
             btnLabel.innerText = 'Summarizing...';
 
             emptyState.innerHTML = `
-                <div class="spinner" style="border-color: rgba(79, 70, 229, 0.2); border-top-color: var(--primary); width: 24px; height: 24px;"></div>
+                <div class="spinner" style="border-color: rgba(79, 70, 229, 0.2); border-top-color: var(--primary); width: 22px; height: 22px;"></div>
                 <div style="font-weight: 600; color: var(--primary); margin-top: 0.5rem;">Generating summary...</div>
             `;
             emptyState.style.display = 'flex';
@@ -887,15 +844,19 @@
                 summaryText.innerText = summary;
 
                 const a = data.analytics || {};
-                document.getElementById('summaryWordCount').innerText = a.summary_words || summary.trim().split(/\s+/).length;
-                document.getElementById('latencyText').innerText = `${a.latency_ms || 0}ms`;
-                document.getElementById('compressionVal').innerText = a.compression_ratio || "0%";
-                document.getElementById('timeSavedVal').innerText = a.estimated_read_time_saved || "0s";
-                document.getElementById('latencyVal').innerText = `${a.latency_ms || 0}ms`;
+                const sumWords = a.summary_words || summary.trim().split(/\s+/).length;
+                document.getElementById('statWords').innerText = `${sumWords} words`;
 
-                const engineEl = document.getElementById('engineLabel');
-                if (engineEl && data.model_source) {
-                    engineEl.innerHTML = `Model: <span style="color: var(--primary);">${data.model_source}</span>`;
+                if (a.compression_ratio) {
+                    const redEl = document.getElementById('statReduction');
+                    redEl.style.display = 'inline-flex';
+                    redEl.innerText = `${a.compression_ratio} condensed`;
+                }
+
+                if (a.latency_ms) {
+                    const timeEl = document.getElementById('statTime');
+                    timeEl.style.display = 'inline-flex';
+                    timeEl.innerText = `${a.latency_ms}ms`;
                 }
 
                 showToast("Summary generated successfully!");
@@ -904,7 +865,7 @@
                 emptyState.innerHTML = `<div style="color: #dc2626; font-weight: 500;">Error: ${err.message}</div>`;
             } finally {
                 btn.disabled = false;
-                btnIcon.innerText = '⚡';
+                btnIcon.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
                 btnLabel.innerText = 'Summarize';
             }
         }
