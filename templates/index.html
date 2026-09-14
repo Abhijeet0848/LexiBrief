@@ -287,14 +287,29 @@
       const [rougeScores, setRougeScores] = useState(null);
       const [rougeLoading, setRougeLoading] = useState(false);
 
-      // Speech Synthesis
+      // Speech Synthesis Voice State
       const [isSpeaking, setIsSpeaking] = useState(false);
+      const [voices, setVoices] = useState([]);
 
       const showToast = (msg, type = 'info') => setToast({ message: msg, type });
 
       useEffect(() => {
         fetchSummaries();
         fetchDocuments();
+
+        // Populate available TTS voices for natural Indian English playback
+        const loadVoices = () => {
+          if ('speechSynthesis' in window) {
+            const list = window.speechSynthesis.getVoices();
+            if (list && list.length > 0) {
+              setVoices(list);
+            }
+          }
+        };
+        loadVoices();
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.onvoiceschanged = loadVoices;
+        }
       }, []);
 
       const fetchSummaries = async () => {
@@ -582,7 +597,7 @@
         showToast("Cleared evaluator inputs.", "info");
       };
 
-      // Text to Speech
+      // Text to Speech with Natural Human-like Indian English (en-IN) Accent
       const handleSpeak = (text) => {
         if (!('speechSynthesis' in window)) {
           showToast("Text-to-speech not supported on this browser.", "error");
@@ -593,11 +608,51 @@
           setIsSpeaking(false);
           return;
         }
-        const utterance = new SpeechSynthesisUtterance(text);
+
+        // Clean text of markdown bullet points and code artifacts for smooth narration
+        const cleanText = text
+          .replace(/[#*_`~>-]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        if (!cleanText) return;
+
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        utterance.lang = 'en-IN';
+        utterance.rate = 0.93; // Slightly measured cadence for natural, clear Indian English phrasing
+        utterance.pitch = 1.0; // Realistic natural pitch
+
+        // Dynamic detection of best available Indian English voice
+        const availableVoices = voices.length > 0 ? voices : window.speechSynthesis.getVoices();
+
+        // 1. Natural / Neural / Online Indian English voice
+        const indianNeuralVoice = availableVoices.find(v => 
+          (v.lang === 'en-IN' || v.lang === 'en_IN' || v.lang.toLowerCase().includes('en-in')) &&
+          (v.name.includes('Natural') || v.name.includes('Neural') || v.name.includes('Online') || v.name.includes('Google') || v.name.includes('Neerja') || v.name.includes('Prabhat') || v.name.includes('Heera') || v.name.includes('Rishi') || v.name.includes('Veena'))
+        );
+
+        // 2. Standard en-IN voice
+        const anyIndianVoice = availableVoices.find(v => 
+          v.lang === 'en-IN' || v.lang === 'en_IN' || v.lang.toLowerCase().includes('en-in') || v.name.toLowerCase().includes('india')
+        );
+
+        // 3. Fallback to Natural English voice
+        const fallbackNatural = availableVoices.find(v => 
+          v.lang.startsWith('en') && (v.name.includes('Natural') || v.name.includes('Neural') || v.name.includes('Google'))
+        );
+
+        const selectedVoice = indianNeuralVoice || anyIndianVoice || fallbackNatural;
+        if (selectedVoice) {
+          utterance.voice = selectedVoice;
+        }
+
+        utterance.onstart = () => setIsSpeaking(true);
         utterance.onend = () => setIsSpeaking(false);
         utterance.onerror = () => setIsSpeaking(false);
+
         window.speechSynthesis.speak(utterance);
         setIsSpeaking(true);
+        showToast(selectedVoice ? `Speaking with ${selectedVoice.name.split('-')[0].trim()}` : "Speaking summary...", "info");
       };
 
       // Copy & Export
