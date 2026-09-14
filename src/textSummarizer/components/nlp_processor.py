@@ -3,8 +3,8 @@ import math
 from collections import Counter
 from typing import List, Dict, Any, Tuple
 
-# Precompiled regular expressions for maximum performance
-_RE_SENTENCE_SPLIT = re.compile(r'(?<=[.!?])\s+(?=[A-Z0-9"\'])')
+# Precompiled regular expressions for maximum performance (supports both standard sentences and structured document lines)
+_RE_SENTENCE_SPLIT = re.compile(r'(?:(?<=[.!?])\s+(?=[A-Z0-9"\']))|(?:\n+)')
 _RE_WORDS = re.compile(r'\b[A-Za-z0-9_-]{2,}\b')
 _RE_VOWELS = re.compile(r'[aeiouy]')
 
@@ -35,11 +35,11 @@ class NLPProcessor:
 
     @classmethod
     def split_sentences(cls, text: str) -> List[str]:
-        """Splits text into discrete sentences with boundary preservation using precompiled regex."""
+        """Splits text into discrete sentences or structured clauses with boundary preservation."""
         if not text:
             return []
         raw_sentences = _RE_SENTENCE_SPLIT.split(text)
-        sentences = [s.strip() for s in raw_sentences if len(s.strip()) > 5]
+        sentences = [s.strip() for s in raw_sentences if len(s.strip()) > 3]
         return sentences if sentences else [text.strip()]
 
     @classmethod
