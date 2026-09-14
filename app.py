@@ -1,13 +1,25 @@
+import sys
+import os
+
+# Serverless & local environment directory resolution
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SRC_DIR = os.path.join(BASE_DIR, "src")
+TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+
+for path in [BASE_DIR, SRC_DIR]:
+    if path not in sys.path:
+        sys.path.insert(0, path)
+
 from fastapi import FastAPI, Request, Form, HTTPException, UploadFile, File, Response
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 import uvicorn
 import subprocess
 import time
-import sys
-import os
 import pandas as pd
 
 from textSummarizer.components.text_extractor import TextExtractor
@@ -20,8 +32,6 @@ app = FastAPI(
     version="2.0.0"
 )
 
-from fastapi.staticfiles import StaticFiles
-
 # Enable CORS for cross-origin frontend requests
 app.add_middleware(
     CORSMiddleware,
@@ -31,8 +41,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-if os.path.exists("static"):
-    app.mount("/static", StaticFiles(directory="static"), name="static")
+if os.path.exists(STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # Lazy-loaded prediction pipeline & database manager
 prediction_pipeline = None

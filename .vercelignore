@@ -1,0 +1,28 @@
+# Version Control
+.git
+.gitignore
+.github
+
+# Testing & Cache
+.pytest_cache
+tests
+research
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# Heavy ML artifacts not needed for serverless inference
+artifacts/data_ingestion
+artifacts/data_transformation
+artifacts/data_validation
+artifacts/model_evaluation
+artifacts/model_trainer
+
+# Virtual Environments & Logs
+.env
+.env.local
+*.log
+logs/
+venv/
+.venv/

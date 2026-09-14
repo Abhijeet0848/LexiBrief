@@ -224,6 +224,33 @@ pytest -v
 
 ---
 
+## ⚡ Vercel Serverless Deployment
+
+LexiBrief is pre-configured for **instant serverless deployment on Vercel** using `@vercel/python`.
+
+### Step 1: Push Code to GitHub
+Ensure your repository is pushed to GitHub:
+```bash
+git add .
+git commit -m "Configure Vercel serverless deployment"
+git push origin main
+```
+
+### Step 2: Deploy to Vercel
+1. Go to [Vercel Dashboard](https://vercel.com/dashboard) and click **"Add New Project"**.
+2. Import the `LexiBrief` repository from your GitHub account.
+3. Keep the default build settings:
+   - **Framework Preset**: `Other`
+   - **Root Directory**: `./`
+4. Add **Environment Variables** (Optional, for MongoDB Atlas Cloud Persistence):
+   - `MONGODB_URL`: `mongodb+srv://<username>:<password>@cluster.mongodb.net/?retryWrites=true&w=majority`
+   *(or use individual keys: `MONGODB_USER`, `MONGODB_PASSWORD`, `MONGODB_CLUSTER`, `MONGODB_DB_NAME`)*
+5. Click **Deploy**.
+
+Your LexiBrief instance will be live worldwide on a `.vercel.app` URL with serverless auto-scaling!
+
+---
+
 ## ☁️ AWS CI/CD Deployment
 
 ### 1. Build and Run via Docker Locally
@@ -244,3 +271,4 @@ Configure the following secrets in your GitHub repository (`Settings > Secrets a
 
 ## 📜 License
 This project is open-sourced under the [MIT License](LICENSE).
+
