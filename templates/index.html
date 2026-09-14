@@ -3,45 +3,31 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LexiBrief - State-of-the-Art NLP Text Summarization Platform</title>
-  <meta name="description" content="AI-powered Text Summarization with Extractive TF-IDF, Abstractive Transformers (BART/T5/Pegasus), MongoDB Persistence, and ROUGE Evaluation." />
+  <title>LexiBrief - AI Text Summarizer</title>
+  <meta name="description" content="Simple, fast, and powerful AI text summarization with Extractive & Transformer engines, MongoDB persistence, and ROUGE evaluation." />
 
-  <!-- Fonts & Icons -->
+  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   
-  <!-- Tailwind CSS CDN for instant styling primitives -->
+  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
-      darkMode: 'class',
       theme: {
         extend: {
           colors: {
             brand: {
-              50: '#f5f7ff',
-              100: '#ebf0fe',
-              200: '#ced9fd',
-              300: '#a3bbfb',
-              400: '#7195f7',
-              500: '#436cf0',
-              600: '#264de4',
-              700: '#1d3bb8',
-              800: '#1c3395',
-              900: '#1c2d76',
-              950: '#111b49',
-            },
-            accent: {
-              purple: '#8b5cf6',
-              cyan: '#06b6d4',
-              emerald: '#10b981',
-              amber: '#f59e0b',
-              rose: '#f43f5e'
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
             }
           },
           fontFamily: {
-            sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+            sans: ['Inter', 'system-ui', 'sans-serif'],
             mono: ['"JetBrains Mono"', 'monospace']
           }
         }
@@ -54,223 +40,119 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
-
   <style>
     body {
-      font-family: 'Plus Jakarta Sans', sans-serif;
-      background: #090d16;
-      color: #f1f5f9;
+      font-family: 'Inter', sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
       min-height: 100vh;
     }
-    
-    /* Glassmorphic card styling */
-    .glass-panel {
-      background: rgba(17, 24, 39, 0.7);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+    .custom-shadow {
+      box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
     }
-    .glass-card {
-      background: rgba(30, 41, 59, 0.5);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-    }
-    .glass-input {
-      background: rgba(15, 23, 42, 0.6);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-    .glass-input:focus {
-      border-color: #6366f1;
-      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
-    }
-
-    /* Gradient glow effects */
-    .glow-purple {
-      box-shadow: 0 0 25px -5px rgba(139, 92, 246, 0.3);
-    }
-    .glow-blue {
-      box-shadow: 0 0 25px -5px rgba(59, 130, 246, 0.3);
-    }
-    
-    /* Custom Scrollbar */
-    ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-    ::-webkit-scrollbar-track {
-      background: rgba(15, 23, 42, 0.5);
-    }
-    ::-webkit-scrollbar-thumb {
-      background: rgba(100, 116, 139, 0.4);
-      border-radius: 4px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: rgba(148, 163, 184, 0.6);
-    }
-
-    @keyframes pulseGlow {
-      0%, 100% { opacity: 0.6; transform: scale(1); }
-      50% { opacity: 1; transform: scale(1.03); }
-    }
-    .animate-pulse-glow {
-      animation: pulseGlow 3s ease-in-out infinite;
+    .custom-shadow-md {
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
     }
   </style>
 </head>
-<body class="bg-[#0b0f19] text-slate-100 antialiased selection:bg-brand-500 selection:text-white">
+<body class="bg-slate-50 text-slate-900 antialiased selection:bg-indigo-500 selection:text-white">
   <div id="root"></div>
 
-  <!-- React Application Script -->
+  <!-- React Application -->
   <script type="text/babel">
-    const { useState, useEffect, useRef, useMemo } = React;
+    const { useState, useEffect, useMemo, useRef } = React;
 
-    // Toast Notification Component
+    // Lightweight Toast
     function Toast({ message, type, onClose }) {
       useEffect(() => {
-        const timer = setTimeout(onClose, 4000);
-        return () => clearTimeout(timer);
+        const t = setTimeout(onClose, 3500);
+        return () => clearTimeout(t);
       }, [onClose]);
 
-      const bg = type === 'error' ? 'bg-rose-950/90 border-rose-500 text-rose-200' :
-                 type === 'success' ? 'bg-emerald-950/90 border-emerald-500 text-emerald-200' :
-                 'bg-brand-950/90 border-brand-500 text-brand-200';
+      const bg = type === 'error' ? 'bg-rose-600 text-white' :
+                 type === 'success' ? 'bg-emerald-600 text-white' :
+                 'bg-slate-800 text-white';
 
       return (
-        <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl border backdrop-blur-md shadow-2xl ${bg} animate-bounce-short`}>
-          <span className="text-sm font-medium">{message}</span>
-          <button onClick={onClose} className="p-1 hover:opacity-75 transition">✕</button>
+        <div className={`fixed bottom-5 right-5 z-50 flex items-center gap-3 px-4 py-2.5 rounded-lg shadow-lg text-xs font-medium ${bg} transition-all`}>
+          <span>{message}</span>
+          <button onClick={onClose} className="opacity-80 hover:opacity-100 font-bold ml-1">✕</button>
         </div>
       );
     }
 
-    // Modal Component
-    function Modal({ isOpen, onClose, title, children }) {
-      if (!isOpen) return null;
-      return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
-          <div className="bg-slate-900 border border-slate-700/60 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/50">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">{title}</h3>
-              <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition">✕</button>
-            </div>
-            <div className="p-6 overflow-y-auto space-y-4">
-              {children}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    // Main App Component
     function App() {
-      // Navigation state
-      const [activeTab, setActiveTab] = useState('summarize'); // summarize, documents, history, benchmarks, settings
-      
-      // Editor & Output state
+      // Navigation
+      const [activeTab, setActiveTab] = useState('summarize'); // summarize, documents, history, benchmarks
+
+      // Editor State
       const [inputText, setInputText] = useState('');
       const [summaryResult, setSummaryResult] = useState(null);
       const [isLoading, setIsLoading] = useState(false);
       const [uploadLoading, setUploadLoading] = useState(false);
       const [toast, setToast] = useState(null);
 
-      // Model & Config parameters
+      // Model Settings
       const [engineMethod, setEngineMethod] = useState('auto'); // auto, abstractive, extractive
       const [modelChoice, setModelChoice] = useState('bart'); // bart, t5, pegasus
       const [summaryMode, setSummaryMode] = useState('balanced'); // concise, balanced, detailed
-      const [minLength, setMinLength] = useState(30);
-      const [maxLength, setMaxLength] = useState(130);
 
-      // Database & History State
-      const [dbStatus, setDbStatus] = useState(null);
+      // Data Lists
       const [summariesList, setSummariesList] = useState([]);
       const [documentsList, setDocumentsList] = useState([]);
-      const [historySearch, setHistorySearch] = useState('');
-      const [selectedHistoryItem, setSelectedHistoryItem] = useState(null);
-      const [selectedDocItem, setSelectedDocItem] = useState(null);
-
-      // Presets
       const [presets, setPresets] = useState([]);
+      const [historySearch, setHistorySearch] = useState('');
 
-      // Optional Authentication State
-      const [currentUser, setCurrentUser] = useState('gautamabhijeet050_db_user');
-      const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-      const [authUsernameInput, setAuthUsernameInput] = useState('gautamabhijeet050_db_user');
-
-      // Standalone ROUGE Calculator State
+      // Standalone ROUGE
       const [rougeRef, setRougeRef] = useState('');
       const [rougeCand, setRougeCand] = useState('');
-      const [rougeLiveScore, setRougeLiveScore] = useState(null);
+      const [rougeScores, setRougeScores] = useState(null);
 
-      // Speech synthesis
+      // Speech TTS
       const [isSpeaking, setIsSpeaking] = useState(false);
-      const speechRef = useRef(null);
 
-      const showToast = (message, type = 'info') => {
-        setToast({ message, type });
-      };
+      const showToast = (msg, type = 'info') => setToast({ message: msg, type });
 
-      // Initial data fetch
       useEffect(() => {
-        fetchDbStatus();
         fetchPresets();
         fetchSummaries();
         fetchDocuments();
       }, []);
 
-      const fetchDbStatus = async () => {
-        try {
-          const res = await fetch('/api/db/status');
-          if (res.ok) {
-            const data = await res.json();
-            setDbStatus(data);
-          }
-        } catch (e) {
-          console.error("DB status fetch error", e);
-        }
-      };
-
       const fetchPresets = async () => {
         try {
           const res = await fetch('/api/presets');
           if (res.ok) {
-            const data = await res.json();
-            setPresets(data.presets || []);
+            const d = await res.json();
+            setPresets(d.presets || []);
           }
-        } catch (e) {
-          console.error("Presets fetch error", e);
-        }
+        } catch (e) {}
       };
 
       const fetchSummaries = async () => {
         try {
           const res = await fetch('/api/summaries?limit=50');
           if (res.ok) {
-            const data = await res.json();
-            setSummariesList(data.summaries || []);
+            const d = await res.json();
+            setSummariesList(d.summaries || []);
           }
-        } catch (e) {
-          console.error("Summaries fetch error", e);
-        }
+        } catch (e) {}
       };
 
       const fetchDocuments = async () => {
         try {
           const res = await fetch('/api/documents?limit=50');
           if (res.ok) {
-            const data = await res.json();
-            setDocumentsList(data.documents || []);
+            const d = await res.json();
+            setDocumentsList(d.documents || []);
           }
-        } catch (e) {
-          console.error("Documents fetch error", e);
-        }
+        } catch (e) {}
       };
 
-      // Handle Text Summarization
+      // Execute Summarization
       const handleSummarize = async () => {
         if (!inputText.trim()) {
-          showToast("Please enter or paste text to summarize.", "error");
+          showToast("Please enter text or upload a document to summarize.", "error");
           return;
         }
 
@@ -283,30 +165,27 @@
               text: inputText,
               mode: summaryMode,
               method: engineMethod,
-              model_name: modelChoice,
-              max_length: maxLength,
-              min_length: minLength
+              model_name: modelChoice
             })
           });
 
           if (!res.ok) {
-            const errData = await res.json();
-            throw new Error(errData.detail || "Summarization request failed.");
+            const err = await res.json();
+            throw new Error(err.detail || "Summarization failed");
           }
 
           const data = await res.json();
           setSummaryResult(data);
-          showToast("Summary generated & saved to MongoDB!", "success");
-          fetchDbStatus();
+          showToast("Summary created & saved to database!", "success");
           fetchSummaries();
-        } catch (err) {
-          showToast(`Error: ${err.message}`, "error");
+        } catch (e) {
+          showToast(e.message, "error");
         } finally {
           setIsLoading(false);
         }
       };
 
-      // Handle File Upload (PDF, DOCX, TXT)
+      // File Upload
       const handleFileUpload = async (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -316,23 +195,14 @@
 
         setUploadLoading(true);
         try {
-          const res = await fetch('/api/upload', {
-            method: 'POST',
-            body: formData
-          });
-
-          if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.detail || "Failed to extract file.");
-          }
-
+          const res = await fetch('/api/upload', { method: 'POST', body: formData });
+          if (!res.ok) throw new Error("Could not extract file text");
           const data = await res.json();
           setInputText(data.text || '');
-          showToast(`Extracted ${data.filename} (${data.format}) & saved to MongoDB Documents!`, "success");
+          showToast(`Uploaded ${data.filename}`, "success");
           fetchDocuments();
-          fetchDbStatus();
         } catch (err) {
-          showToast(`Extraction failed: ${err.message}`, "error");
+          showToast(err.message, "error");
         } finally {
           setUploadLoading(false);
           e.target.value = '';
@@ -342,41 +212,33 @@
       // Delete Summary
       const handleDeleteSummary = async (id, e) => {
         e?.stopPropagation();
-        if (!confirm("Are you sure you want to delete this summary from MongoDB?")) return;
+        if (!confirm("Delete this summary from history?")) return;
         try {
           const res = await fetch(`/api/summaries/${id}`, { method: 'DELETE' });
           if (res.ok) {
-            showToast("Summary removed from database.", "info");
+            showToast("Summary removed.", "info");
             fetchSummaries();
-            fetchDbStatus();
-            if (selectedHistoryItem?._id === id) setSelectedHistoryItem(null);
           }
-        } catch (err) {
-          showToast("Failed to delete summary.", "error");
-        }
+        } catch (err) {}
       };
 
       // Delete Document
-      const handleDeleteDocument = async (id, e) => {
+      const handleDeleteDoc = async (id, e) => {
         e?.stopPropagation();
-        if (!confirm("Delete this document from MongoDB?")) return;
+        if (!confirm("Delete this document?")) return;
         try {
           const res = await fetch(`/api/documents/${id}`, { method: 'DELETE' });
           if (res.ok) {
             showToast("Document deleted.", "info");
             fetchDocuments();
-            fetchDbStatus();
-            if (selectedDocItem?._id === id) setSelectedDocItem(null);
           }
-        } catch (err) {
-          showToast("Failed to delete document.", "error");
-        }
+        } catch (err) {}
       };
 
-      // Standalone ROUGE evaluate
-      const handleCalculateCustomRouge = async () => {
+      // Standalone ROUGE
+      const handleComputeRouge = async () => {
         if (!rougeRef.trim() || !rougeCand.trim()) {
-          showToast("Please provide both reference text and summary candidate.", "error");
+          showToast("Please provide reference and summary text.", "error");
           return;
         }
         try {
@@ -387,12 +249,10 @@
           });
           if (res.ok) {
             const data = await res.json();
-            setRougeLiveScore(data.rouge);
-            showToast("ROUGE scores computed!", "success");
+            setRougeScores(data.rouge);
+            showToast("ROUGE scores calculated!", "success");
           }
-        } catch (err) {
-          showToast("ROUGE calculation failed.", "error");
-        }
+        } catch (e) {}
       };
 
       // Text to Speech
@@ -407,107 +267,100 @@
           return;
         }
         const utterance = new SpeechSynthesisUtterance(text);
-        utterance.rate = 1.0;
         utterance.onend = () => setIsSpeaking(false);
         utterance.onerror = () => setIsSpeaking(false);
         window.speechSynthesis.speak(utterance);
         setIsSpeaking(true);
       };
 
-      // Export handlers
-      const exportAsTxt = (summary, title = 'LexiBrief_Summary') => {
-        const blob = new Blob([summary], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${title}.txt`;
-        a.click();
-        URL.revokeObjectURL(url);
-        showToast("Downloaded as TXT file.", "success");
-      };
-
-      const exportAsJson = (data, title = 'LexiBrief_Record') => {
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${title}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-        showToast("Exported as JSON.", "success");
-      };
-
+      // Copy & Export
       const copyToClipboard = (text) => {
         navigator.clipboard.writeText(text);
         showToast("Copied to clipboard!", "success");
       };
 
-      // Computed stats for input
-      const inputStats = useMemo(() => {
+      const exportTxt = (text) => {
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Summary_${new Date().toISOString().slice(0, 10)}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast("Downloaded TXT file.", "success");
+      };
+
+      const exportJson = (data) => {
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `LexiBrief_Data_${new Date().toISOString().slice(0, 10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast("Exported JSON.", "success");
+      };
+
+      // Input Stats
+      const stats = useMemo(() => {
         const words = inputText.trim() ? inputText.trim().split(/\s+/).length : 0;
         const chars = inputText.length;
         const sentences = inputText.trim() ? (inputText.match(/[^.!?]+[.!?]+/g) || [inputText]).length : 0;
-        const readTime = Math.ceil(words / 200 * 60);
-        return { words, chars, sentences, readTime };
+        const readingTime = Math.ceil(words / 200 * 60);
+        return { words, chars, sentences, readingTime };
       }, [inputText]);
 
-      // Filtered summaries
+      // Filtered Summaries
       const filteredSummaries = useMemo(() => {
         if (!historySearch.trim()) return summariesList;
         const q = historySearch.toLowerCase();
-        return summariesList.filter(s => 
+        return summariesList.filter(s =>
           (s.summary && s.summary.toLowerCase().includes(q)) ||
-          (s.text_snippet && s.text_snippet.toLowerCase().includes(q)) ||
-          (s.method && s.method.toLowerCase().includes(q))
+          (s.text_snippet && s.text_snippet.toLowerCase().includes(q))
         );
       }, [summariesList, historySearch]);
 
       return (
-        <div className="min-h-screen flex flex-col">
-          {/* Top Navigation Bar */}
-          <header className="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-xl sticky top-0 z-40">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800">
+          
+          {/* Clean Light Navbar */}
+          <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
               
-              {/* Brand Logo & Name */}
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 via-indigo-500 to-accent-cyan flex items-center justify-center shadow-lg shadow-brand-500/20 ring-1 ring-white/20">
-                  <span className="text-xl font-black text-white tracking-wider">L</span>
+              {/* Brand Logo */}
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-base shadow-sm">
+                  L
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-100 to-brand-300 bg-clip-text text-transparent">
-                      LexiBrief
-                    </span>
-                    <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-brand-500/20 text-brand-300 border border-brand-500/30">
-                      NLP Core
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 font-medium">State-of-the-Art Text Summarization Platform</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-base font-bold text-slate-900 tracking-tight">LexiBrief</span>
+                  <span className="text-[11px] font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+                    AI Summarizer
+                  </span>
                 </div>
               </div>
 
               {/* Navigation Tabs */}
-              <nav className="hidden md:flex items-center gap-1 bg-slate-900/60 p-1 rounded-xl border border-slate-800">
+              <nav className="flex items-center gap-1">
                 {[
                   { id: 'summarize', label: 'Summarize', icon: '✨' },
                   { id: 'documents', label: 'Documents', icon: '📄', count: documentsList.length },
                   { id: 'history', label: 'History', icon: '🕘', count: summariesList.length },
-                  { id: 'benchmarks', label: 'ROUGE Benchmarks', icon: '📈' },
-                  { id: 'settings', label: 'DB & Engine', icon: '⚙️' }
+                  { id: 'benchmarks', label: 'ROUGE Metrics', icon: '📊' }
                 ].map(tab => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                      activeTab === tab.id 
-                        ? 'bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-md shadow-brand-600/30' 
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+                      activeTab === tab.id
+                        ? 'bg-slate-100 text-indigo-700 font-bold'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                     }`}
                   >
                     <span>{tab.icon}</span>
                     <span>{tab.label}</span>
-                    {tab.count !== undefined && (
-                      <span className="ml-1 px-1.5 py-0.2 text-[10px] bg-slate-800 rounded-full text-slate-300">
+                    {tab.count !== undefined && tab.count > 0 && (
+                      <span className="text-[10px] px-1.5 py-0.2 bg-slate-200 text-slate-700 rounded-full font-mono">
                         {tab.count}
                       </span>
                     )}
@@ -519,252 +372,182 @@
           </header>
 
           {/* Main Content Area */}
-          <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+          <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6">
 
             {/* TAB 1: SUMMARIZE */}
             {activeTab === 'summarize' && (
-              <div className="space-y-6 animate-fade-in">
+              <div className="space-y-4">
                 
-                {/* Engine Selector Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Extractive Card */}
-                  <div 
-                    onClick={() => setEngineMethod('extractive')}
-                    className={`cursor-pointer p-4 rounded-2xl border transition-all ${
-                      engineMethod === 'extractive' 
-                        ? 'bg-gradient-to-b from-brand-950/60 to-slate-900 border-brand-500/80 ring-2 ring-brand-500/30' 
-                        : 'glass-panel hover:border-slate-700'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl">🔎</span>
-                        <h4 className="font-bold text-sm text-white">Extractive Engine</h4>
-                      </div>
-                      <span className="text-[10px] px-2 py-0.5 rounded bg-brand-500/20 text-brand-300 font-mono">TF-IDF Saliency</span>
-                    </div>
-                    <p className="text-xs text-slate-400">Identifies and extracts high-impact thesis sentences mathematically with zero hallucination risk.</p>
-                  </div>
-
-                  {/* Abstractive Card */}
-                  <div 
-                    onClick={() => setEngineMethod('abstractive')}
-                    className={`cursor-pointer p-4 rounded-2xl border transition-all ${
-                      engineMethod === 'abstractive' 
-                        ? 'bg-gradient-to-b from-indigo-950/60 to-slate-900 border-indigo-500/80 ring-2 ring-indigo-500/30' 
-                        : 'glass-panel hover:border-slate-700'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl">✨</span>
-                        <h4 className="font-bold text-sm text-white">Abstractive Transformers</h4>
-                      </div>
-                      <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-mono">Seq2Seq Neural</span>
-                    </div>
-                    <p className="text-xs text-slate-400">Generates fluent human-like paraphrased synthesis utilizing deep encoder-decoder transformers.</p>
-                  </div>
-
-                  {/* Auto Hybrid Card */}
-                  <div 
-                    onClick={() => setEngineMethod('auto')}
-                    className={`cursor-pointer p-4 rounded-2xl border transition-all ${
-                      engineMethod === 'auto' 
-                        ? 'bg-gradient-to-b from-accent-cyan/10 to-slate-900 border-cyan-500/80 ring-2 ring-cyan-500/30' 
-                        : 'glass-panel hover:border-slate-700'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl">⚡</span>
-                        <h4 className="font-bold text-sm text-white">Auto-Adaptive Hybrid</h4>
-                      </div>
-                      <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono">Dynamic AI</span>
-                    </div>
-                    <p className="text-xs text-slate-400">Automatically evaluates token count and routes to optimal neural or saliency pipelines seamlessly.</p>
-                  </div>
-                </div>
-
-                {/* Configuration Controls Bar */}
-                <div className="glass-panel p-4 rounded-2xl flex flex-wrap items-center justify-between gap-4">
+                {/* Simplified Controls Bar */}
+                <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-xs">
                   
-                  {/* Left: Model Choice & Mode */}
-                  <div className="flex flex-wrap items-center gap-4">
-                    {/* Transformer Architecture Selector */}
+                  {/* Left: Engine & Mode */}
+                  <div className="flex flex-wrap items-center gap-3">
+                    
+                    {/* Method Selector */}
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <span className="text-slate-500 font-medium">Method:</span>
+                      <select
+                        value={engineMethod}
+                        onChange={(e) => setEngineMethod(e.target.value)}
+                        className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-medium py-1 px-2 rounded-lg focus:outline-none focus:border-indigo-500 cursor-pointer"
+                      >
+                        <option value="auto">Auto (Hybrid)</option>
+                        <option value="extractive">Extractive (TF-IDF Saliency)</option>
+                        <option value="abstractive">Abstractive (Transformer)</option>
+                      </select>
+                    </div>
+
+                    {/* Transformer Model */}
                     {(engineMethod === 'abstractive' || engineMethod === 'auto') && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-slate-300">Transformer:</span>
-                        <select 
-                          value={modelChoice} 
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <span className="text-slate-500 font-medium">Model:</span>
+                        <select
+                          value={modelChoice}
                           onChange={(e) => setModelChoice(e.target.value)}
-                          className="glass-input text-xs font-medium text-slate-200 py-1.5 px-3 rounded-xl focus:outline-none cursor-pointer"
+                          className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-medium py-1 px-2 rounded-lg focus:outline-none focus:border-indigo-500 cursor-pointer"
                         >
-                          <option value="bart" className="bg-slate-900">BART (DistilBART-CNN-12-6)</option>
-                          <option value="bart-large" className="bg-slate-900">BART Large (Facebook CNN)</option>
-                          <option value="t5" className="bg-slate-900">Google T5 (T5-Small Seq2Seq)</option>
-                          <option value="pegasus" className="bg-slate-900">Google Pegasus (CNN/DailyMail)</option>
+                          <option value="bart">BART (DistilBART-CNN)</option>
+                          <option value="bart-large">BART Large (Facebook)</option>
+                          <option value="t5">Google T5 (T5-Small)</option>
+                          <option value="pegasus">Google Pegasus</option>
                         </select>
                       </div>
                     )}
 
-                    {/* Summary Mode Pill */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-slate-300">Length Mode:</span>
-                      <div className="inline-flex bg-slate-950 p-1 rounded-xl border border-slate-800">
-                        {['concise', 'balanced', 'detailed'].map(mode => (
+                    {/* Mode Toggle */}
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <span className="text-slate-500 font-medium">Length:</span>
+                      <div className="inline-flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                        {['concise', 'balanced', 'detailed'].map(m => (
                           <button
-                            key={mode}
-                            onClick={() => {
-                              setSummaryMode(mode);
-                              if (mode === 'concise') { setMinLength(20); setMaxLength(64); }
-                              else if (mode === 'balanced') { setMinLength(40); setMaxLength(128); }
-                              else { setMinLength(80); setMaxLength(256); }
-                            }}
-                            className={`px-3 py-1 text-xs font-semibold capitalize rounded-lg transition-all ${
-                              summaryMode === mode 
-                                ? 'bg-brand-600 text-white shadow-sm' 
-                                : 'text-slate-400 hover:text-slate-200'
+                            key={m}
+                            onClick={() => setSummaryMode(m)}
+                            className={`px-2.5 py-1 text-xs font-medium capitalize rounded-md transition ${
+                              summaryMode === m
+                                ? 'bg-white text-indigo-700 font-bold shadow-xs'
+                                : 'text-slate-600 hover:text-slate-900'
                             }`}
                           >
-                            {mode}
+                            {m}
                           </button>
                         ))}
                       </div>
                     </div>
+
                   </div>
 
-                  {/* Right: Presets Loader & Clear */}
+                  {/* Right: Presets & Clear */}
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-400">Sample:</span>
                     <select
                       onChange={(e) => {
                         const sel = presets.find(p => p.id === e.target.value);
                         if (sel) {
                           setInputText(sel.text);
-                          showToast(`Loaded "${sel.title}" preset!`, "info");
+                          showToast(`Loaded "${sel.title}"`, "info");
                         }
                       }}
                       defaultValue=""
-                      className="glass-input text-xs text-slate-300 py-1.5 px-2.5 rounded-xl cursor-pointer"
+                      className="bg-slate-50 border border-slate-200 text-slate-600 text-xs py-1 px-2 rounded-lg cursor-pointer focus:outline-none"
                     >
-                      <option value="" disabled>Select Sample Text...</option>
+                      <option value="" disabled>Load Sample Text...</option>
                       {presets.map(p => (
-                        <option key={p.id} value={p.id} className="bg-slate-900">{p.title} ({p.badge})</option>
+                        <option key={p.id} value={p.id}>{p.title}</option>
                       ))}
                     </select>
 
                     <button
                       onClick={() => { setInputText(''); setSummaryResult(null); }}
-                      className="px-3 py-1.5 text-xs text-slate-400 hover:text-rose-300 hover:bg-rose-950/40 rounded-xl border border-transparent hover:border-rose-900/50 transition"
-                      title="Clear Editor"
+                      className="text-xs text-slate-400 hover:text-slate-700 px-2 py-1 rounded transition"
+                      title="Clear Text"
                     >
                       Clear
                     </button>
                   </div>
+
                 </div>
 
-                {/* Main Two-Column Interactive Workspace */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* 2-Column Clean Workspace */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   
-                  {/* Left Column: Source Input & Document Upload */}
-                  <div className="glass-panel p-5 rounded-2xl flex flex-col justify-between space-y-4">
+                  {/* Left: Input Text Card */}
+                  <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col justify-between space-y-3 shadow-xs">
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full bg-brand-500"></span>
-                          <h3 className="font-bold text-sm text-slate-200">Source Text / Document Input</h3>
-                        </div>
-
-                        {/* File Upload Button */}
-                        <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-brand-300 hover:text-brand-200 transition">
-                          <span>{uploadLoading ? '⏳ Extracting...' : '📄 Upload PDF / DOCX / TXT'}</span>
-                          <input 
-                            type="file" 
-                            accept=".pdf,.docx,.txt" 
-                            onChange={handleFileUpload} 
-                            disabled={uploadLoading}
-                            className="hidden" 
-                          />
+                        <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">Source Document</span>
+                        
+                        {/* Upload File */}
+                        <label className="cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-200 text-xs font-semibold text-slate-700 transition">
+                          <span>{uploadLoading ? '⏳ Reading...' : '📄 Upload PDF / DOCX / TXT'}</span>
+                          <input type="file" accept=".pdf,.docx,.txt" onChange={handleFileUpload} disabled={uploadLoading} className="hidden" />
                         </label>
                       </div>
 
-                      {/* Textarea */}
                       <textarea
                         value={inputText}
                         onChange={(e) => setInputText(e.target.value)}
-                        placeholder="Paste article, dialogue, essay, legal document, or meeting transcript here to summarize..."
-                        className="w-full h-80 p-4 rounded-xl glass-input text-sm text-slate-100 placeholder-slate-500 font-sans leading-relaxed focus:outline-none resize-none transition"
+                        placeholder="Paste or type text to summarize here..."
+                        className="w-full h-80 p-3.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 text-sm placeholder-slate-400 focus:bg-white focus:outline-none focus:border-indigo-500 leading-relaxed resize-none transition"
                       />
                     </div>
 
-                    {/* Footer Stats & Generate Button */}
-                    <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-800">
-                      <div className="flex items-center gap-3 text-xs text-slate-400 font-mono">
-                        <span>📝 <b>{inputStats.words}</b> words</span>
-                        <span>•</span>
-                        <span>🔤 <b>{inputStats.chars}</b> chars</span>
-                        <span>•</span>
-                        <span>⏱️ ~<b>{inputStats.readTime}</b>s read</span>
+                    {/* Footer Stats & Button */}
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                      <div className="text-xs text-slate-500 font-mono">
+                        {stats.words} words • {stats.chars} chars • ~{stats.readingTime}s read
                       </div>
 
                       <button
                         onClick={handleSummarize}
                         disabled={isLoading || !inputText.trim()}
-                        className={`px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-lg ${
+                        className={`px-5 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 shadow-xs ${
                           isLoading || !inputText.trim()
-                            ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                            : 'bg-gradient-to-r from-brand-600 via-indigo-600 to-accent-cyan text-white hover:opacity-95 shadow-brand-500/25 active:scale-95'
+                            ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                            : 'bg-indigo-600 hover:bg-indigo-700 text-white active:scale-98'
                         }`}
                       >
                         {isLoading ? (
                           <>
-                            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                            <span>Synthesizing...</span>
+                            <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
+                            <span>Summarizing...</span>
                           </>
                         ) : (
-                          <>
-                            <span>✨ Generate Summary</span>
-                          </>
+                          <span>✨ Summarize</span>
                         )}
                       </button>
                     </div>
                   </div>
 
-                  {/* Right Column: Generated Summary & NLP Takeaways */}
-                  <div className="glass-panel p-5 rounded-2xl flex flex-col justify-between space-y-4">
+                  {/* Right: Summary Result Card */}
+                  <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col justify-between space-y-3 shadow-xs">
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                          <h3 className="font-bold text-sm text-slate-200">Generated Summary & Synthesis</h3>
-                        </div>
-
+                        <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">Generated Summary</span>
                         {summaryResult && (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                              {summaryResult.method_used}
-                            </span>
-                          </div>
+                          <span className="text-[11px] font-mono font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded">
+                            {summaryResult.method_used}
+                          </span>
                         )}
                       </div>
 
-                      {/* Summary Output Box */}
                       {summaryResult ? (
-                        <div className="space-y-4">
-                          <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800/80 text-slate-100 text-sm leading-relaxed font-sans min-h-[140px]">
+                        <div className="space-y-3">
+                          
+                          {/* Summary Text */}
+                          <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 text-sm leading-relaxed min-h-[140px]">
                             {summaryResult.summary}
                           </div>
 
-                          {/* Key Points Takeaway Box */}
+                          {/* Key Points Takeaways */}
                           {summaryResult.key_points && summaryResult.key_points.length > 0 && (
-                            <div className="p-3.5 rounded-xl bg-indigo-950/30 border border-indigo-500/30 space-y-2">
-                              <h5 className="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
-                                <span>📌</span> Executive Key Takeaways
-                              </h5>
-                              <ul className="space-y-1.5 text-xs text-slate-300 pl-2">
-                                {summaryResult.key_points.map((pt, idx) => (
-                                  <li key={idx} className="flex items-start gap-2">
-                                    <span className="text-indigo-400 font-bold">•</span>
+                            <div className="p-3 rounded-lg bg-indigo-50/70 border border-indigo-100 space-y-1.5">
+                              <span className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+                                <span>📌</span> Key Takeaways
+                              </span>
+                              <ul className="text-xs text-slate-700 space-y-1 pl-1">
+                                {summaryResult.key_points.map((pt, i) => (
+                                  <li key={i} className="flex items-start gap-1.5">
+                                    <span className="text-indigo-600 font-bold">•</span>
                                     <span>{pt}</span>
                                   </li>
                                 ))}
@@ -772,87 +555,63 @@
                             </div>
                           )}
 
-                          {/* Salient Keywords Cloud */}
+                          {/* Domain Keywords */}
                           {summaryResult.keywords && summaryResult.keywords.length > 0 && (
-                            <div className="space-y-1.5">
-                              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">🧠 Salient Domain Keywords</span>
-                              <div className="flex flex-wrap gap-1.5">
-                                {summaryResult.keywords.map((kw, idx) => (
-                                  <span 
-                                    key={idx} 
-                                    className="px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700/60 text-[11px] font-mono text-cyan-300 flex items-center gap-1.5"
-                                  >
-                                    <span>#{kw.keyword}</span>
-                                    <span className="text-[9px] px-1 bg-slate-900 rounded text-slate-400">{kw.count}x</span>
-                                  </span>
-                                ))}
-                              </div>
+                            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                              <span className="text-[11px] font-bold text-slate-500 uppercase mr-1">Keywords:</span>
+                              {summaryResult.keywords.map((kw, i) => (
+                                <span key={i} className="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 text-[11px] rounded font-mono">
+                                  #{kw.keyword} <span className="text-slate-400 text-[9px]">{kw.count}x</span>
+                                </span>
+                              ))}
                             </div>
                           )}
 
-                          {/* Real-Time ROUGE Score Cards */}
+                          {/* ROUGE Mini Score Bar */}
                           {summaryResult.rouge && (
-                            <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 grid grid-cols-3 gap-2 text-center">
-                              <div className="p-2 rounded-lg bg-slate-950/60">
-                                <div className="text-[10px] text-slate-400 font-bold uppercase">ROUGE-1 F1</div>
-                                <div className="text-base font-black text-brand-400">
-                                  {(summaryResult.rouge.rouge1.f1 * 100).toFixed(1)}%
-                                </div>
-                                <div className="text-[9px] text-slate-500">Unigram Overlap</div>
+                            <div className="grid grid-cols-3 gap-2 text-center pt-1">
+                              <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
+                                <span className="text-[10px] text-slate-500 font-semibold block">ROUGE-1 F1</span>
+                                <span className="text-sm font-bold text-indigo-600">{(summaryResult.rouge.rouge1.f1 * 100).toFixed(1)}%</span>
                               </div>
-                              <div className="p-2 rounded-lg bg-slate-950/60">
-                                <div className="text-[10px] text-slate-400 font-bold uppercase">ROUGE-2 F1</div>
-                                <div className="text-base font-black text-indigo-400">
-                                  {(summaryResult.rouge.rouge2.f1 * 100).toFixed(1)}%
-                                </div>
-                                <div className="text-[9px] text-slate-500">Bigram Overlap</div>
+                              <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
+                                <span className="text-[10px] text-slate-500 font-semibold block">ROUGE-2 F1</span>
+                                <span className="text-sm font-bold text-indigo-600">{(summaryResult.rouge.rouge2.f1 * 100).toFixed(1)}%</span>
                               </div>
-                              <div className="p-2 rounded-lg bg-slate-950/60">
-                                <div className="text-[10px] text-slate-400 font-bold uppercase">ROUGE-L F1</div>
-                                <div className="text-base font-black text-emerald-400">
-                                  {(summaryResult.rouge.rougeL.f1 * 100).toFixed(1)}%
-                                </div>
-                                <div className="text-[9px] text-slate-500">LCS Sequence</div>
+                              <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
+                                <span className="text-[10px] text-slate-500 font-semibold block">ROUGE-L F1</span>
+                                <span className="text-sm font-bold text-emerald-600">{(summaryResult.rouge.rougeL.f1 * 100).toFixed(1)}%</span>
                               </div>
                             </div>
                           )}
 
                         </div>
                       ) : (
-                        <div className="h-80 flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-slate-800 rounded-xl">
-                          <div className="w-12 h-12 rounded-full bg-slate-800/80 flex items-center justify-center text-2xl mb-3">
-                            💡
-                          </div>
-                          <h4 className="text-sm font-semibold text-slate-300">Ready to Summarize</h4>
-                          <p className="text-xs text-slate-500 max-w-sm mt-1">
-                            Input your source text or upload a document to generate an extractive or neural abstractive summary with ROUGE metrics and MongoDB persistence.
-                          </p>
+                        <div className="h-80 flex flex-col items-center justify-center text-center p-6 border border-dashed border-slate-200 rounded-lg text-slate-400">
+                          <span className="text-2xl mb-1">📄</span>
+                          <span className="text-xs font-semibold text-slate-600">Summary will appear here</span>
+                          <span className="text-[11px] text-slate-400 max-w-xs mt-0.5">
+                            Enter text on the left and click Summarize to generate an abstractive or extractive summary.
+                          </span>
                         </div>
                       )}
                     </div>
 
-                    {/* Summary Action Bar (Export, Copy, Audio, Analytics) */}
+                    {/* Actions & Export Toolbar */}
                     {summaryResult && (
-                      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800">
-                        {/* Compression & Latency Badge */}
-                        <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
-                          <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800/60">
-                            📉 {summaryResult.analytics?.compression_ratio} compression
-                          </span>
-                          <span>⚡ {summaryResult.analytics?.latency_ms}ms</span>
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                        <div className="text-slate-500 font-mono text-[11px]">
+                          📉 <span className="text-emerald-700 font-semibold">{summaryResult.analytics?.compression_ratio}</span> compressed • {summaryResult.analytics?.latency_ms}ms
                         </div>
 
-                        {/* Export & Actions */}
                         <div className="flex items-center gap-1.5">
-                          {/* Audio TTS */}
+                          {/* Audio */}
                           <button
                             onClick={() => handleSpeak(summaryResult.summary)}
-                            className={`p-2 rounded-lg border text-xs font-semibold transition ${
-                              isSpeaking 
-                                ? 'bg-rose-600 text-white border-rose-500 animate-pulse' 
-                                : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                            className={`px-2.5 py-1 rounded border text-xs font-medium transition ${
+                              isSpeaking ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
                             }`}
-                            title={isSpeaking ? "Stop Audio" : "Listen via Text-to-Speech"}
+                            title="Listen"
                           >
                             {isSpeaking ? '⏹️ Stop' : '🔊 Listen'}
                           </button>
@@ -860,67 +619,62 @@
                           {/* Copy */}
                           <button
                             onClick={() => copyToClipboard(summaryResult.summary)}
-                            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-200 transition"
+                            className="px-2.5 py-1 rounded bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-medium transition"
                             title="Copy Summary"
                           >
                             📋 Copy
                           </button>
 
-                          {/* TXT Download */}
+                          {/* Download TXT */}
                           <button
-                            onClick={() => exportAsTxt(summaryResult.summary)}
-                            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-200 transition"
-                            title="Download as TXT"
+                            onClick={() => exportTxt(summaryResult.summary)}
+                            className="px-2.5 py-1 rounded bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-medium transition"
+                            title="Download TXT"
                           >
                             📥 TXT
                           </button>
 
-                          {/* JSON Download */}
+                          {/* Export JSON */}
                           <button
-                            onClick={() => exportAsJson(summaryResult)}
-                            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-200 transition"
-                            title="Export Full JSON"
+                            onClick={() => exportJson(summaryResult)}
+                            className="px-2.5 py-1 rounded bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-medium transition"
+                            title="Export JSON"
                           >
                             💾 JSON
                           </button>
                         </div>
                       </div>
                     )}
-
                   </div>
 
                 </div>
 
-                {/* NLP Statistics & Readability Comparison Bar */}
+                {/* NLP Statistics Bar */}
                 {summaryResult && (
-                  <div className="glass-panel p-5 rounded-2xl space-y-3">
-                    <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                      <span>📊</span> NLP Comprehensive Statistics Comparison
-                    </h4>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
-                      <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
-                        <div className="text-[10px] text-slate-400">Original Words</div>
-                        <div className="text-lg font-bold text-white">{summaryResult.analytics?.original_words}</div>
+                  <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-xs">
+                    <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-2">
+                      📊 NLP Comparison Statistics
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center text-xs">
+                      <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
+                        <span className="text-slate-400 text-[10px] block">Source Words</span>
+                        <span className="font-bold text-slate-800 text-sm">{summaryResult.analytics?.original_words}</span>
                       </div>
-                      <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
-                        <div className="text-[10px] text-slate-400">Summary Words</div>
-                        <div className="text-lg font-bold text-emerald-400">{summaryResult.analytics?.summary_words}</div>
+                      <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
+                        <span className="text-slate-400 text-[10px] block">Summary Words</span>
+                        <span className="font-bold text-indigo-600 text-sm">{summaryResult.analytics?.summary_words}</span>
                       </div>
-                      <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
-                        <div className="text-[10px] text-slate-400">Time Saved</div>
-                        <div className="text-lg font-bold text-cyan-400">{summaryResult.analytics?.estimated_read_time_saved}</div>
+                      <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
+                        <span className="text-slate-400 text-[10px] block">Time Saved</span>
+                        <span className="font-bold text-emerald-600 text-sm">{summaryResult.analytics?.estimated_read_time_saved}</span>
                       </div>
-                      <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
-                        <div className="text-[10px] text-slate-400">Readability (Source)</div>
-                        <div className="text-lg font-bold text-indigo-400">{summaryResult.nlp_stats?.readability_score || 72.5}</div>
+                      <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
+                        <span className="text-slate-400 text-[10px] block">Source Readability</span>
+                        <span className="font-bold text-slate-800 text-sm">{summaryResult.nlp_stats?.readability_score || 72.5}</span>
                       </div>
-                      <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
-                        <div className="text-[10px] text-slate-400">Readability (Summary)</div>
-                        <div className="text-lg font-bold text-brand-400">{summaryResult.summary_stats?.readability_score || 78.0}</div>
-                      </div>
-                      <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
-                        <div className="text-[10px] text-slate-400">Database Engine</div>
-                        <div className="text-sm font-bold text-amber-300 truncate">MongoDB Saved</div>
+                      <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
+                        <span className="text-slate-400 text-[10px] block">Summary Readability</span>
+                        <span className="font-bold text-indigo-600 text-sm">{summaryResult.summary_stats?.readability_score || 78.0}</span>
                       </div>
                     </div>
                   </div>
@@ -931,74 +685,55 @@
 
             {/* TAB 2: DOCUMENTS */}
             {activeTab === 'documents' && (
-              <div className="space-y-4 animate-fade-in">
+              <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                      <span>📄</span> Uploaded Documents Archive
-                    </h2>
-                    <p className="text-xs text-slate-400">Persisted in MongoDB collection: <code className="text-cyan-300 font-mono">documents</code></p>
-                  </div>
-
-                  <label className="cursor-pointer px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 font-bold text-xs text-white shadow-lg transition flex items-center gap-2">
+                  <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Uploaded Documents</h2>
+                  
+                  <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition shadow-xs">
                     <span>+ Upload Document</span>
                     <input type="file" accept=".pdf,.docx,.txt" onChange={handleFileUpload} className="hidden" />
                   </label>
                 </div>
 
                 {documentsList.length === 0 ? (
-                  <div className="glass-panel p-12 rounded-2xl text-center">
-                    <p className="text-slate-400 text-sm">No documents uploaded yet. Upload a PDF, DOCX, or TXT file to persist it to MongoDB.</p>
+                  <div className="bg-white border border-slate-200 rounded-xl p-8 text-center text-xs text-slate-400">
+                    No documents uploaded yet.
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="bg-white border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 shadow-xs">
                     {documentsList.map(doc => (
-                      <div 
-                        key={doc._id}
-                        className="glass-panel p-4 rounded-2xl flex flex-col justify-between space-y-3 hover:border-slate-700 transition"
-                      >
-                        <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="px-2 py-0.5 rounded bg-brand-500/20 text-brand-300 text-[10px] font-mono font-bold">
+                      <div key={doc._id} className="p-3.5 flex items-center justify-between gap-4 hover:bg-slate-50 transition">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="px-1.5 py-0.2 bg-slate-100 border border-slate-200 text-slate-700 font-mono text-[10px] font-bold rounded">
                               {doc.format || 'TXT'}
                             </span>
-                            <span className="text-[11px] text-slate-500 font-mono">{doc.uploaded_at}</span>
+                            <span className="text-xs font-bold text-slate-900">{doc.filename}</span>
                           </div>
-                          <h4 className="font-bold text-sm text-slate-200 truncate" title={doc.filename}>{doc.filename}</h4>
-                          <p className="text-xs text-slate-400 mt-1">
-                            {doc.words} words • {doc.characters} characters • {doc.sentences} sentences
-                          </p>
-                          {doc.keywords && doc.keywords.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-2">
-                              {doc.keywords.slice(0, 3).map((kw, i) => (
-                                <span key={i} className="px-1.5 py-0.5 bg-slate-800 text-[10px] text-cyan-300 rounded font-mono">#{kw}</span>
-                              ))}
-                            </div>
-                          )}
+                          <div className="text-[11px] text-slate-400 font-mono">
+                            {doc.words} words • {doc.sentences} sentences • {doc.uploaded_at}
+                          </div>
                         </div>
 
-                        <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
+                        <div className="flex items-center gap-2">
                           <button
                             onClick={async () => {
                               try {
                                 const res = await fetch(`/api/documents/${doc._id}`);
-                                const fullDoc = await res.json();
-                                setInputText(fullDoc.text_content || '');
+                                const full = await res.json();
+                                setInputText(full.text_content || '');
                                 setActiveTab('summarize');
-                                showToast(`Loaded ${doc.filename} into editor!`, "info");
-                              } catch (e) {
-                                showToast("Failed to load document content.", "error");
-                              }
+                                showToast(`Loaded ${doc.filename}`, "info");
+                              } catch (e) {}
                             }}
-                            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white transition"
+                            className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-medium transition"
                           >
-                            ⚡ Summarize
+                            Summarize
                           </button>
-
                           <button
-                            onClick={(e) => handleDeleteDocument(doc._id, e)}
-                            className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-rose-950/40 transition"
-                            title="Delete from MongoDB"
+                            onClick={(e) => handleDeleteDoc(doc._id, e)}
+                            className="p-1 text-slate-400 hover:text-rose-600 rounded transition"
+                            title="Delete"
                           >
                             🗑️
                           </button>
@@ -1012,44 +747,36 @@
 
             {/* TAB 3: HISTORY */}
             {activeTab === 'history' && (
-              <div className="space-y-4 animate-fade-in">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div>
-                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                      <span>🕘</span> Summary Generation History
-                    </h2>
-                    <p className="text-xs text-slate-400">Persisted in MongoDB collection: <code className="text-emerald-300 font-mono">summaries</code></p>
-                  </div>
-
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Summary History</h2>
+                  
                   <input
                     type="text"
                     value={historySearch}
                     onChange={(e) => setHistorySearch(e.target.value)}
-                    placeholder="Search summary history..."
-                    className="glass-input px-3.5 py-2 rounded-xl text-xs text-white placeholder-slate-500 w-full sm:w-64 focus:outline-none"
+                    placeholder="Search history..."
+                    className="bg-white border border-slate-200 text-slate-800 text-xs px-3 py-1.5 rounded-lg focus:outline-none focus:border-indigo-500 w-56"
                   />
                 </div>
 
                 {filteredSummaries.length === 0 ? (
-                  <div className="glass-panel p-12 rounded-2xl text-center">
-                    <p className="text-slate-400 text-sm">No summaries found in history.</p>
+                  <div className="bg-white border border-slate-200 rounded-xl p-8 text-center text-xs text-slate-400">
+                    No summary history found.
                   </div>
                 ) : (
-                  <div className="glass-panel rounded-2xl overflow-hidden divide-y divide-slate-800">
+                  <div className="bg-white border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 shadow-xs">
                     {filteredSummaries.map(item => (
-                      <div key={item._id} className="p-4 hover:bg-slate-800/40 transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                        <div className="space-y-1 max-w-2xl">
-                          <div className="flex items-center gap-2">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                              {item.method || 'Auto'}
-                            </span>
-                            <span className="text-[11px] text-slate-500 font-mono">{item.created_at}</span>
-                            <span className="text-[11px] text-emerald-400 font-mono">📉 {item.compression_ratio}</span>
+                      <div key={item._id} className="p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:bg-slate-50 transition">
+                        <div className="space-y-1 max-w-xl">
+                          <div className="flex items-center gap-2 text-[11px] text-slate-500 font-mono">
+                            <span className="font-semibold text-indigo-600">{item.method || 'Auto'}</span>
+                            <span>•</span>
+                            <span>{item.created_at}</span>
+                            <span>•</span>
+                            <span className="text-emerald-600">{item.compression_ratio} compression</span>
                           </div>
-                          <p className="text-xs text-slate-200 line-clamp-2 leading-relaxed font-sans">{item.summary}</p>
-                          {item.key_points && item.key_points.length > 0 && (
-                            <p className="text-[11px] text-slate-400 italic truncate">📌 {item.key_points[0]}</p>
-                          )}
+                          <p className="text-xs text-slate-800 line-clamp-2 leading-relaxed">{item.summary}</p>
                         </div>
 
                         <div className="flex items-center gap-2 self-end sm:self-center">
@@ -1061,28 +788,26 @@
                                 setInputText(full.full_text || full.text_snippet || '');
                                 setSummaryResult(full);
                                 setActiveTab('summarize');
-                                showToast("Summary loaded into active workspace!", "info");
-                              } catch (e) {
-                                showToast("Failed to load summary item.", "error");
-                              }
+                                showToast("Loaded into editor", "info");
+                              } catch (e) {}
                             }}
-                            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white transition"
+                            className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded transition"
                           >
                             Re-Open
                           </button>
 
                           <button
-                            onClick={() => exportAsTxt(item.summary, `Summary_${item._id.slice(0, 8)}`)}
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 transition"
-                            title="Export TXT"
+                            onClick={() => exportTxt(item.summary)}
+                            className="p-1 text-slate-400 hover:text-slate-700 rounded transition"
+                            title="Download TXT"
                           >
                             📥
                           </button>
 
                           <button
                             onClick={(e) => handleDeleteSummary(item._id, e)}
-                            className="p-1.5 rounded-lg hover:bg-rose-950/40 text-slate-500 hover:text-rose-400 transition"
-                            title="Delete Record"
+                            className="p-1 text-slate-400 hover:text-rose-600 rounded transition"
+                            title="Delete"
                           >
                             🗑️
                           </button>
@@ -1094,194 +819,107 @@
               </div>
             )}
 
-            {/* TAB 4: ROUGE BENCHMARKS & EVALUATOR */}
+            {/* TAB 4: ROUGE BENCHMARKS */}
             {activeTab === 'benchmarks' && (
-              <div className="space-y-6 animate-fade-in">
-                <div>
-                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                    <span>📈</span> ROUGE Evaluation & Benchmark Suite
-                  </h2>
-                  <p className="text-xs text-slate-400">Precision, Recall, and F1 N-Gram and Longest Common Subsequence Scoring</p>
-                </div>
+              <div className="space-y-4">
+                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">ROUGE Benchmark Evaluator</h2>
 
-                {/* Pre-trained Model Benchmarks */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="glass-panel p-5 rounded-2xl space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-bold text-sm text-slate-200">BART Seq2Seq Benchmark</h4>
-                      <span className="px-2 py-0.5 bg-brand-500/20 text-brand-300 text-[10px] font-mono rounded">SAMSum Corpus</span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 text-center">
-                      <div className="p-3 rounded-xl bg-slate-900/80">
-                        <div className="text-[10px] text-slate-400">ROUGE-1</div>
-                        <div className="text-lg font-black text-brand-400">44.21%</div>
+                {/* Pretrained Benchmark Scores */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
+                    <span className="text-xs font-bold text-slate-800 block mb-2">BART Seq2Seq (SAMSum)</span>
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                      <div className="p-2 bg-slate-50 rounded-lg">
+                        <span className="text-slate-400 text-[10px] block">ROUGE-1</span>
+                        <span className="font-bold text-indigo-600">44.2%</span>
                       </div>
-                      <div className="p-3 rounded-xl bg-slate-900/80">
-                        <div className="text-[10px] text-slate-400">ROUGE-2</div>
-                        <div className="text-lg font-black text-indigo-400">21.85%</div>
+                      <div className="p-2 bg-slate-50 rounded-lg">
+                        <span className="text-slate-400 text-[10px] block">ROUGE-2</span>
+                        <span className="font-bold text-indigo-600">21.8%</span>
                       </div>
-                      <div className="p-3 rounded-xl bg-slate-900/80">
-                        <div className="text-[10px] text-slate-400">ROUGE-L</div>
-                        <div className="text-lg font-black text-emerald-400">36.84%</div>
+                      <div className="p-2 bg-slate-50 rounded-lg">
+                        <span className="text-slate-400 text-[10px] block">ROUGE-L</span>
+                        <span className="font-bold text-emerald-600">36.8%</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="glass-panel p-5 rounded-2xl space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-bold text-sm text-slate-200">Google Pegasus Benchmark</h4>
-                      <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 text-[10px] font-mono rounded">CNN / DailyMail</span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 text-center">
-                      <div className="p-3 rounded-xl bg-slate-900/80">
-                        <div className="text-[10px] text-slate-400">ROUGE-1</div>
-                        <div className="text-lg font-black text-brand-400">43.52%</div>
+                  <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
+                    <span className="text-xs font-bold text-slate-800 block mb-2">Google Pegasus (CNN/DailyMail)</span>
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                      <div className="p-2 bg-slate-50 rounded-lg">
+                        <span className="text-slate-400 text-[10px] block">ROUGE-1</span>
+                        <span className="font-bold text-indigo-600">43.5%</span>
                       </div>
-                      <div className="p-3 rounded-xl bg-slate-900/80">
-                        <div className="text-[10px] text-slate-400">ROUGE-2</div>
-                        <div className="text-lg font-black text-indigo-400">20.14%</div>
+                      <div className="p-2 bg-slate-50 rounded-lg">
+                        <span className="text-slate-400 text-[10px] block">ROUGE-2</span>
+                        <span className="font-bold text-indigo-600">20.1%</span>
                       </div>
-                      <div className="p-3 rounded-xl bg-slate-900/80">
-                        <div className="text-[10px] text-slate-400">ROUGE-L</div>
-                        <div className="text-lg font-black text-emerald-400">35.41%</div>
+                      <div className="p-2 bg-slate-50 rounded-lg">
+                        <span className="text-slate-400 text-[10px] block">ROUGE-L</span>
+                        <span className="font-bold text-emerald-600">35.4%</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Standalone Live ROUGE Evaluator Tool */}
-                <div className="glass-panel p-5 rounded-2xl space-y-4">
-                  <h4 className="font-bold text-sm text-white flex items-center gap-2">
-                    <span>🧪</span> Custom Pair ROUGE Evaluator
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Custom Pair Calculator */}
+                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3 shadow-xs">
+                  <span className="text-xs font-bold text-slate-800 block">Custom Pair Evaluator</span>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                     <div>
-                      <label className="text-xs font-semibold text-slate-300 mb-1 block">Reference Text (Ground Truth / Source)</label>
+                      <label className="text-slate-500 font-medium mb-1 block">Reference Text:</label>
                       <textarea
                         value={rougeRef}
                         onChange={(e) => setRougeRef(e.target.value)}
                         placeholder="Paste reference text here..."
-                        className="w-full h-32 p-3 rounded-xl glass-input text-xs text-white focus:outline-none resize-none"
+                        className="w-full h-28 p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 resize-none"
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-semibold text-slate-300 mb-1 block">Candidate Summary</label>
+                      <label className="text-slate-500 font-medium mb-1 block">Summary Candidate:</label>
                       <textarea
                         value={rougeCand}
                         onChange={(e) => setRougeCand(e.target.value)}
-                        placeholder="Paste generated or evaluated candidate summary here..."
-                        className="w-full h-32 p-3 rounded-xl glass-input text-xs text-white focus:outline-none resize-none"
+                        placeholder="Paste summary candidate here..."
+                        className="w-full h-28 p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 resize-none"
                       />
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <button
-                      onClick={handleCalculateCustomRouge}
-                      className="px-5 py-2 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 font-bold text-xs text-white shadow-lg transition"
-                    >
-                      ⚡ Compute ROUGE Metrics
-                    </button>
-                  </div>
+                  <button
+                    onClick={handleComputeRouge}
+                    className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition"
+                  >
+                    Compute ROUGE Scores
+                  </button>
 
-                  {rougeLiveScore && (
-                    <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div className="p-3 rounded-lg bg-slate-900/60 text-center">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">ROUGE-1 (Unigram)</span>
-                        <div className="text-xl font-extrabold text-brand-400 my-1">
-                          {(rougeLiveScore.rouge1.f1 * 100).toFixed(1)}% F1
-                        </div>
-                        <div className="text-[10px] text-slate-400">
-                          P: {(rougeLiveScore.rouge1.precision * 100).toFixed(1)}% | R: {(rougeLiveScore.rouge1.recall * 100).toFixed(1)}%
-                        </div>
+                  {rougeScores && (
+                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 grid grid-cols-3 gap-2 text-center text-xs">
+                      <div>
+                        <span className="text-slate-400 text-[10px] block font-semibold">ROUGE-1 (Unigram)</span>
+                        <span className="text-base font-bold text-indigo-600">{(rougeScores.rouge1.f1 * 100).toFixed(1)}% F1</span>
+                        <span className="text-[10px] text-slate-500 block">P: {(rougeScores.rouge1.precision * 100).toFixed(1)}% • R: {(rougeScores.rouge1.recall * 100).toFixed(1)}%</span>
                       </div>
-
-                      <div className="p-3 rounded-lg bg-slate-900/60 text-center">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">ROUGE-2 (Bigram)</span>
-                        <div className="text-xl font-extrabold text-indigo-400 my-1">
-                          {(rougeLiveScore.rouge2.f1 * 100).toFixed(1)}% F1
-                        </div>
-                        <div className="text-[10px] text-slate-400">
-                          P: {(rougeLiveScore.rouge2.precision * 100).toFixed(1)}% | R: {(rougeLiveScore.rouge2.recall * 100).toFixed(1)}%
-                        </div>
+                      <div>
+                        <span className="text-slate-400 text-[10px] block font-semibold">ROUGE-2 (Bigram)</span>
+                        <span className="text-base font-bold text-indigo-600">{(rougeScores.rouge2.f1 * 100).toFixed(1)}% F1</span>
+                        <span className="text-[10px] text-slate-500 block">P: {(rougeScores.rouge2.precision * 100).toFixed(1)}% • R: {(rougeScores.rouge2.recall * 100).toFixed(1)}%</span>
                       </div>
-
-                      <div className="p-3 rounded-lg bg-slate-900/60 text-center">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">ROUGE-L (LCS)</span>
-                        <div className="text-xl font-extrabold text-emerald-400 my-1">
-                          {(rougeLiveScore.rougeL.f1 * 100).toFixed(1)}% F1
-                        </div>
-                        <div className="text-[10px] text-slate-400">
-                          P: {(rougeLiveScore.rougeL.precision * 100).toFixed(1)}% | R: {(rougeLiveScore.rougeL.recall * 100).toFixed(1)}%
-                        </div>
+                      <div>
+                        <span className="text-slate-400 text-[10px] block font-semibold">ROUGE-L (LCS)</span>
+                        <span className="text-base font-bold text-emerald-600">{(rougeScores.rougeL.f1 * 100).toFixed(1)}% F1</span>
+                        <span className="text-[10px] text-slate-500 block">P: {(rougeScores.rougeL.precision * 100).toFixed(1)}% • R: {(rougeScores.rougeL.recall * 100).toFixed(1)}%</span>
                       </div>
                     </div>
                   )}
                 </div>
-              </div>
-            )}
 
-            {/* TAB 5: DB & SETTINGS */}
-            {activeTab === 'settings' && (
-              <div className="space-y-6 animate-fade-in max-w-4xl mx-auto">
-                <div>
-                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                    <span>⚙️</span> Database & NLP Pipeline Settings
-                  </h2>
-                  <p className="text-xs text-slate-400">MongoDB Connection, Collection Telemetry & Model Orchestration</p>
-                </div>
-
-                {/* MongoDB Status Box */}
-                <div className="glass-panel p-5 rounded-2xl space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-sm text-white">MongoDB Persistence Layer</h4>
-                    <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono text-xs font-bold">
-                      {dbStatus?.engine || 'MongoDB Active'}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                    <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
-                      <span className="text-slate-400 block mb-1">Authenticated DB User:</span>
-                      <span className="text-white font-mono font-bold text-sm">{currentUser}</span>
-                    </div>
-
-                    <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
-                      <span className="text-slate-400 block mb-1">Target Database:</span>
-                      <span className="text-cyan-300 font-mono font-bold text-sm">{dbStatus?.database || 'lexibrief_db'}</span>
-                    </div>
-
-                    <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
-                      <span className="text-slate-400 block mb-1">Summaries Collection Count:</span>
-                      <span className="text-emerald-400 font-mono font-bold text-sm">{dbStatus?.collections?.summaries || 0} records</span>
-                    </div>
-
-                    <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
-                      <span className="text-slate-400 block mb-1">Documents Collection Count:</span>
-                      <span className="text-brand-400 font-mono font-bold text-sm">{dbStatus?.collections?.documents || 0} records</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Optional Environment Variables Guide */}
-                <div className="glass-panel p-5 rounded-2xl space-y-3">
-                  <h4 className="font-bold text-sm text-white">MongoDB Atlas Connection Setup (.env)</h4>
-                  <p className="text-xs text-slate-400">
-                    To connect directly to MongoDB Atlas Cloud, configure the <code className="text-cyan-300 font-mono">.env</code> file with:
-                  </p>
-                  <pre className="p-3 rounded-xl bg-slate-950 font-mono text-xs text-slate-300 overflow-x-auto border border-slate-800">
-MONGODB_USER=gautamabhijeet050_db_user
-MONGODB_PASSWORD=your_mongodb_password
-MONGODB_CLUSTER=cluster0.xxxx
-MONGODB_DB=lexibrief_db
-                  </pre>
-                </div>
               </div>
             )}
 
           </main>
-
-
 
           {/* Toast Notification */}
           {toast && (
@@ -1292,15 +930,15 @@ MONGODB_DB=lexibrief_db
             />
           )}
 
-          {/* Footer */}
-          <footer className="border-t border-slate-800/60 bg-slate-950/60 py-4 text-center text-xs text-slate-500">
-            <span>LexiBrief NLP Platform • Powered by Python, Transformers, FastAPI, MongoDB & React</span>
+          {/* Clean Footer */}
+          <footer className="border-t border-slate-200 bg-white py-3 text-center text-xs text-slate-400">
+            LexiBrief NLP Engine • Fast, Extractive & Abstractive Text Summarization
           </footer>
+
         </div>
       );
     }
 
-    // Render React Application
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
