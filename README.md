@@ -5,6 +5,8 @@
 # ✨ LexiBrief
 ### Enterprise-Grade Neural NLP Abstractive Text Summarizer
 
+[![Live Demo](https://img.shields.io/badge/Live_Demo-lexi--brief.vercel.app-000000.svg?style=for-the-badge&logo=vercel&logoColor=white)](https://lexi-brief.vercel.app/)
+
 [![Python Version](https://img.shields.io/badge/Python-3.10%2B-blue.svg?logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-1.0.0-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Hugging Face](https://img.shields.io/badge/Hugging%20Face-Transformers-yellow.svg?logo=huggingface&logoColor=white)](https://huggingface.co/google/pegasus-cnn_dailymail)
@@ -14,7 +16,9 @@
 
 *Transform complex multi-page articles, corporate transcripts, and technical documents into clear, high-impact executive briefs in real time.*
 
-[Features](#-key-features) • [Architecture](#-modular-mlops-architecture) • [Getting Started](#-getting-started) • [API Documentation](#-api-endpoints) • [Deployment](#-aws-cicd-deployment)
+🌐 **Live Application**: [**https://lexi-brief.vercel.app**](https://lexi-brief.vercel.app/)
+
+[Live Demo](https://lexi-brief.vercel.app/) • [Features](#-key-features) • [Architecture](#-modular-mlops-architecture) • [Getting Started](#-getting-started) • [API Documentation](#-api-endpoints) • [Deployment](#-aws-cicd-deployment)
 
 ---
 
