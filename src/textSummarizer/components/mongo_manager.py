@@ -45,7 +45,7 @@ class MongoDBManager:
         if explicit_url:
             return explicit_url
 
-        user = os.getenv("MONGODB_USER", "gautamabhijeet050_db_user")
+        user = os.getenv("MONGODB_USER")
         pwd = os.getenv("MONGODB_PASSWORD")
         cluster = os.getenv("MONGODB_CLUSTER")
 

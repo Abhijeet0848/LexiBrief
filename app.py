@@ -1,5 +1,6 @@
 import sys
 import os
+import re
 
 # Serverless & local environment directory resolution
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -25,6 +26,7 @@ import pandas as pd
 from textSummarizer.components.text_extractor import TextExtractor
 from textSummarizer.components.nlp_processor import NLPProcessor
 from textSummarizer.components.mongo_manager import MongoDBManager
+from textSummarizer.logging import logger
 
 app = FastAPI(
     title="LexiBrief API",
@@ -32,12 +34,17 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# Enable CORS for cross-origin frontend requests
+# Security Constants & Limits
+MAX_UPLOAD_SIZE = 15 * 1024 * 1024   # 15 MB max file upload
+MAX_INPUT_CHARS = 150_000            # 150,000 max input character limit
+ADMIN_SECRET_KEY = os.getenv("ADMIN_SECRET_KEY")
+
+# Enable Secure CORS for API endpoints
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -54,6 +61,12 @@ def get_prediction_pipeline():
         from textSummarizer.pipeline.prediction import PredictionPipeline
         prediction_pipeline = PredictionPipeline()
     return prediction_pipeline
+
+def validate_entity_id(entity_id: str) -> str:
+    """Validates entity ID to prevent malformed or injection strings."""
+    if not entity_id or len(entity_id) > 64 or not re.match(r'^[a-zA-Z0-9_-]+$', entity_id):
+        raise HTTPException(status_code=400, detail="Invalid identifier format.")
+    return entity_id
 
 
 class SummaryRequest(BaseModel):
@@ -139,10 +152,17 @@ async def get_presets():
 async def upload_document(file: UploadFile = File(...)):
     """Extracts and cleans raw text from uploaded files (PDF, DOCX, TXT) and saves to MongoDB."""
     try:
-        content_bytes = await file.read()
-        extracted_text, detected_format = TextExtractor.extract(file.filename, content_bytes)
+        # Security: Enforce max upload file size (15 MB) to prevent OOM/DoS
+        content_bytes = await file.read(MAX_UPLOAD_SIZE + 1)
+        if len(content_bytes) > MAX_UPLOAD_SIZE:
+            raise HTTPException(
+                status_code=413, 
+                detail="File too large. Maximum supported document size is 15 MB."
+            )
         
-        if not extracted_text:
+        extracted_text, detected_format = TextExtractor.extract(file.filename or "document.txt", content_bytes)
+        
+        if not extracted_text or not extracted_text.strip():
             raise HTTPException(status_code=400, detail="Could not extract readable text from uploaded file.")
             
         stats = NLPProcessor.compute_stats(extracted_text)
@@ -150,7 +170,7 @@ async def upload_document(file: UploadFile = File(...)):
         key_points = NLPProcessor.extract_key_points(extracted_text, top_k=4)
         
         doc_payload = {
-            "filename": file.filename,
+            "filename": file.filename or "document.txt",
             "format": detected_format,
             "text": extracted_text,
             "stats": stats,
@@ -163,7 +183,7 @@ async def upload_document(file: UploadFile = File(...)):
         
         return {
             "id": saved_record.get("_id"),
-            "filename": file.filename,
+            "filename": file.filename or "document.txt",
             "format": detected_format,
             "text": extracted_text,
             "stats": stats,
@@ -174,20 +194,22 @@ async def upload_document(file: UploadFile = File(...)):
     except HTTPException as he:
         raise he
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"File extraction error: {e}")
+        logger.error(f"File extraction error: {e}")
+        raise HTTPException(status_code=500, detail="An error occurred while processing the uploaded file.")
 
 
 @app.get("/api/documents", tags=["MongoDB Documents"])
 async def get_documents(limit: int = 50):
     """Retrieves uploaded documents from MongoDB."""
-    docs = db_manager.get_documents(limit=limit)
+    docs = db_manager.get_documents(limit=min(limit, 100))
     return {"documents": docs, "count": len(docs)}
 
 
 @app.get("/api/documents/{doc_id}", tags=["MongoDB Documents"])
 async def get_document_item(doc_id: str):
     """Retrieves a single document with full text from MongoDB."""
-    doc = db_manager.get_document_by_id(doc_id)
+    valid_id = validate_entity_id(doc_id)
+    doc = db_manager.get_document_by_id(valid_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     return doc
@@ -196,21 +218,23 @@ async def get_document_item(doc_id: str):
 @app.delete("/api/documents/{doc_id}", tags=["MongoDB Documents"])
 async def delete_document_item(doc_id: str):
     """Deletes a document from MongoDB."""
-    success = db_manager.delete_document(doc_id)
-    return {"success": success, "deleted_id": doc_id}
+    valid_id = validate_entity_id(doc_id)
+    success = db_manager.delete_document(valid_id)
+    return {"success": success, "deleted_id": valid_id}
 
 
 @app.get("/api/summaries", tags=["MongoDB Summaries"])
 async def get_summaries(limit: int = 50):
     """Retrieves saved summary history from MongoDB."""
-    sums = db_manager.get_summaries(limit=limit)
+    sums = db_manager.get_summaries(limit=min(limit, 100))
     return {"summaries": sums, "count": len(sums)}
 
 
 @app.get("/api/summaries/{summary_id}", tags=["MongoDB Summaries"])
 async def get_summary_item(summary_id: str):
     """Retrieves a single summary record with full text from MongoDB."""
-    item = db_manager.get_summary_by_id(summary_id)
+    valid_id = validate_entity_id(summary_id)
+    item = db_manager.get_summary_by_id(valid_id)
     if not item:
         raise HTTPException(status_code=404, detail="Summary not found")
     return item
@@ -219,8 +243,9 @@ async def get_summary_item(summary_id: str):
 @app.delete("/api/summaries/{summary_id}", tags=["MongoDB Summaries"])
 async def delete_summary_item(summary_id: str):
     """Deletes a summary record from MongoDB."""
-    success = db_manager.delete_summary(summary_id)
-    return {"success": success, "deleted_id": summary_id}
+    valid_id = validate_entity_id(summary_id)
+    success = db_manager.delete_summary(valid_id)
+    return {"success": success, "deleted_id": valid_id}
 
 
 @app.get("/api/db/status", tags=["MongoDB Status"])
@@ -283,7 +308,17 @@ async def get_metrics():
 
 
 @app.get("/train", tags=["Pipeline"])
-async def training():
+async def training(request: Request):
+    """Triggers model training and evaluation pipeline (Protected by ADMIN_SECRET_KEY)."""
+    # Security: If ADMIN_SECRET_KEY is configured in environment, require authorization
+    if ADMIN_SECRET_KEY:
+        req_key = request.headers.get("X-Admin-Key") or request.query_params.get("admin_key")
+        if req_key != ADMIN_SECRET_KEY:
+            raise HTTPException(
+                status_code=403, 
+                detail="Forbidden: Valid admin key is required to trigger model training."
+            )
+
     try:
         process = subprocess.run([sys.executable, "main.py"], capture_output=True, text=True)
         if process.returncode == 0:
@@ -293,16 +328,17 @@ async def training():
                 "output": process.stdout
             })
         else:
+            logger.error(f"Training pipeline failed: {process.stderr}")
             return JSONResponse(
                 status_code=500,
                 content={
                     "status": "error",
-                    "message": "Pipeline execution failed",
-                    "details": process.stderr or process.stdout
+                    "message": "Pipeline execution encountered an internal error."
                 }
             )
     except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error(f"Training process execution error: {e}")
+        return JSONResponse(status_code=500, content={"status": "error", "message": "Failed to start training process."})
 
 
 @app.post("/predict", tags=["Prediction & MongoDB"])
@@ -341,6 +377,13 @@ async def predict_route(request: Request):
 
         if not input_text or not str(input_text).strip():
             raise HTTPException(status_code=400, detail="Input text cannot be empty.")
+
+        # Security: Enforce maximum input text length to prevent memory & CPU starvation
+        if len(str(input_text)) > MAX_INPUT_CHARS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Input text exceeds maximum allowed length of {MAX_INPUT_CHARS:,} characters."
+            )
 
         pipeline_obj = get_prediction_pipeline()
         prediction_result = pipeline_obj.predict(
@@ -398,8 +441,10 @@ async def predict_route(request: Request):
     except HTTPException as he:
         raise he
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Prediction error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error during summarization.")
 
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8080)
+

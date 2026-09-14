@@ -149,3 +149,26 @@ def test_mongodb_crud_endpoints():
     res_status = client.get("/api/db/status")
     assert res_status.status_code == 200
     assert "collections" in res_status.json()
+
+
+def test_security_input_validation_and_id_sanitization():
+    """Verify security controls: input length cap and invalid ID rejection."""
+    # Test 1: Excessive input text (>150,000 characters)
+    huge_text = "A" * 150_001
+    res_huge = client.post("/predict", json={"text": huge_text})
+    assert res_huge.status_code == 400
+    assert "exceeds maximum allowed length" in res_huge.json()["detail"]
+
+    # Test 2: Invalid entity identifier (injection string)
+    res_bad_id = client.get("/api/documents/../../etc/passwd$#@")
+    assert res_bad_id.status_code in [400, 404]
+
+    # Test 3: Large file upload rejection (> 15MB)
+    large_payload = b"X" * (15 * 1024 * 1024 + 10)
+    res_large_file = client.post(
+        "/api/upload",
+        files={"file": ("large_bomb.txt", io.BytesIO(large_payload), "text/plain")}
+    )
+    assert res_large_file.status_code == 413
+    assert "File too large" in res_large_file.json()["detail"]
+
