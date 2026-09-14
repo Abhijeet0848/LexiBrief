@@ -22,12 +22,22 @@
 
 ## 🚀 Key Features
 
-- 🧠 **Abstractive Sequence-to-Sequence Modeling**: Powered by Google Pegasus (`google/pegasus-cnn_dailymail`) fine-tuned on dialogue & discourse datasets.
+- 🧠 **Dual Extractive & Deep Transformer Engine**: Seq2Seq neural summarization paired with TF-IDF semantic saliency ranking.
 - 🎛️ **Adaptive Compression Modes**: Switch between **Concise** *(high condensation)*, **Balanced** *(recommended)*, and **Detailed** *(comprehensive)* summary lengths.
-- ⚡ **Real-Time Telemetry & Analytics**: Live calculation of word/character compression ratios, reading time savings, and inference latency.
-- 🎨 **Executive Glassmorphism UI**: High-end obsidian dark-mode interface with 1-click sample presets, text-to-speech audio reader, and one-click markdown exports.
-- 🛠️ **Modular MLOps Architecture**: Decoupled 5-stage pipeline for Data Ingestion, Data Validation, Transformation, Model Training, and Evaluation.
-- 🐳 **Production-Ready CI/CD**: Containerized with Docker and automated for deployment to AWS (ECR & EC2) via GitHub Actions.
+- ⚡ **Real-Time Telemetry & ROUGE Evaluation**: Live calculation of word/character compression ratios, reading time savings, and ROUGE-1/ROUGE-2/ROUGE-L F1 accuracy scores.
+- 📄 **Multi-Format Document Ingestion**: Drag-and-drop parsing for PDF, DOCX, and TXT documents.
+- 🍃 **MongoDB Atlas Cloud Persistence**: Dual collections for `summaries` and `documents` with resilient local storage fallback.
+- 🎨 **Modern Minimalist UI**: Clean, light-mode interface with audio text-to-speech reader, key takeaways extraction, and JSON/TXT export tools.
+
+---
+
+## ⚙️ What's Automated Under the Hood
+
+- **Best Method (Auto Hybrid)**:
+  - Dynamically synthesizes text using deep neural Seq2Seq transformer architectures for natural, human-like summaries.
+  - Automatically utilizes extractive TF-IDF saliency fallback for ultra-fast response times if needed.
+- **Best Model (BART Transformer)**:
+  - Uses pre-trained bidirectional encoder + autoregressive decoder (`sshleifer/distilbart-cnn-12-6` / `facebook/bart-large-cnn`) for maximum coherence and high ROUGE accuracy.
 
 ---
 
