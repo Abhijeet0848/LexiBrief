@@ -74,14 +74,25 @@ class MongoDBManager:
             self._ensure_local_dirs()
 
     def _ensure_local_dirs(self):
-        """Creates directory structure for local persistence."""
-        os.makedirs(os.path.join("artifacts", "database"), exist_ok=True)
-        self.summaries_file = os.path.join("artifacts", "database", "summaries.json")
-        self.documents_file = os.path.join("artifacts", "database", "documents.json")
+        """Creates directory structure for local persistence (using /tmp on serverless if needed)."""
+        try:
+            os.makedirs(os.path.join("artifacts", "database"), exist_ok=True)
+            self.summaries_file = os.path.join("artifacts", "database", "summaries.json")
+            self.documents_file = os.path.join("artifacts", "database", "documents.json")
+        except (OSError, PermissionError):
+            import tempfile
+            tmp_dir = os.path.join(tempfile.gettempdir(), "lexibrief_db")
+            os.makedirs(tmp_dir, exist_ok=True)
+            self.summaries_file = os.path.join(tmp_dir, "summaries.json")
+            self.documents_file = os.path.join(tmp_dir, "documents.json")
+
         for f in [self.summaries_file, self.documents_file]:
-            if not os.path.exists(f):
-                with open(f, "w", encoding="utf-8") as fp:
-                    json.dump([], fp)
+            try:
+                if not os.path.exists(f):
+                    with open(f, "w", encoding="utf-8") as fp:
+                        json.dump([], fp)
+            except Exception:
+                pass
 
     # ------------------ SUMMARIES COLLECTION ------------------
 

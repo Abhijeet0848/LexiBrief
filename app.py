@@ -128,7 +128,19 @@ Agent: Excellent to hear. I have filed an internal incident report to ensure thi
 
 @app.get("/", response_class=FileResponse, tags=["UI"])
 async def index():
+    index_path = os.path.join(TEMPLATES_DIR, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
     return FileResponse("templates/index.html")
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+@app.get("/favicon.png", include_in_schema=False)
+async def favicon():
+    logo_path = os.path.join(STATIC_DIR, "logo.jpg")
+    if os.path.exists(logo_path):
+        return FileResponse(logo_path, media_type="image/jpeg")
+    return Response(status_code=204)
 
 
 @app.get("/api/health", tags=["System"])
