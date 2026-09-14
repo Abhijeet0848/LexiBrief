@@ -1082,10 +1082,32 @@
 
                         </div>
                       ) : (
-                        /* Clean Minimalist Empty State */
-                        <div className="w-full h-[380px] sm:h-[430px] min-h-[320px] rounded-2xl bg-slate-50/40 border border-dashed border-slate-200/90 flex flex-col items-center justify-center text-center p-6 text-slate-400 select-none">
-                          <DocumentIcon className="w-7 h-7 text-slate-300 mb-2" />
-                          <span className="text-xs text-slate-400 font-medium">Summary will appear here</span>
+                        /* AI Studio Empty State Hub */
+                        <div className="h-[380px] sm:h-[430px] min-h-[320px] flex flex-col items-center justify-center text-center p-6 sm:p-8 rounded-2xl border-2 border-dashed border-indigo-200/80 bg-gradient-to-b from-indigo-50/40 via-purple-50/20 to-transparent relative overflow-hidden group/empty hover:border-indigo-400/90 transition-all duration-300">
+                          {/* 3D Animated AI Sparkle Orb */}
+                          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/30 flex items-center justify-center mb-3.5 transform group-hover/empty:scale-110 group-hover/empty:rotate-6 transition-all duration-300">
+                            <SparklesIcon className="w-8 h-8 text-amber-300 drop-shadow-sm" />
+                          </div>
+                          
+                          <span className="text-sm sm:text-base font-bold text-slate-800 font-heading">
+                            Summary will appear here
+                          </span>
+                          <p className="text-xs text-slate-500 max-w-xs mt-1.5 leading-relaxed">
+                            Type or paste your text on the left, or upload a document to generate an abstractive or extractive summary.
+                          </p>
+
+                          {/* High-tech feature badges */}
+                          <div className="flex flex-wrap items-center justify-center gap-2 mt-4">
+                            <span className="px-2.5 py-1 rounded-lg bg-white/90 border border-slate-200/80 text-[11px] font-semibold text-slate-600 shadow-2xs">
+                              🤖 Seq2Seq & TF-IDF
+                            </span>
+                            <span className="px-2.5 py-1 rounded-lg bg-white/90 border border-slate-200/80 text-[11px] font-semibold text-slate-600 shadow-2xs">
+                              📊 ROUGE Scoring
+                            </span>
+                            <span className="px-2.5 py-1 rounded-lg bg-white/90 border border-slate-200/80 text-[11px] font-semibold text-slate-600 shadow-2xs">
+                              💾 Cloud History
+                            </span>
+                          </div>
                         </div>
                       )}
                     </div>
