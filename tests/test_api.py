@@ -172,3 +172,24 @@ def test_security_input_validation_and_id_sanitization():
     assert res_large_file.status_code == 413
     assert "File too large" in res_large_file.json()["detail"]
 
+
+def test_multilingual_summarization_and_tts():
+    """Verify end-to-end language detection, extractive summarization, and TTS in Hindi."""
+    hindi_input = (
+        "कर्मचारी चयन आयोग भारत सरकार के विभिन्न मंत्रालयों में भर्ती आयोजित करता है। "
+        "यह परीक्षा विभिन्न सरकारी विभागों में योग्य उम्मीदवारों के चयन के लिए अत्यंत महत्वपूर्ण है। "
+        "सभी उम्मीदवारों को निर्धारित समय सीमा के भीतर अपना आवेदन जमा करना आवश्यक है।"
+    )
+    res_pred = client.post("/predict", json={"text": hindi_input, "mode": "balanced", "method": "auto"})
+    assert res_pred.status_code == 200
+    data = res_pred.json()
+    assert data["detected_language"] == "hi"
+    assert data["language_name"] == "Hindi"
+    assert len(data["summary"]) > 0
+
+    # TTS audio generation
+    res_tts = client.post("/api/tts", json={"text": data["summary"]})
+    assert res_tts.status_code == 200
+    assert len(res_tts.content) > 1000
+    assert res_tts.headers.get("x-voice-language") == "Hindi"
+

@@ -3,14 +3,37 @@ import math
 from collections import Counter
 from typing import List, Dict, Any, Tuple
 
-# Precompiled regular expressions for maximum performance (supports both standard sentences and structured document lines)
-_RE_SENTENCE_SPLIT = re.compile(r'(?:(?<=[.!?])\s+(?=[A-Z0-9"\']))|(?:\n+)')
-_RE_WORDS = re.compile(r'\b[A-Za-z0-9_-]{2,}\b')
-_RE_VOWELS = re.compile(r'[aeiouy]')
+# Precompiled regular expressions for multilingual performance (supports English, Indic, and Global scripts)
+_RE_SENTENCE_SPLIT = re.compile(r'(?:(?<=[.!?।॥؛۔\n])\s+)|(?:\n+)')
+_RE_WORDS = re.compile(r'\b[\w-]{2,}\b', re.UNICODE)
+_RE_VOWELS = re.compile(r'[aeiouy\u0904-\u0914\u0960-\u0963]', re.UNICODE)
+
+LANGUAGE_NAMES = {
+    "en": "English",
+    "hi": "Hindi",
+    "mr": "Marathi",
+    "bn": "Bengali",
+    "ta": "Tamil",
+    "te": "Telugu",
+    "gu": "Gujarati",
+    "kn": "Kannada",
+    "ml": "Malayalam",
+    "ur": "Urdu",
+    "pa": "Punjabi",
+    "es": "Spanish",
+    "fr": "French",
+    "de": "German",
+    "it": "Italian",
+    "pt": "Portuguese",
+    "ru": "Russian",
+    "zh": "Chinese",
+    "ja": "Japanese",
+    "ar": "Arabic"
+}
 
 
 class NLPProcessor:
-    """High-performance NLP processing engine: tokenization, sentence splitting, stats, keywords, key-points, and ROUGE scoring."""
+    """High-performance NLP processing engine: multilingual tokenization, language detection, stats, keywords, and ROUGE."""
 
     STOPWORDS = {
         'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and', 'any',
@@ -36,6 +59,52 @@ class NLPProcessor:
     }
 
     @classmethod
+    def detect_language(cls, text: str) -> Tuple[str, str]:
+        """
+        Fast and accurate language detection.
+        Combines Unicode script distribution and langdetect. Returns (lang_code, lang_name).
+        """
+        if not text or not text.strip():
+            return "en", "English"
+
+        clean = text.strip()[:2000]
+
+        # 1. Script checks for Indic & Asian scripts
+        devanagari_count = len(re.findall(r'[\u0900-\u097F]', clean))
+        bengali_count = len(re.findall(r'[\u0980-\u09FF]', clean))
+        tamil_count = len(re.findall(r'[\u0B80-\u0BFF]', clean))
+        telugu_count = len(re.findall(r'[\u0C00-\u0C7F]', clean))
+        gujarati_count = len(re.findall(r'[\u0A80-\u0AFF]', clean))
+        kannada_count = len(re.findall(r'[\u0C80-\u0CFF]', clean))
+        malayalam_count = len(re.findall(r'[\u0D00-\u0D7F]', clean))
+        arabic_count = len(re.findall(r'[\u0600-\u06FF]', clean))
+
+        if devanagari_count > 10:
+            return "hi", "Hindi"
+        if bengali_count > 10:
+            return "bn", "Bengali"
+        if tamil_count > 10:
+            return "ta", "Tamil"
+        if telugu_count > 10:
+            return "te", "Telugu"
+        if gujarati_count > 10:
+            return "gu", "Gujarati"
+        if kannada_count > 10:
+            return "kn", "Kannada"
+        if malayalam_count > 10:
+            return "ml", "Malayalam"
+        if arabic_count > 10:
+            return "ur", "Urdu"
+
+        # 2. General statistical detection with langdetect
+        try:
+            from langdetect import detect
+            code = detect(clean)
+            return code, LANGUAGE_NAMES.get(code, code.upper())
+        except Exception:
+            return "en", "English"
+
+    @classmethod
     def split_sentences(cls, text: str) -> List[str]:
         """Splits text into discrete sentences or structured clauses with boundary preservation."""
         if not text:
@@ -46,7 +115,7 @@ class NLPProcessor:
 
     @classmethod
     def tokenize_words(cls, text: str) -> List[str]:
-        """Extracts lowercase alphabetic words of length >= 2 using precompiled regex."""
+        """Extracts lowercase alphabetic words of length >= 2 using Unicode regex."""
         if not text:
             return []
         return _RE_WORDS.findall(text.lower())

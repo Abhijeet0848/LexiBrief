@@ -45,16 +45,40 @@ MAX_UPLOAD_SIZE = 15 * 1024 * 1024   # 15 MB max file upload
 MAX_INPUT_CHARS = 150_000            # 150,000 max input character limit
 ADMIN_SECRET_KEY = os.getenv("ADMIN_SECRET_KEY")
 
-# Ultra-Realistic Studio Neural Indian English Voices (100% Free, Zero Key Required)
+# Ultra-Realistic Studio Neural Voices (100% Free, Zero Key Required)
 EDGE_NEURAL_VOICE_MAP = {
     "neerja": {"id": "en-IN-NeerjaNeural", "name": "Neerja (Studio Indian Female)", "gender": "female"},
     "prabhat": {"id": "en-IN-PrabhatNeural", "name": "Prabhat (Studio Indian Male)", "gender": "male"}
 }
 
+# Multilingual Native Voice Map for Auto-Detected Languages
+MULTILINGUAL_VOICE_MAP = {
+    "hi": {"id": "hi-IN-SwaraNeural", "name": "Swara (Hindi)", "gender": "female"},
+    "mr": {"id": "mr-IN-AarohiNeural", "name": "Aarohi (Marathi)", "gender": "female"},
+    "bn": {"id": "bn-IN-TanishaaNeural", "name": "Tanishaa (Bengali)", "gender": "female"},
+    "ta": {"id": "ta-IN-PallaviNeural", "name": "Pallavi (Tamil)", "gender": "female"},
+    "te": {"id": "te-IN-ShrutiNeural", "name": "Shruti (Telugu)", "gender": "female"},
+    "gu": {"id": "gu-IN-DhwaniNeural", "name": "Dhwani (Gujarati)", "gender": "female"},
+    "kn": {"id": "kn-IN-SapnaNeural", "name": "Sapna (Kannada)", "gender": "female"},
+    "ml": {"id": "ml-IN-SobhanaNeural", "name": "Sobhana (Malayalam)", "gender": "female"},
+    "ur": {"id": "ur-IN-GulNeural", "name": "Gul (Urdu)", "gender": "female"},
+    "pa": {"id": "pa-IN-GurpreetNeural", "name": "Gurpreet (Punjabi)", "gender": "female"},
+    "es": {"id": "es-ES-ElviraNeural", "name": "Elvira (Spanish)", "gender": "female"},
+    "fr": {"id": "fr-FR-VivienneMultilingualNeural", "name": "Vivienne (French)", "gender": "female"},
+    "de": {"id": "de-DE-KatjaNeural", "name": "Katja (German)", "gender": "female"},
+    "it": {"id": "it-IT-ElsaNeural", "name": "Elsa (Italian)", "gender": "female"},
+    "pt": {"id": "pt-BR-FranciscaNeural", "name": "Francisca (Portuguese)", "gender": "female"},
+    "ru": {"id": "ru-RU-SvetlanaNeural", "name": "Svetlana (Russian)", "gender": "female"},
+    "zh": {"id": "zh-CN-XiaoxiaoNeural", "name": "Xiaoxiao (Chinese)", "gender": "female"},
+    "ja": {"id": "ja-JP-NanamiNeural", "name": "Nanami (Japanese)", "gender": "female"},
+    "ar": {"id": "ar-SA-ZariyahNeural", "name": "Zariyah (Arabic)", "gender": "female"},
+    "en": {"id": "en-IN-NeerjaNeural", "name": "Neerja (Studio Indian English)", "gender": "female"}
+}
+
 
 class TTSRequest(BaseModel):
     text: str = Field(..., description="Text to synthesize to speech")
-    voice: Optional[str] = Field("neerja", description="Voice identifier ('neerja', 'prabhat')")
+    voice: Optional[str] = Field("neerja", description="Voice identifier ('neerja', 'prabhat' or language-specific)")
     speed: Optional[float] = Field(1.0, description="Speech rate multiplier")
 
 # Enable Secure CORS for API endpoints
@@ -315,7 +339,7 @@ async def evaluate_rouge(req: RougeEvalRequest):
 
 @app.post("/api/tts", tags=["Speech Synthesis"])
 async def text_to_speech(req: TTSRequest):
-    """Synthesizes text into realistic, studio-quality Indian English (en-IN) neural audio stream."""
+    """Synthesizes text into realistic, studio-quality speech stream in any detected language."""
     if not req.text or not req.text.strip():
         raise HTTPException(status_code=400, detail="Text cannot be empty.")
     
@@ -328,11 +352,35 @@ async def text_to_speech(req: TTSRequest):
     try:
         from gtts import gTTS
         import io
-        tts = gTTS(text=clean_text, lang='en', tld='co.in', slow=False)
+        from textSummarizer.components.nlp_processor import NLPProcessor
+        
+        lang_code, lang_name = NLPProcessor.detect_language(clean_text)
+        
+        # Supported gTTS language codes
+        supported_gtts = {
+            'hi': 'hi', 'mr': 'mr', 'ta': 'ta', 'te': 'te', 'bn': 'bn',
+            'gu': 'gu', 'kn': 'kn', 'ml': 'ml', 'ur': 'ur', 'pa': 'pa',
+            'es': 'es', 'fr': 'fr', 'de': 'de', 'it': 'it', 'pt': 'pt',
+            'ru': 'ru', 'ja': 'ja', 'ko': 'ko', 'zh': 'zh-CN', 'ar': 'ar',
+            'id': 'id', 'vi': 'vi', 'th': 'th', 'tr': 'tr', 'nl': 'nl'
+        }
+        
+        target_lang = supported_gtts.get(lang_code, 'en')
+        tld_param = 'co.in' if target_lang == 'en' else 'com'
+        
+        tts = gTTS(text=clean_text, lang=target_lang, tld=tld_param, slow=False)
         fp = io.BytesIO()
         tts.write_to_fp(fp)
         fp.seek(0)
-        return Response(content=fp.read(), media_type="audio/mpeg")
+        
+        return Response(
+            content=fp.read(), 
+            media_type="audio/mpeg",
+            headers={
+                "X-Voice-Language": lang_name,
+                "X-Voice-Code": target_lang
+            }
+        )
     except Exception as e:
         logger.error(f"TTS synthesis error: {e}")
         raise HTTPException(status_code=500, detail=f"Audio synthesis failed: {str(e)}")
@@ -418,30 +466,40 @@ async def training(request: Request):
         return JSONResponse(status_code=500, content={"status": "error", "message": "Failed to start training process."})
 
 
-async def synthesize_edge_neural(text: str, voice_key: str = "neerja", rate: str = "+0%") -> Optional[bytes]:
+async def synthesize_edge_neural(text: str, voice_key: str = "neerja", rate: str = "+0%") -> Tuple[Optional[bytes], str]:
     """
     Synthesizes ultra-realistic, studio-grade human neural voice audio using Microsoft Edge Neural TTS.
-    100% Free, zero API key required, authentic Indian English accent with natural human cadence.
+    Automatically detects language (Hindi, Marathi, Tamil, Spanish, English, etc.) and routes to the authentic native voice.
+    Returns (audio_bytes, voice_name).
     """
     try:
-        voice_id = EDGE_NEURAL_VOICE_MAP.get(voice_key.lower().strip(), {}).get("id", "en-IN-NeerjaNeural")
+        lang_code, lang_name = NLPProcessor.detect_language(text)
+        if lang_code != "en" and lang_code in MULTILINGUAL_VOICE_MAP:
+            voice_meta = MULTILINGUAL_VOICE_MAP[lang_code]
+            voice_id = voice_meta["id"]
+            voice_display = voice_meta["name"]
+        else:
+            voice_meta = EDGE_NEURAL_VOICE_MAP.get(voice_key.lower().strip(), {"id": "en-IN-NeerjaNeural", "name": "Neerja (English)"})
+            voice_id = voice_meta["id"]
+            voice_display = voice_meta["name"]
+
         communicate = edge_tts.Communicate(text, voice_id, rate=rate)
         audio_stream = bytearray()
         async for chunk in communicate.stream():
             if chunk["type"] == "audio":
                 audio_stream.extend(chunk["data"])
         if audio_stream:
-            return bytes(audio_stream)
+            return bytes(audio_stream), voice_display
     except Exception as e:
         logger.warning(f"Edge Neural TTS generation error: {e}")
-    return None
+    return None, "Fallback"
 
 
 @app.post("/api/tts", tags=["Text-to-Speech"])
 async def text_to_speech(req: TTSRequest):
     """
-    Synthesizes ultra-realistic, studio-grade Indian English voice audio.
-    Uses Microsoft Edge Neural TTS (Neerja & Prabhat) - 100% Free, Zero Key Required.
+    Synthesizes ultra-realistic, multilingual neural voice audio.
+    Supports Hindi, Marathi, Bengali, Tamil, Telugu, Spanish, French, German, and English automatically.
     """
     try:
         text_content = req.text.strip()
@@ -456,30 +514,30 @@ async def text_to_speech(req: TTSRequest):
 
         selected_voice = (req.voice or "neerja").lower().strip()
 
-        # 1. Studio-Grade Microsoft Neural Indian English (100% Free, Zero Key, Human Voice)
-        mp3_bytes = await synthesize_edge_neural(clean_text, selected_voice)
+        # 1. Studio-Grade Microsoft Multilingual Neural Voice (100% Free, Zero Key, Native Speech)
+        mp3_bytes, voice_display = await synthesize_edge_neural(clean_text, selected_voice)
         if mp3_bytes:
-            voice_meta = EDGE_NEURAL_VOICE_MAP.get(selected_voice, {"name": "Neerja"})
             return StreamingResponse(
                 io.BytesIO(mp3_bytes),
                 media_type="audio/mpeg",
                 headers={
-                    "Content-Disposition": f"inline; filename=neural_{selected_voice}.mp3",
-                    "X-Voice-Engine": f"Microsoft-Neural-{voice_meta['name']}"
+                    "Content-Disposition": f"inline; filename=neural_speech.mp3",
+                    "X-Voice-Engine": f"Microsoft-Neural-{voice_display}"
                 }
             )
 
-        # 2. Built-in Safety Fallback: Google Indian English
+        # 2. Built-in Safety Fallback: Google TTS
+        lang_code, _ = NLPProcessor.detect_language(clean_text)
         fp = io.BytesIO()
-        tts = gTTS(text=clean_text, lang='en', tld='co.in', slow=False)
+        tts = gTTS(text=clean_text, lang=lang_code if lang_code in ['en', 'hi', 'es', 'fr', 'de', 'ta', 'te', 'bn', 'mr', 'gu'] else 'en', slow=False)
         tts.write_to_fp(fp)
         fp.seek(0)
         return StreamingResponse(
             fp,
             media_type="audio/mpeg",
             headers={
-                "Content-Disposition": "inline; filename=speech_neural_indian.mp3",
-                "X-Voice-Engine": "Google-Neural-en-IN-Free"
+                "Content-Disposition": "inline; filename=speech_fallback.mp3",
+                "X-Voice-Engine": f"Google-TTS-{lang_code}"
             }
         )
     except HTTPException as he:
@@ -557,6 +615,8 @@ async def predict_route(request: Request, background_tasks: BackgroundTasks):
             "mode": selected_mode,
             "method_used": prediction_result.get("method_used", selected_method),
             "model_source": prediction_result.get("model_source", "unknown"),
+            "detected_language": prediction_result.get("detected_language", "en"),
+            "language_name": prediction_result.get("language_name", "English"),
             "keywords": prediction_result.get("keywords", []),
             "nlp_stats": prediction_result.get("nlp_stats", {}),
             "summary_stats": prediction_result.get("summary_stats", {}),

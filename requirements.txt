@@ -17,3 +17,4 @@ gTTS>=2.3.0
 requests>=2.28.0
 edge-tts>=7.0.0
 pymupdf>=1.23.0
+langdetect>=1.0.9

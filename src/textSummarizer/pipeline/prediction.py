@@ -55,12 +55,15 @@ class PredictionPipeline:
         if cache_key in self._cache:
             return self._cache[cache_key]
 
-        # 1. Single-pass tokenization and sentence splitting
+        # 1. Single-pass language detection, tokenization, and sentence splitting
+        lang_code, lang_name = NLPProcessor.detect_language(cleaned_text)
         pre_words = NLPProcessor.tokenize_words(cleaned_text)
         pre_sentences = NLPProcessor.split_sentences(cleaned_text)
 
         # 2. Compute input text NLP statistics & salient domain keywords with precomputed tokens
         nlp_stats = NLPProcessor.compute_stats(cleaned_text, precomputed_words=pre_words, precomputed_sentences=pre_sentences)
+        nlp_stats["language"] = lang_code
+        nlp_stats["language_name"] = lang_name
         keywords = NLPProcessor.extract_keywords(cleaned_text, top_k=8, precomputed_tokens=pre_words)
 
         # 3. Extract structured key takeaways (action points) with precomputed sentences
@@ -78,11 +81,11 @@ class PredictionPipeline:
         engine_used = ""
         model_source = ""
 
-        # 5. Engine selection
-        if method == "extractive":
+        # 5. Engine selection (For non-English text, use high-speed multilingual extractive saliency)
+        if method == "extractive" or (method == "auto" and lang_code != "en"):
             summary = self.extractive_engine.summarize(cleaned_text, ratio=cfg["ratio"], precomputed_sentences=pre_sentences)
-            engine_used = "Extractive (TF-IDF Saliency)"
-            model_source = "extractive_tfidf_engine"
+            engine_used = f"Multilingual Extractive ({lang_name})" if lang_code != "en" else "Extractive (TF-IDF Saliency)"
+            model_source = f"multilingual_{lang_code}_engine" if lang_code != "en" else "extractive_tfidf_engine"
         elif method == "abstractive":
             try:
                 summary = self.abstractive_engine.summarize(
@@ -98,7 +101,7 @@ class PredictionPipeline:
                 summary = self.extractive_engine.summarize(cleaned_text, ratio=cfg["ratio"], precomputed_sentences=pre_sentences)
                 engine_used = "Extractive Fallback (TF-IDF)"
                 model_source = "extractive_fallback_tfidf"
-        else:  # "auto" or "hybrid"
+        else:  # "auto" for English
             try:
                 summary = self.abstractive_engine.summarize(
                     cleaned_text,
@@ -119,6 +122,8 @@ class PredictionPipeline:
 
         # 7. Compute summary-specific NLP statistics
         summary_stats = NLPProcessor.compute_stats(summary)
+        summary_stats["language"] = lang_code
+        summary_stats["language_name"] = lang_name
 
         result = {
             "summary": summary,
@@ -126,6 +131,8 @@ class PredictionPipeline:
             "method_used": engine_used,
             "model_source": model_source,
             "mode": mode,
+            "detected_language": lang_code,
+            "language_name": lang_name,
             "keywords": keywords,
             "nlp_stats": nlp_stats,
             "summary_stats": summary_stats,
