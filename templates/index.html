@@ -386,60 +386,24 @@
                 {/* Control Toolbar */}
                 <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 flex flex-wrap items-center justify-between gap-4 card-shadow">
                   
-                  {/* Left: Engine & Mode Controls */}
-                  <div className="flex flex-wrap items-center gap-4">
-                    
-                    {/* Method Selector */}
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-slate-600 font-semibold">Method:</span>
-                      <select
-                        value={engineMethod}
-                        onChange={(e) => setEngineMethod(e.target.value)}
-                        className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 text-xs font-medium py-1.5 px-3 rounded-lg focus:outline-none focus:border-indigo-500 focus:bg-white cursor-pointer transition"
-                      >
-                        <option value="auto">Auto (Hybrid)</option>
-                        <option value="extractive">Extractive (TF-IDF Saliency)</option>
-                        <option value="abstractive">Abstractive (Transformer)</option>
-                      </select>
-                    </div>
-
-                    {/* Transformer Model Selector */}
-                    {(engineMethod === 'abstractive' || engineMethod === 'auto') && (
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="text-slate-600 font-semibold">Model:</span>
-                        <select
-                          value={modelChoice}
-                          onChange={(e) => setModelChoice(e.target.value)}
-                          className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 text-xs font-medium py-1.5 px-3 rounded-lg focus:outline-none focus:border-indigo-500 focus:bg-white cursor-pointer transition"
+                  {/* Left: Length Mode Switcher */}
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-slate-600 font-semibold">Summary Length:</span>
+                    <div className="inline-flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                      {['concise', 'balanced', 'detailed'].map(m => (
+                        <button
+                          key={m}
+                          onClick={() => setSummaryMode(m)}
+                          className={`px-3 py-1.5 text-xs font-medium capitalize rounded-md transition ${
+                            summaryMode === m
+                              ? 'bg-white text-indigo-700 font-bold shadow-xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
                         >
-                          <option value="bart">BART (DistilBART-CNN)</option>
-                          <option value="bart-large">BART Large (Facebook CNN)</option>
-                          <option value="t5">Google T5 (T5-Small)</option>
-                          <option value="pegasus">Google Pegasus</option>
-                        </select>
-                      </div>
-                    )}
-
-                    {/* Mode Length Pill Switcher */}
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-slate-600 font-semibold">Length:</span>
-                      <div className="inline-flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                        {['concise', 'balanced', 'detailed'].map(m => (
-                          <button
-                            key={m}
-                            onClick={() => setSummaryMode(m)}
-                            className={`px-3 py-1 text-xs font-medium capitalize rounded-md transition ${
-                              summaryMode === m
-                                ? 'bg-white text-indigo-700 font-bold shadow-xs'
-                                : 'text-slate-600 hover:text-slate-900'
-                            }`}
-                          >
-                            {m}
-                          </button>
-                        ))}
-                      </div>
+                          {m}
+                        </button>
+                      ))}
                     </div>
-
                   </div>
 
                   {/* Right: Clear Button */}
