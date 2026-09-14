@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SUMMARIX | AI Text Summarizer</title>
+    <title>LexiBrief | AI Text Summarizer</title>
     <link rel="icon" type="image/jpeg" href="/static/icon.jpg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -793,7 +793,7 @@
     <header>
         <a href="/" class="brand">
             <span class="brand-spark">✦</span>
-            <span class="brand-title">SUMMARIX</span>
+            <span class="brand-title">LexiBrief</span>
             <span class="brand-pill">AI NLP</span>
         </a>
 
@@ -1074,7 +1074,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <div>
-                    <h3 style="font-size: 1.1rem; font-weight: 700;">✦ SUMMARIX Architecture & Help</h3>
+                    <h3 style="font-size: 1.1rem; font-weight: 700;">✦ LexiBrief Architecture & Help</h3>
                     <p style="font-size: 0.8rem; color: var(--text-muted);">How Extractive & Abstractive Summarization Works</p>
                 </div>
                 <button class="modal-close" onclick="closeHelpModal()">&times;</button>
@@ -1290,7 +1290,7 @@
             const blob = new Blob([txt], { type: 'text/plain;charset=utf-8;' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = `SUMMARIX_Brief_${Date.now()}.txt`;
+            link.download = `LexiBrief_${Date.now()}.txt`;
             link.click();
             showToast("Downloaded text brief!");
         }
