@@ -1442,227 +1442,57 @@
               </div>
             )}
 
-            {/* TAB 4: ROUGE BENCHMARKS */}
+            {/* TAB 4: ROUGE ACCURACY & METRICS */}
             {activeTab === 'benchmarks' && (
               <div className="space-y-5">
                 
-                {/* Header Banner */}
-                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 card-shadow flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                {/* Clean Header */}
+                <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 card-shadow flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
-                    <h2 className="text-base font-bold text-slate-900 font-heading flex items-center gap-2">
-                      <span>📊</span> ROUGE Benchmark & Evaluation Suite
+                    <h2 className="text-lg font-bold text-slate-900 font-heading flex items-center gap-2">
+                      <span>📊</span> Summary Accuracy Evaluator
                     </h2>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Recall-Oriented Understudy for Gisting Evaluation — benchmarking n-gram overlap, fluency, and structural coherence
+                    <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                      Measure how well a summary captures the key points and flow of the original text.
                     </p>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
-                    <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100">ROUGE-1 Unigram</span>
-                    <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100">ROUGE-2 Bigram</span>
-                    <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100">ROUGE-L LCS</span>
-                  </div>
-                </div>
-
-                {/* Pretrained Benchmark Architecture Cards */}
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider font-heading">
-                      Standard Dataset Benchmark Comparisons
+                  <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
+                    <span className="px-3 py-1 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-100/80 flex items-center gap-1.5">
+                      <span>🎯</span> Word Accuracy
                     </span>
-                    <span className="text-[11px] text-slate-400 font-medium">Standardized ROUGE F1-Scores</span>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    
-                    {/* Model 1: BART */}
-                    <div className="bg-white border border-slate-200/80 rounded-2xl p-5 hover:border-indigo-300 hover:shadow-md transition card-shadow flex flex-col justify-between space-y-4">
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="px-2.5 py-0.5 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
-                            BART Transformer
-                          </span>
-                          <span className="text-[11px] text-slate-400 font-medium">Seq2Seq Decoder</span>
-                        </div>
-                        <div>
-                          <h3 className="text-sm font-bold text-slate-900 font-heading">sshleifer/distilbart-cnn-12-6</h3>
-                          <p className="text-[11px] text-slate-500 mt-0.5">Evaluated on <b>SAMSum Dialogue</b> corpus</p>
-                        </div>
-
-                        {/* Progress Bars */}
-                        <div className="space-y-2 pt-1">
-                          <div>
-                            <div className="flex justify-between text-xs mb-1">
-                              <span className="text-slate-600 font-medium">ROUGE-1 (Unigram)</span>
-                              <span className="font-bold text-indigo-600">44.2%</span>
-                            </div>
-                            <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                              <div className="bg-indigo-600 h-2 rounded-full transition-all duration-500" style={{ width: '44.2%' }}></div>
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="flex justify-between text-xs mb-1">
-                              <span className="text-slate-600 font-medium">ROUGE-2 (Bigram)</span>
-                              <span className="font-bold text-indigo-600">21.8%</span>
-                            </div>
-                            <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                              <div className="bg-indigo-500 h-2 rounded-full transition-all duration-500" style={{ width: '21.8%' }}></div>
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="flex justify-between text-xs mb-1">
-                              <span className="text-slate-600 font-medium">ROUGE-L (LCS)</span>
-                              <span className="font-bold text-emerald-600">36.8%</span>
-                            </div>
-                            <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                              <div className="bg-emerald-500 h-2 rounded-full transition-all duration-500" style={{ width: '36.8%' }}></div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-400">
-                        ⚡ Production-ready abstractive baseline
-                      </div>
-                    </div>
-
-                    {/* Model 2: Pegasus */}
-                    <div className="bg-white border border-slate-200/80 rounded-2xl p-5 hover:border-indigo-300 hover:shadow-md transition card-shadow flex flex-col justify-between space-y-4">
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="px-2.5 py-0.5 rounded-lg text-xs font-bold bg-purple-50 text-purple-700 border border-purple-100">
-                            Pegasus GSG
-                          </span>
-                          <span className="text-[11px] text-slate-400 font-medium">Gap Sentence Gen</span>
-                        </div>
-                        <div>
-                          <h3 className="text-sm font-bold text-slate-900 font-heading">google/pegasus-cnn_dailymail</h3>
-                          <p className="text-[11px] text-slate-500 mt-0.5">Evaluated on <b>CNN / DailyMail</b> corpus</p>
-                        </div>
-
-                        {/* Progress Bars */}
-                        <div className="space-y-2 pt-1">
-                          <div>
-                            <div className="flex justify-between text-xs mb-1">
-                              <span className="text-slate-600 font-medium">ROUGE-1 (Unigram)</span>
-                              <span className="font-bold text-purple-600">43.5%</span>
-                            </div>
-                            <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                              <div className="bg-purple-600 h-2 rounded-full transition-all duration-500" style={{ width: '43.5%' }}></div>
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="flex justify-between text-xs mb-1">
-                              <span className="text-slate-600 font-medium">ROUGE-2 (Bigram)</span>
-                              <span className="font-bold text-purple-600">20.1%</span>
-                            </div>
-                            <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                              <div className="bg-purple-500 h-2 rounded-full transition-all duration-500" style={{ width: '20.1%' }}></div>
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="flex justify-between text-xs mb-1">
-                              <span className="text-slate-600 font-medium">ROUGE-L (LCS)</span>
-                              <span className="font-bold text-emerald-600">35.4%</span>
-                            </div>
-                            <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                              <div className="bg-emerald-500 h-2 rounded-full transition-all duration-500" style={{ width: '35.4%' }}></div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-400">
-                        ⚡ High fidelity on narrative articles
-                      </div>
-                    </div>
-
-                    {/* Model 3: LexiBrief Extractive Engine */}
-                    <div className="bg-white border border-slate-200/80 rounded-2xl p-5 hover:border-indigo-300 hover:shadow-md transition card-shadow flex flex-col justify-between space-y-4">
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="px-2.5 py-0.5 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
-                            TF-IDF Extractive
-                          </span>
-                          <span className="text-[11px] text-slate-400 font-medium">Semantic Saliency</span>
-                        </div>
-                        <div>
-                          <h3 className="text-sm font-bold text-slate-900 font-heading">LexiBrief Saliency Engine</h3>
-                          <p className="text-[11px] text-slate-500 mt-0.5">Zero-shot CPU benchmark engine</p>
-                        </div>
-
-                        {/* Progress Bars */}
-                        <div className="space-y-2 pt-1">
-                          <div>
-                            <div className="flex justify-between text-xs mb-1">
-                              <span className="text-slate-600 font-medium">ROUGE-1 (Unigram)</span>
-                              <span className="font-bold text-emerald-600">41.0%</span>
-                            </div>
-                            <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                              <div className="bg-emerald-600 h-2 rounded-full transition-all duration-500" style={{ width: '41.0%' }}></div>
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="flex justify-between text-xs mb-1">
-                              <span className="text-slate-600 font-medium">ROUGE-2 (Bigram)</span>
-                              <span className="font-bold text-emerald-600">18.5%</span>
-                            </div>
-                            <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                              <div className="bg-emerald-500 h-2 rounded-full transition-all duration-500" style={{ width: '18.5%' }}></div>
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="flex justify-between text-xs mb-1">
-                              <span className="text-slate-600 font-medium">ROUGE-L (LCS)</span>
-                              <span className="font-bold text-emerald-600">34.2%</span>
-                            </div>
-                            <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                              <div className="bg-emerald-500 h-2 rounded-full transition-all duration-500" style={{ width: '34.2%' }}></div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-400">
-                        ⚡ Instant 0ms latency fallback baseline
-                      </div>
-                    </div>
-
+                    <span className="px-3 py-1 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100/80 flex items-center gap-1.5">
+                      <span>🔗</span> Phrasing Flow
+                    </span>
                   </div>
                 </div>
 
-                {/* Custom Pair Evaluator Workspace */}
-                <div className="bg-white border border-slate-200/80 rounded-2xl p-5 space-y-4 card-shadow">
+                {/* Primary Interactive Summary Tester */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-5 sm:p-6 space-y-4 card-shadow">
                   
-                  {/* Workspace Toolbar */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100">
+                  {/* Tester Header */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
                     <div>
                       <span className="text-sm font-bold text-slate-900 block font-heading">
-                        ⚡ Real-Time Custom Pair Evaluator
+                        Test Any Summary
                       </span>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Compare any gold-standard reference text against a candidate summary to compute exact ROUGE precision, recall, and F1
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Paste original text and summary to calculate accuracy scores instantly
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <div className="flex items-center gap-2">
                       <button
                         onClick={handleLoadRougeSample}
-                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition border border-slate-200/60 flex items-center gap-1.5"
+                        className="px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition border border-indigo-200/60 flex items-center gap-1.5"
                       >
-                        <span>⚡ Load Sample Pair</span>
+                        <span>⚡ Load Example</span>
                       </button>
 
                       {(rougeRef || rougeCand || rougeScores) && (
                         <button
                           onClick={handleClearRouge}
-                          className="px-2.5 py-1.5 text-slate-400 hover:text-slate-700 text-xs font-semibold transition"
+                          className="px-3 py-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 text-xs font-semibold rounded-xl transition"
                         >
                           ✕ Clear
                         </button>
@@ -1670,140 +1500,138 @@
                     </div>
                   </div>
                   
-                  {/* Side-by-Side Input Editors */}
+                  {/* 2-Column Side-by-Side Editors */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                     
-                    {/* Reference Input */}
+                    {/* Original Reference Box */}
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <label className="text-slate-700 font-bold flex items-center gap-1.5">
-                          <span>📖</span> Reference Text (Ground Truth)
+                        <label className="text-slate-700 font-bold flex items-center gap-1.5 text-xs">
+                          <span>📖</span> Original Text (Reference)
                         </label>
                         <span className="text-[11px] text-slate-400 font-medium">
-                          {rougeRef.trim() ? rougeRef.trim().split(/\s+/).length : 0} words • {rougeRef.length} chars
+                          {rougeRef.trim() ? rougeRef.trim().split(/\s+/).length : 0} words
                         </span>
                       </div>
                       <textarea
                         value={rougeRef}
                         onChange={(e) => setRougeRef(e.target.value)}
-                        placeholder="Paste the original gold-standard reference document or human summary here..."
-                        className="w-full h-36 p-3.5 rounded-xl bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 text-slate-900 text-sm leading-relaxed focus:outline-none focus:border-indigo-500 resize-none transition shadow-2xs"
+                        placeholder="Paste the original article or reference text here..."
+                        className="w-full h-36 p-3.5 rounded-xl bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 text-slate-900 text-xs sm:text-sm leading-relaxed focus:outline-none focus:border-indigo-500 resize-none transition shadow-2xs"
                       />
                     </div>
 
-                    {/* Candidate Input */}
+                    {/* Candidate Summary Box */}
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <label className="text-slate-700 font-bold flex items-center gap-1.5">
-                          <span>📝</span> Summary Candidate (Generated Text)
+                        <label className="text-slate-700 font-bold flex items-center gap-1.5 text-xs">
+                          <span>📝</span> Summary to Test
                         </label>
                         <span className="text-[11px] text-slate-400 font-medium">
-                          {rougeCand.trim() ? rougeCand.trim().split(/\s+/).length : 0} words • {rougeCand.length} chars
+                          {rougeCand.trim() ? rougeCand.trim().split(/\s+/).length : 0} words
                         </span>
                       </div>
                       <textarea
                         value={rougeCand}
                         onChange={(e) => setRougeCand(e.target.value)}
-                        placeholder="Paste the candidate summary text to be evaluated here..."
-                        className="w-full h-36 p-3.5 rounded-xl bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 text-slate-900 text-sm leading-relaxed focus:outline-none focus:border-indigo-500 resize-none transition shadow-2xs"
+                        placeholder="Paste the summary you want to evaluate here..."
+                        className="w-full h-36 p-3.5 rounded-xl bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 text-slate-900 text-xs sm:text-sm leading-relaxed focus:outline-none focus:border-indigo-500 resize-none transition shadow-2xs"
                       />
                     </div>
 
                   </div>
 
-                  {/* Compute Action CTA */}
+                  {/* Calculate Action CTA */}
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
                     <button
                       onClick={handleComputeRouge}
-                      disabled={rougeLoading}
-                      className={`w-full sm:w-auto px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-sm flex items-center justify-center gap-2 whitespace-nowrap active:scale-98 ${rougeLoading ? 'opacity-70 pointer-events-none' : ''}`}
+                      disabled={rougeLoading || !rougeRef.trim() || !rougeCand.trim()}
+                      className={`w-full sm:w-auto px-6 py-3 rounded-xl font-bold text-xs sm:text-sm transition shadow-sm flex items-center justify-center gap-2 whitespace-nowrap active:scale-98 ${
+                        rougeLoading || !rougeRef.trim() || !rougeCand.trim()
+                          ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                          : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-100'
+                      }`}
                     >
                       {rougeLoading ? (
                         <>
-                          <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                          <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
                           </svg>
-                          <span>Computing Overlap...</span>
+                          <span>Analyzing Accuracy...</span>
                         </>
                       ) : (
                         <>
-                          <span>📊 Calculate ROUGE Scores</span>
+                          <span>✨ Test Summary Accuracy</span>
                         </>
                       )}
                     </button>
                     
-                    <span className="text-[11px] text-slate-400 text-center sm:text-right">
-                      Calculates standard unigram, bigram & LCS F1 metrics
+                    <span className="text-xs text-slate-400 text-center sm:text-right">
+                      Evaluates word retention, phrasing match, and structural accuracy
                     </span>
                   </div>
 
-                  {/* Computed Metric Scores Display */}
+                  {/* Easy-to-Read Results */}
                   {rougeScores && (
-                    <div className="pt-4 border-t border-slate-100 space-y-3">
+                    <div className="pt-4 border-t border-slate-100 space-y-4 animate-fadeIn">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-slate-800 uppercase tracking-wider font-heading">
-                          Evaluation Results
+                          Accuracy Results
                         </span>
-                        <span className="text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-0.5 rounded-full">
-                          Calculated Successfully
+                        <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full flex items-center gap-1.5">
+                          <span>✓</span> Evaluation Complete
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 text-center text-xs">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 text-center text-xs">
                         
-                        {/* ROUGE-1 */}
-                        <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200 space-y-2">
-                          <span className="text-slate-500 text-xs block font-bold">ROUGE-1 (Unigram Overlap)</span>
-                          <span className="text-2xl font-extrabold text-indigo-600 block">
-                            {(rougeScores.rouge1.f1 * 100).toFixed(1)}% <span className="text-xs font-semibold text-slate-400">F1</span>
+                        {/* Metric 1: Word Match */}
+                        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-2">
+                          <span className="text-slate-500 text-xs font-bold flex items-center justify-center gap-1.5">
+                            <span>🎯</span> Word Match (ROUGE-1)
                           </span>
-                          <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
-                            <div className="bg-indigo-600 h-1.5 rounded-full" style={{ width: `${Math.min(100, rougeScores.rouge1.f1 * 100)}%` }}></div>
-                          </div>
-                          <div className="flex justify-between text-[11px] text-slate-500 pt-1">
-                            <span>Precision: <b>{(rougeScores.rouge1.precision * 100).toFixed(1)}%</b></span>
-                            <span>Recall: <b>{(rougeScores.rouge1.recall * 100).toFixed(1)}%</b></span>
-                          </div>
-                          <span className="text-[10px] text-slate-400 block border-t border-slate-200/60 pt-1.5">
-                            Individual word presence & overlap
+                          <span className="text-2xl sm:text-3xl font-extrabold text-indigo-600 block">
+                            {(rougeScores.rouge1.f1 * 100).toFixed(1)}%
                           </span>
+                          <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                            <div className="bg-indigo-600 h-2 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, rougeScores.rouge1.f1 * 100)}%` }}></div>
+                          </div>
+                          <p className="text-[11px] text-slate-500 pt-1">
+                            Checks if essential keywords and facts from original text are retained.
+                          </p>
                         </div>
 
-                        {/* ROUGE-2 */}
-                        <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200 space-y-2">
-                          <span className="text-slate-500 text-xs block font-bold">ROUGE-2 (Bigram Fluency)</span>
-                          <span className="text-2xl font-extrabold text-indigo-600 block">
-                            {(rougeScores.rouge2.f1 * 100).toFixed(1)}% <span className="text-xs font-semibold text-slate-400">F1</span>
+                        {/* Metric 2: Phrase Match */}
+                        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-2">
+                          <span className="text-slate-500 text-xs font-bold flex items-center justify-center gap-1.5">
+                            <span>🔗</span> Phrase Flow (ROUGE-2)
                           </span>
-                          <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
-                            <div className="bg-indigo-500 h-1.5 rounded-full" style={{ width: `${Math.min(100, rougeScores.rouge2.f1 * 100)}%` }}></div>
-                          </div>
-                          <div className="flex justify-between text-[11px] text-slate-500 pt-1">
-                            <span>Precision: <b>{(rougeScores.rouge2.precision * 100).toFixed(1)}%</b></span>
-                            <span>Recall: <b>{(rougeScores.rouge2.recall * 100).toFixed(1)}%</b></span>
-                          </div>
-                          <span className="text-[10px] text-slate-400 block border-t border-slate-200/60 pt-1.5">
-                            Two-word phrase continuity & syntax
+                          <span className="text-2xl sm:text-3xl font-extrabold text-indigo-600 block">
+                            {(rougeScores.rouge2.f1 * 100).toFixed(1)}%
                           </span>
+                          <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                            <div className="bg-indigo-500 h-2 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, rougeScores.rouge2.f1 * 100)}%` }}></div>
+                          </div>
+                          <p className="text-[11px] text-slate-500 pt-1">
+                            Checks two-word combinations for natural phrasing and fluency.
+                          </p>
                         </div>
 
-                        {/* ROUGE-L */}
-                        <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200 space-y-2">
-                          <span className="text-slate-500 text-xs block font-bold">ROUGE-L (Longest Sequence)</span>
-                          <span className="text-2xl font-extrabold text-emerald-600 block">
-                            {(rougeScores.rougeL.f1 * 100).toFixed(1)}% <span className="text-xs font-semibold text-slate-400">F1</span>
+                        {/* Metric 3: Sentence Flow */}
+                        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-2">
+                          <span className="text-slate-500 text-xs font-bold flex items-center justify-center gap-1.5">
+                            <span>📐</span> Structure Match (ROUGE-L)
                           </span>
-                          <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
-                            <div className="bg-emerald-500 h-1.5 rounded-full" style={{ width: `${Math.min(100, rougeScores.rougeL.f1 * 100)}%` }}></div>
-                          </div>
-                          <div className="flex justify-between text-[11px] text-slate-500 pt-1">
-                            <span>Precision: <b>{(rougeScores.rougeL.precision * 100).toFixed(1)}%</b></span>
-                            <span>Recall: <b>{(rougeScores.rougeL.recall * 100).toFixed(1)}%</b></span>
-                          </div>
-                          <span className="text-[10px] text-slate-400 block border-t border-slate-200/60 pt-1.5">
-                            Sentence structure & semantic order
+                          <span className="text-2xl sm:text-3xl font-extrabold text-emerald-600 block">
+                            {(rougeScores.rougeL.f1 * 100).toFixed(1)}%
                           </span>
+                          <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                            <div className="bg-emerald-500 h-2 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, rougeScores.rougeL.f1 * 100)}%` }}></div>
+                          </div>
+                          <p className="text-[11px] text-slate-500 pt-1">
+                            Checks if the overall sentence structure and story flow are preserved.
+                          </p>
                         </div>
 
                       </div>
@@ -1812,31 +1640,86 @@
 
                 </div>
 
-                {/* Educational Metric Interpretation Guide */}
-                <div className="bg-white border border-slate-200/80 rounded-2xl p-5 card-shadow space-y-3">
+                {/* Simplified Benchmark Overview */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-5 sm:p-6 card-shadow space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 font-heading">
+                        ⚡ AI Model Performance Comparison
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Benchmark scores across standard test datasets
+                      </p>
+                    </div>
+                    <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">
+                      Industry Standard
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 text-xs">
+                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-900">BART Transformer</span>
+                        <span className="text-indigo-600 font-bold bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md text-[11px]">44.2%</span>
+                      </div>
+                      <p className="text-slate-500 text-[11px] leading-relaxed">
+                        Best for conversational dialogue, meetings, and deep rewriting.
+                      </p>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-900">Pegasus Model</span>
+                        <span className="text-purple-600 font-bold bg-purple-50 border border-purple-100 px-2 py-0.5 rounded-md text-[11px]">43.5%</span>
+                      </div>
+                      <p className="text-slate-500 text-[11px] leading-relaxed">
+                        Best for long news articles, press releases, and publications.
+                      </p>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-900">LexiBrief Saliency</span>
+                        <span className="text-emerald-600 font-bold bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md text-[11px]">41.0%</span>
+                      </div>
+                      <p className="text-slate-500 text-[11px] leading-relaxed">
+                        Instant 0ms speed for quick key-sentence extraction.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Simple 3-Step Guide */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-5 sm:p-6 card-shadow space-y-3">
                   <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block font-heading">
-                    💡 How to Interpret ROUGE Scores
+                    💡 Quick Guide
                   </span>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
-                      <span className="font-bold text-slate-900 block mb-1">ROUGE-1 (Unigram Overlap)</span>
-                      <p className="text-slate-600 text-[11px] leading-relaxed">
-                        Measures the proportion of single words shared between candidate and reference. Higher scores indicate high factual retention.
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                    <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/70">
+                      <span className="font-bold text-slate-900 flex items-center gap-1.5 mb-1">
+                        <span>🎯</span> 1. Word Match
+                      </span>
+                      <p className="text-slate-500 text-[11px] leading-relaxed">
+                        A score above <b>40%</b> indicates strong keyword and factual coverage from the original document.
                       </p>
                     </div>
 
-                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
-                      <span className="font-bold text-slate-900 block mb-1">ROUGE-2 (Bigram Matching)</span>
-                      <p className="text-slate-600 text-[11px] leading-relaxed">
-                        Measures consecutive 2-word phrase matches. Indicates linguistic fluency, syntax preservation, and grammatical flow.
+                    <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/70">
+                      <span className="font-bold text-slate-900 flex items-center gap-1.5 mb-1">
+                        <span>🔗</span> 2. Phrase Flow
+                      </span>
+                      <p className="text-slate-500 text-[11px] leading-relaxed">
+                        A score above <b>20%</b> reflects smooth phrasing, natural grammar, and coherent sentence connectors.
                       </p>
                     </div>
 
-                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
-                      <span className="font-bold text-slate-900 block mb-1">ROUGE-L (Subsequence)</span>
-                      <p className="text-slate-600 text-[11px] leading-relaxed">
-                        Identifies the longest common word sequence. Assesses global sentence-level structure without requiring contiguous matches.
+                    <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/70">
+                      <span className="font-bold text-slate-900 flex items-center gap-1.5 mb-1">
+                        <span>📐</span> 3. Structure
+                      </span>
+                      <p className="text-slate-500 text-[11px] leading-relaxed">
+                        Measures the overall progression of ideas from the start to the end of the text.
                       </p>
                     </div>
                   </div>
