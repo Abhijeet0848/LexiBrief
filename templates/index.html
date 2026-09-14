@@ -287,14 +287,11 @@
       const [rougeScores, setRougeScores] = useState(null);
       const [rougeLoading, setRougeLoading] = useState(false);
 
-      // Speech Synthesis & Sarvam AI Voice State
+      // Speech Synthesis & Studio Neural Voice State
       const [isSpeaking, setIsSpeaking] = useState(false);
       const [audioLoading, setAudioLoading] = useState(false);
       const [selectedVoice, setSelectedVoice] = useState(() => {
         try { return localStorage.getItem('lexibrief_voice') || 'neerja'; } catch(e) { return 'neerja'; }
-      });
-      const [sarvamKey, setSarvamKey] = useState(() => {
-        try { return localStorage.getItem('lexibrief_sarvam_key') || ''; } catch(e) { return ''; }
       });
       const [showVoiceSettings, setShowVoiceSettings] = useState(false);
       const [voices, setVoices] = useState([]);
@@ -303,12 +300,6 @@
       const handleSaveVoicePreference = (voiceId) => {
         setSelectedVoice(voiceId);
         try { localStorage.setItem('lexibrief_voice', voiceId); } catch(e) {}
-      };
-
-      const handleSaveSarvamKey = (key) => {
-        setSarvamKey(key);
-        try { localStorage.setItem('lexibrief_sarvam_key', key); } catch(e) {}
-        showToast(key ? "✓ Sarvam AI (Bulbul) Subscription Key saved!" : "Sarvam Key cleared", "success");
       };
 
       const showToast = (msg, type = 'info') => setToast({ message: msg, type });
@@ -624,7 +615,7 @@
         showToast("Cleared evaluator inputs.", "info");
       };
 
-      // Text to Speech with Sarvam AI Bulbul, ElevenLabs & Google Neural Audio Streaming
+      // Text to Speech with Studio Neural Indian Voice Audio Streaming
       const handleSpeak = async (text) => {
         if (!text || !text.trim()) return;
 
@@ -654,18 +645,13 @@
         setAudioLoading(true);
 
         try {
-          // Call Sarvam AI Bulbul / Google Neural backend TTS
-          const headers = { 'Content-Type': 'application/json' };
-          if (sarvamKey) headers['api-subscription-key'] = sarvamKey;
-
+          // Call Studio Neural backend TTS
           const res = await fetch('/api/tts', {
             method: 'POST',
-            headers: headers,
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
               text: cleanText,
-              voice: selectedVoice,
-              sarvam_key: sarvamKey || undefined,
-              model: "bulbul:v1"
+              voice: selectedVoice
             })
           });
 
@@ -673,7 +659,6 @@
             throw new Error(`TTS server response error: ${res.status}`);
           }
 
-          const engineUsed = res.headers.get('x-voice-engine') || selectedVoice;
           const blob = await res.blob();
           const audioUrl = URL.createObjectURL(blob);
           const audio = new Audio(audioUrl);
@@ -701,12 +686,7 @@
 
           await audio.play();
           
-          const voiceLabel = selectedVoice === 'neerja' ? 'Neerja (Studio Indian Female)' :
-                             selectedVoice === 'prabhat' ? 'Prabhat (Studio Indian Male)' :
-                             selectedVoice === 'meera' ? 'Meera (Sarvam Bulbul)' :
-                             selectedVoice === 'arvind' ? 'Arvind (Sarvam Bulbul)' :
-                             selectedVoice === 'shubh' ? 'Shubh (Sarvam Bulbul)' :
-                             selectedVoice === 'ananya' ? 'Ananya (Sarvam Bulbul)' : 'Studio Neural Indian English';
+          const voiceLabel = selectedVoice === 'prabhat' ? 'Prabhat (Studio Indian Male)' : 'Neerja (Studio Indian Female)';
           showToast(`🎙️ Speaking with ${voiceLabel}`, "info");
         } catch (err) {
           console.warn("Backend TTS stream fallback to browser speech synthesis:", err);
@@ -1289,16 +1269,11 @@
                             <button
                               onClick={() => setShowVoiceSettings(true)}
                               className="btn-3d-secondary py-2 px-2 rounded-xl text-slate-700 font-semibold flex items-center gap-1 cursor-pointer text-xs"
-                              title="Voice Model & Accent Settings (Studio Neural & Sarvam AI)"
+                              title="Voice Model & Accent Settings (Studio Neural Indian English)"
                             >
                               <span>🎙️</span>
                               <span className="hidden md:inline text-[11px] font-bold text-indigo-600">
-                                {selectedVoice === 'neerja' ? 'Neerja (Studio)' :
-                                 selectedVoice === 'prabhat' ? 'Prabhat (Studio)' :
-                                 selectedVoice === 'meera' ? 'Meera (Sarvam)' :
-                                 selectedVoice === 'arvind' ? 'Arvind (Sarvam)' :
-                                 selectedVoice === 'shubh' ? 'Shubh (Sarvam)' :
-                                 selectedVoice === 'ananya' ? 'Ananya (Sarvam)' : 'Studio Neural'}
+                                {selectedVoice === 'prabhat' ? 'Prabhat (Studio)' : 'Neerja (Studio)'}
                               </span>
                               <span className="text-[8px] text-slate-400">⚙️</span>
                             </button>
@@ -2189,7 +2164,7 @@
 
           </main>
 
-          {/* Sarvam AI & Neural Voice Settings Modal */}
+          {/* Studio Neural Voice Settings Modal */}
           {showVoiceSettings && (
             <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
               <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
@@ -2204,7 +2179,7 @@
                         Voice & Accent Engine
                       </h3>
                       <p className="text-xs text-slate-500">
-                        Studio Neural Voices (100% Free) & Sarvam AI Bulbul
+                        Studio Neural Indian English Voices • 100% Free & Zero Key
                       </p>
                     </div>
                   </div>
@@ -2224,14 +2199,14 @@
                     <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-2 font-heading">
                       Select Authentic Indian Voice
                     </label>
-                    <div className="space-y-2">
+                    <div className="space-y-2.5">
                       {[
                         {
                           id: 'neerja',
                           name: 'Neerja (Studio Indian Female)',
                           badge: 'Ultra-Realistic Female',
                           desc: 'Studio-grade neural Indian English voice with natural human breath and cadence. 100% Free, zero config.',
-                          tag: '⭐ Top Pick • 100% Free',
+                          tag: '⭐ Default / Top Pick',
                           icon: '🇮🇳'
                         },
                         {
@@ -2239,54 +2214,14 @@
                           name: 'Prabhat (Studio Indian Male)',
                           badge: 'Ultra-Realistic Male',
                           desc: 'Studio-grade neural Indian male voice with warm, natural authoritative human tone. 100% Free, zero config.',
-                          tag: '⭐ Top Pick • 100% Free',
+                          tag: '⭐ Studio Quality',
                           icon: '🇮🇳'
-                        },
-                        {
-                          id: 'meera',
-                          name: 'Meera (Sarvam AI Bulbul:v1)',
-                          badge: 'Authentic Indian Female',
-                          desc: 'Authentic Indian English pronunciation & cadence from Sarvam AI.',
-                          tag: 'Sarvam AI Bulbul',
-                          icon: '🇮🇳'
-                        },
-                        {
-                          id: 'arvind',
-                          name: 'Arvind (Sarvam AI Bulbul:v1)',
-                          badge: 'Authentic Indian Male',
-                          desc: 'Natural Indian male voice for clear, confident delivery from Sarvam AI.',
-                          tag: 'Sarvam AI Bulbul',
-                          icon: '🇮🇳'
-                        },
-                        {
-                          id: 'shubh',
-                          name: 'Shubh (Sarvam AI Bulbul:v1)',
-                          badge: 'Natural Indian Male',
-                          desc: 'Conversational Indian English tone.',
-                          tag: 'Sarvam AI',
-                          icon: '🇮🇳'
-                        },
-                        {
-                          id: 'ananya',
-                          name: 'Ananya (Sarvam AI Bulbul:v1)',
-                          badge: 'Expressive Indian Female',
-                          desc: 'Expressive and friendly Indian delivery.',
-                          tag: 'Sarvam AI',
-                          icon: '🇮🇳'
-                        },
-                        {
-                          id: 'google',
-                          name: 'Google Neural en-IN',
-                          badge: 'Free / Zero Config',
-                          desc: 'Built-in high-definition Indian English. 100% Free, no keys required.',
-                          tag: '⚡ Free Fallback',
-                          icon: '🌐'
                         }
                       ].map(v => (
                         <div
                           key={v.id}
                           onClick={() => handleSaveVoicePreference(v.id)}
-                          className={`p-3.5 rounded-2xl border-2 transition cursor-pointer flex items-center justify-between gap-3 ${
+                          className={`p-4 rounded-2xl border-2 transition cursor-pointer flex items-center justify-between gap-3 ${
                             selectedVoice === v.id
                               ? 'border-indigo-600 bg-indigo-50/50 shadow-xs ring-1 ring-indigo-200'
                               : 'border-slate-200 hover:border-indigo-200 bg-white'
@@ -2310,52 +2245,20 @@
                               <p className="text-[11px] text-slate-500 mt-0.5">{v.desc}</p>
                             </div>
                           </div>
-                          <span className="text-base sm:text-lg flex-shrink-0">{v.icon}</span>
+                          <span className="text-xl flex-shrink-0">{v.icon}</span>
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  {/* Sarvam AI Free Developer Key Config */}
-                  <div className="p-4 rounded-2xl bg-indigo-50/50 border border-indigo-200/80 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-indigo-950 flex items-center gap-1.5 font-heading">
-                        <span>🇮🇳</span> Sarvam AI Subscription Key
-                      </span>
-                      {sarvamKey ? (
-                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                          ✓ Key Configured
-                        </span>
-                      ) : (
-                        <a
-                          href="https://dashboard.sarvam.ai"
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-[10px] font-bold text-indigo-600 hover:underline flex items-center gap-0.5"
-                        >
-                          Get Free Key ↗
-                        </a>
-                      )}
-                    </div>
-                    
-                    <p className="text-[11px] text-slate-600 leading-relaxed">
-                      Sign up for free developer credits at <b>dashboard.sarvam.ai</b> for authentic Indian Bulbul:v1 speech.
-                    </p>
-
-                    <div className="flex gap-2 pt-1">
-                      <input
-                        type="password"
-                        value={sarvamKey}
-                        onChange={(e) => setSarvamKey(e.target.value)}
-                        placeholder="Enter Sarvam AI Subscription Key..."
-                        className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-mono focus:outline-none focus:border-indigo-500"
-                      />
-                      <button
-                        onClick={() => handleSaveSarvamKey(sarvamKey)}
-                        className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition shadow-xs"
-                      >
-                        Save
-                      </button>
+                  {/* Free & Zero Key Highlight Banner */}
+                  <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 flex items-center gap-3">
+                    <span className="text-xl">⚡</span>
+                    <div className="text-xs text-emerald-900">
+                      <p className="font-bold">100% Free & No Setup Required</p>
+                      <p className="text-[11px] text-emerald-700 mt-0.5">
+                        High-definition neural speech synthesis is pre-configured and ready to play immediately.
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -2363,7 +2266,7 @@
                 {/* Footer */}
                 <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between">
                   <span className="text-[11px] text-slate-500">
-                    Active: <b className="text-indigo-600">{selectedVoice.toUpperCase()}</b>
+                    Active Voice: <b className="text-indigo-600">{selectedVoice === 'prabhat' ? 'Prabhat (Male)' : 'Neerja (Female)'}</b>
                   </span>
                   <button
                     onClick={() => setShowVoiceSettings(false)}

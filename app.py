@@ -43,37 +43,16 @@ app = FastAPI(
 # Security Constants & Limits
 MAX_UPLOAD_SIZE = 15 * 1024 * 1024   # 15 MB max file upload
 MAX_INPUT_CHARS = 150_000            # 150,000 max input character limit
-ADMIN_SECRET_KEY = os.getenv("ADMIN_SECRET_KEY")
-SARVAM_API_KEY = os.getenv("SARVAM_API_KEY")
-
-# Ultra-Realistic Neural Indian English Voices (100% Free, Zero Key Required)
+# Ultra-Realistic Studio Neural Indian English Voices (100% Free, Zero Key Required)
 EDGE_NEURAL_VOICE_MAP = {
     "neerja": {"id": "en-IN-NeerjaNeural", "name": "Neerja (Studio Indian Female)", "gender": "female"},
-    "prabhat": {"id": "en-IN-PrabhatNeural", "name": "Prabhat (Studio Indian Male)", "gender": "male"},
-    "meera": {"id": "en-IN-NeerjaNeural", "name": "Meera (Authentic Indian Female)", "gender": "female"},
-    "arvind": {"id": "en-IN-PrabhatNeural", "name": "Arvind (Authentic Indian Male)", "gender": "male"},
-    "ananya": {"id": "en-IN-NeerjaNeural", "name": "Ananya (Expressive Indian Female)", "gender": "female"},
-    "shubh": {"id": "en-IN-PrabhatNeural", "name": "Shubh (Natural Indian Male)", "gender": "male"}
-}
-
-# Sarvam AI Authentic Indian Voice Catalog (bulbul:v1)
-SARVAM_VOICE_MAP = {
-    "meera": {"speaker": "meera", "name": "Meera (Sarvam Bulbul)", "gender": "female"},
-    "arvind": {"speaker": "arvind", "name": "Arvind (Sarvam Bulbul)", "gender": "male"},
-    "shubh": {"speaker": "shubh", "name": "Shubh (Sarvam Bulbul)", "gender": "male"},
-    "ananya": {"speaker": "ananya", "name": "Ananya (Sarvam Bulbul)", "gender": "female"},
-    "priya": {"speaker": "priya", "name": "Priya (Sarvam Bulbul)", "gender": "female"},
-    "dhruv": {"speaker": "dhruv", "name": "Dhruv (Sarvam Bulbul)", "gender": "male"},
-    "amartya": {"speaker": "amartya", "name": "Amartya (Sarvam Bulbul)", "gender": "male"}
+    "prabhat": {"id": "en-IN-PrabhatNeural", "name": "Prabhat (Studio Indian Male)", "gender": "male"}
 }
 
 
 class TTSRequest(BaseModel):
     text: str = Field(..., description="Text to synthesize to speech")
-    voice: Optional[str] = Field("neerja", description="Voice identifier ('neerja', 'prabhat', 'meera', 'arvind', 'shubh', 'ananya', 'google')")
-    sarvam_key: Optional[str] = Field(None, description="Optional Sarvam AI API subscription key")
-    api_key: Optional[str] = Field(None, description="Generic API key override")
-    model: Optional[str] = Field("bulbul:v1", description="Sarvam model: 'bulbul:v1' or 'bulbul:v2'")
+    voice: Optional[str] = Field("neerja", description="Voice identifier ('neerja', 'prabhat')")
     speed: Optional[float] = Field(1.0, description="Speech rate multiplier")
 
 # Enable Secure CORS for API endpoints
@@ -432,82 +411,6 @@ async def training(request: Request):
         return JSONResponse(status_code=500, content={"status": "error", "message": "Failed to start training process."})
 
 
-def combine_wav_bytes(wav_list: List[bytes]) -> bytes:
-    """Concatenates multiple RIFF WAV audio byte chunks into a valid single WAV."""
-    if not wav_list:
-        return b""
-    if len(wav_list) == 1:
-        return wav_list[0]
-    first = wav_list[0]
-    if len(first) < 44 or not first.startswith(b'RIFF'):
-        return b"".join(wav_list)
-    combined = bytearray(first)
-    for w in wav_list[1:]:
-        if len(w) > 44 and w.startswith(b'RIFF'):
-            combined.extend(w[44:])
-        else:
-            combined.extend(w)
-    total_size = len(combined) - 8
-    data_size = len(combined) - 44
-    combined[4:8] = total_size.to_bytes(4, 'little')
-    combined[40:44] = data_size.to_bytes(4, 'little')
-    return bytes(combined)
-
-
-def synthesize_sarvam_ai(text: str, speaker: str, api_key: str, model: str = "bulbul:v1") -> Optional[bytes]:
-    """
-    Synthesizes authentic Indian speech using Sarvam AI Bulbul text-to-speech API.
-    Handles automatic sentence chunking (under 500 chars) and concatenates base64 WAV chunks.
-    """
-    try:
-        url = "https://api.sarvam.ai/text-to-speech"
-        headers = {
-            "api-subscription-key": api_key.strip(),
-            "Content-Type": "application/json"
-        }
-        
-        # Split into sensible chunks <= 480 characters for Sarvam bulbul:v1
-        sentences = [s.strip() for s in re.split(r'(?<=[.!?\n])\s+', text) if s.strip()]
-        chunks = []
-        current_chunk = ""
-        for s in sentences:
-            if len(current_chunk) + len(s) + 1 <= 480:
-                current_chunk = f"{current_chunk} {s}".strip()
-            else:
-                if current_chunk:
-                    chunks.append(current_chunk)
-                current_chunk = s[:480]
-        if current_chunk:
-            chunks.append(current_chunk)
-        if not chunks:
-            chunks = [text[:480]]
-
-        payload = {
-            "inputs": chunks[:4],
-            "target_language_code": "en-IN",
-            "speaker": speaker if speaker in SARVAM_VOICE_MAP else "meera",
-            "pitch": 0,
-            "pace": 1.0,
-            "loudness": 1.5,
-            "speech_sample_rate": 22050,
-            "enable_preprocessing": True,
-            "model": model or "bulbul:v1"
-        }
-
-        resp = requests.post(url, json=payload, headers=headers, timeout=25)
-        if resp.status_code == 200:
-            data = resp.json()
-            audios_b64 = data.get("audios", [])
-            if audios_b64:
-                wav_chunks = [base64.b64decode(b) for b in audios_b64 if b]
-                return combine_wav_bytes(wav_chunks)
-        else:
-            logger.warning(f"Sarvam AI TTS API returned {resp.status_code}: {resp.text}")
-    except Exception as e:
-        logger.warning(f"Sarvam AI TTS execution error: {e}")
-    return None
-
-
 async def synthesize_edge_neural(text: str, voice_key: str = "neerja", rate: str = "+0%") -> Optional[bytes]:
     """
     Synthesizes ultra-realistic, studio-grade human neural voice audio using Microsoft Edge Neural TTS.
@@ -528,10 +431,10 @@ async def synthesize_edge_neural(text: str, voice_key: str = "neerja", rate: str
 
 
 @app.post("/api/tts", tags=["Text-to-Speech"])
-async def text_to_speech(req: TTSRequest, request: Request):
+async def text_to_speech(req: TTSRequest):
     """
     Synthesizes ultra-realistic, studio-grade Indian English voice audio.
-    Uses Microsoft Neural (Neerja & Prabhat) - 100% Free, Zero Key Required, plus optional Sarvam AI Bulbul.
+    Uses Microsoft Edge Neural TTS (Neerja & Prabhat) - 100% Free, Zero Key Required.
     """
     try:
         text_content = req.text.strip()
@@ -545,23 +448,8 @@ async def text_to_speech(req: TTSRequest, request: Request):
             clean_text = clean_text[:8000]
 
         selected_voice = (req.voice or "neerja").lower().strip()
-        sarvam_sub_key = req.sarvam_key or req.api_key or request.headers.get("api-subscription-key") or SARVAM_API_KEY
 
-        # 1. If Sarvam AI key is provided and Sarvam voice requested
-        if sarvam_sub_key and (selected_voice in SARVAM_VOICE_MAP or req.model == "bulbul:v1"):
-            speaker_name = selected_voice if selected_voice in SARVAM_VOICE_MAP else "meera"
-            wav_bytes = synthesize_sarvam_ai(clean_text, speaker_name, sarvam_sub_key, req.model or "bulbul:v1")
-            if wav_bytes:
-                return StreamingResponse(
-                    io.BytesIO(wav_bytes),
-                    media_type="audio/wav",
-                    headers={
-                        "Content-Disposition": f"inline; filename=sarvam_{speaker_name}.wav",
-                        "X-Voice-Engine": f"Sarvam-Bulbul-{speaker_name}"
-                    }
-                )
-
-        # 2. Studio-Grade Microsoft Neural Indian English (100% Free, Zero Key, Human Voice)
+        # 1. Studio-Grade Microsoft Neural Indian English (100% Free, Zero Key, Human Voice)
         mp3_bytes = await synthesize_edge_neural(clean_text, selected_voice)
         if mp3_bytes:
             voice_meta = EDGE_NEURAL_VOICE_MAP.get(selected_voice, {"name": "Neerja"})
@@ -574,7 +462,7 @@ async def text_to_speech(req: TTSRequest, request: Request):
                 }
             )
 
-        # 3. Built-in Safety Fallback: Google Indian English
+        # 2. Built-in Safety Fallback: Google Indian English
         fp = io.BytesIO()
         tts = gTTS(text=clean_text, lang='en', tld='co.in', slow=False)
         tts.write_to_fp(fp)
