@@ -291,7 +291,7 @@
       const [isSpeaking, setIsSpeaking] = useState(false);
       const [audioLoading, setAudioLoading] = useState(false);
       const [selectedVoice, setSelectedVoice] = useState(() => {
-        try { return localStorage.getItem('lexibrief_voice') || 'meera'; } catch(e) { return 'meera'; }
+        try { return localStorage.getItem('lexibrief_voice') || 'neerja'; } catch(e) { return 'neerja'; }
       });
       const [sarvamKey, setSarvamKey] = useState(() => {
         try { return localStorage.getItem('lexibrief_sarvam_key') || ''; } catch(e) { return ''; }
@@ -701,10 +701,12 @@
 
           await audio.play();
           
-          const voiceLabel = selectedVoice === 'meera' ? 'Meera (Sarvam Bulbul)' :
+          const voiceLabel = selectedVoice === 'neerja' ? 'Neerja (Studio Indian Female)' :
+                             selectedVoice === 'prabhat' ? 'Prabhat (Studio Indian Male)' :
+                             selectedVoice === 'meera' ? 'Meera (Sarvam Bulbul)' :
                              selectedVoice === 'arvind' ? 'Arvind (Sarvam Bulbul)' :
                              selectedVoice === 'shubh' ? 'Shubh (Sarvam Bulbul)' :
-                             selectedVoice === 'ananya' ? 'Ananya (Sarvam Bulbul)' : 'Google Neural (Free)';
+                             selectedVoice === 'ananya' ? 'Ananya (Sarvam Bulbul)' : 'Studio Neural Indian English';
           showToast(`🎙️ Speaking with ${voiceLabel}`, "info");
         } catch (err) {
           console.warn("Backend TTS stream fallback to browser speech synthesis:", err);
@@ -1287,14 +1289,16 @@
                             <button
                               onClick={() => setShowVoiceSettings(true)}
                               className="btn-3d-secondary py-2 px-2 rounded-xl text-slate-700 font-semibold flex items-center gap-1 cursor-pointer text-xs"
-                              title="Voice Model & Accent Settings (Sarvam Bulbul & Google Neural)"
+                              title="Voice Model & Accent Settings (Studio Neural & Sarvam AI)"
                             >
                               <span>🎙️</span>
                               <span className="hidden md:inline text-[11px] font-bold text-indigo-600">
-                                {selectedVoice === 'meera' ? 'Meera (Sarvam)' :
+                                {selectedVoice === 'neerja' ? 'Neerja (Studio)' :
+                                 selectedVoice === 'prabhat' ? 'Prabhat (Studio)' :
+                                 selectedVoice === 'meera' ? 'Meera (Sarvam)' :
                                  selectedVoice === 'arvind' ? 'Arvind (Sarvam)' :
                                  selectedVoice === 'shubh' ? 'Shubh (Sarvam)' :
-                                 selectedVoice === 'ananya' ? 'Ananya (Sarvam)' : 'Google Neural'}
+                                 selectedVoice === 'ananya' ? 'Ananya (Sarvam)' : 'Studio Neural'}
                               </span>
                               <span className="text-[8px] text-slate-400">⚙️</span>
                             </button>
@@ -2200,7 +2204,7 @@
                         Voice & Accent Engine
                       </h3>
                       <p className="text-xs text-slate-500">
-                        Sarvam AI (Bulbul:v1) & Free Google Neural Voices
+                        Studio Neural Voices (100% Free) & Sarvam AI Bulbul
                       </p>
                     </div>
                   </div>
@@ -2223,19 +2227,35 @@
                     <div className="space-y-2">
                       {[
                         {
+                          id: 'neerja',
+                          name: 'Neerja (Studio Indian Female)',
+                          badge: 'Ultra-Realistic Female',
+                          desc: 'Studio-grade neural Indian English voice with natural human breath and cadence. 100% Free, zero config.',
+                          tag: '⭐ Top Pick • 100% Free',
+                          icon: '🇮🇳'
+                        },
+                        {
+                          id: 'prabhat',
+                          name: 'Prabhat (Studio Indian Male)',
+                          badge: 'Ultra-Realistic Male',
+                          desc: 'Studio-grade neural Indian male voice with warm, natural authoritative human tone. 100% Free, zero config.',
+                          tag: '⭐ Top Pick • 100% Free',
+                          icon: '🇮🇳'
+                        },
+                        {
                           id: 'meera',
                           name: 'Meera (Sarvam AI Bulbul:v1)',
                           badge: 'Authentic Indian Female',
-                          desc: 'Authentic Indian English pronunciation & cadence.',
-                          tag: '⭐ Sarvam AI Bulbul',
+                          desc: 'Authentic Indian English pronunciation & cadence from Sarvam AI.',
+                          tag: 'Sarvam AI Bulbul',
                           icon: '🇮🇳'
                         },
                         {
                           id: 'arvind',
                           name: 'Arvind (Sarvam AI Bulbul:v1)',
                           badge: 'Authentic Indian Male',
-                          desc: 'Natural Indian male voice for clear, confident delivery.',
-                          tag: '⭐ Sarvam AI Bulbul',
+                          desc: 'Natural Indian male voice for clear, confident delivery from Sarvam AI.',
+                          tag: 'Sarvam AI Bulbul',
                           icon: '🇮🇳'
                         },
                         {
@@ -2259,7 +2279,7 @@
                           name: 'Google Neural en-IN',
                           badge: 'Free / Zero Config',
                           desc: 'Built-in high-definition Indian English. 100% Free, no keys required.',
-                          tag: '⚡ 100% Free',
+                          tag: '⚡ Free Fallback',
                           icon: '🌐'
                         }
                       ].map(v => (
