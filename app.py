@@ -13,7 +13,7 @@ for path in [BASE_DIR, SRC_DIR]:
         sys.path.insert(0, path)
 
 from fastapi import FastAPI, Request, Form, HTTPException, UploadFile, File, Response, BackgroundTasks, Body
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -21,7 +21,9 @@ from typing import Optional, Dict, Any, List
 import uvicorn
 import subprocess
 import time
+import io
 import pandas as pd
+from gtts import gTTS
 
 from textSummarizer.components.text_extractor import TextExtractor
 from textSummarizer.components.nlp_processor import NLPProcessor
@@ -81,6 +83,11 @@ class SummaryRequest(BaseModel):
 class RougeEvalRequest(BaseModel):
     reference: str = Field(..., description="Original reference text")
     summary: str = Field(..., description="Generated or candidate summary")
+
+
+class TTSRequest(BaseModel):
+    text: str = Field(..., description="Text to synthesize to speech")
+    speed: Optional[float] = Field(1.0, description="Speech rate multiplier")
 
 
 SAMPLE_PRESETS = [
@@ -285,6 +292,31 @@ async def evaluate_rouge(req: RougeEvalRequest):
     return {"rouge": rouge_res}
 
 
+@app.post("/api/tts", tags=["Speech Synthesis"])
+async def text_to_speech(req: TTSRequest):
+    """Synthesizes text into realistic, studio-quality Indian English (en-IN) neural audio stream."""
+    if not req.text or not req.text.strip():
+        raise HTTPException(status_code=400, detail="Text cannot be empty.")
+    
+    clean_text = re.sub(r'[#*_`~>-]', ' ', req.text)
+    clean_text = re.sub(r'\s+', ' ', clean_text).strip()
+    
+    # Cap to reasonable size for rapid generation
+    clean_text = clean_text[:5000]
+    
+    try:
+        from gtts import gTTS
+        import io
+        tts = gTTS(text=clean_text, lang='en', tld='co.in', slow=False)
+        fp = io.BytesIO()
+        tts.write_to_fp(fp)
+        fp.seek(0)
+        return Response(content=fp.read(), media_type="audio/mpeg")
+    except Exception as e:
+        logger.error(f"TTS synthesis error: {e}")
+        raise HTTPException(status_code=500, detail=f"Audio synthesis failed: {str(e)}")
+
+
 @app.get("/api/metrics", tags=["Telemetry"])
 async def get_metrics():
     metrics_path = os.path.join("artifacts", "model_evaluation", "metrics.csv")
@@ -363,6 +395,45 @@ async def training(request: Request):
     except Exception as e:
         logger.error(f"Training process execution error: {e}")
         return JSONResponse(status_code=500, content={"status": "error", "message": "Failed to start training process."})
+
+
+@app.post("/api/tts", tags=["Text-to-Speech"])
+async def text_to_speech(req: TTSRequest):
+    """
+    Synthesizes studio-quality, natural Indian English voice audio using Google Neural TTS.
+    Returns audio/mpeg stream directly for browser playback.
+    """
+    try:
+        text_content = req.text.strip()
+        if not text_content:
+            raise HTTPException(status_code=400, detail="Text cannot be empty.")
+        
+        # Clean text of markdown bullet points and code characters for smooth speech narration
+        clean_text = re.sub(r'[#*_`~>-]', ' ', text_content)
+        clean_text = re.sub(r'\s+', ' ', clean_text).strip()
+        
+        if len(clean_text) > 8000:
+            clean_text = clean_text[:8000]
+
+        # Use Indian English (en) with tld='co.in' for authentic, pleasant accent
+        fp = io.BytesIO()
+        tts = gTTS(text=clean_text, lang='en', tld='co.in', slow=False)
+        tts.write_to_fp(fp)
+        fp.seek(0)
+
+        return StreamingResponse(
+            fp,
+            media_type="audio/mpeg",
+            headers={
+                "Content-Disposition": "inline; filename=summary_speech.mp3",
+                "Cache-Control": "public, max-age=3600"
+            }
+        )
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"TTS generation error: {e}")
+        raise HTTPException(status_code=500, detail="Error generating text-to-speech audio.")
 
 
 @app.post("/predict", tags=["Prediction & MongoDB"])
