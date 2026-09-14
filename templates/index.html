@@ -437,28 +437,11 @@
 
                   </div>
 
-                  {/* Right: Presets & Clear */}
-                  <div className="flex items-center gap-2">
-                    <select
-                      onChange={(e) => {
-                        const sel = presets.find(p => p.id === e.target.value);
-                        if (sel) {
-                          setInputText(sel.text);
-                          showToast(`Loaded "${sel.title}"`, "info");
-                        }
-                      }}
-                      defaultValue=""
-                      className="bg-slate-50 border border-slate-200 text-slate-600 text-xs py-1 px-2 rounded-lg cursor-pointer focus:outline-none"
-                    >
-                      <option value="" disabled>Load Sample Text...</option>
-                      {presets.map(p => (
-                        <option key={p.id} value={p.id}>{p.title}</option>
-                      ))}
-                    </select>
-
+                  {/* Right: Clear Button */}
+                  <div>
                     <button
                       onClick={() => { setInputText(''); setSummaryResult(null); }}
-                      className="text-xs text-slate-400 hover:text-slate-700 px-2 py-1 rounded transition"
+                      className="text-xs text-slate-400 hover:text-slate-700 px-2.5 py-1 rounded-md border border-slate-200 hover:bg-slate-100 transition"
                       title="Clear Text"
                     >
                       Clear
