@@ -1,8 +1,8 @@
-from fastapi import FastAPI, Request, Form, HTTPException
+from fastapi import FastAPI, Request, Form, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import uvicorn
 import subprocess
 import time
@@ -10,9 +10,12 @@ import sys
 import os
 import pandas as pd
 
+from textSummarizer.components.text_extractor import TextExtractor
+from textSummarizer.components.nlp_processor import NLPProcessor
+
 app = FastAPI(
     title="LexiBrief API",
-    description="State-of-the-Art NLP Text Summarization Engine using Transformer Models",
+    description="State-of-the-Art NLP Text Summarization Engine with Extractive & Abstractive Transformers",
     version="1.0.0"
 )
 
@@ -44,6 +47,7 @@ def get_prediction_pipeline():
 class SummaryRequest(BaseModel):
     text: str = Field(..., description="The raw input text or dialogue to summarize")
     mode: Optional[str] = Field("balanced", description="Summary mode: 'concise', 'balanced', or 'detailed'")
+    method: Optional[str] = Field("auto", description="Summarization engine: 'abstractive', 'extractive', or 'auto'")
     max_length: Optional[int] = Field(None, description="Optional override for maximum tokens")
     min_length: Optional[int] = Field(None, description="Optional override for minimum tokens")
 
@@ -111,6 +115,32 @@ async def get_presets():
     return {"presets": SAMPLE_PRESETS}
 
 
+@app.post("/api/upload", tags=["Text Extraction"])
+async def upload_document(file: UploadFile = File(...)):
+    """Extracts and cleans raw text from uploaded files (PDF, DOCX, TXT)."""
+    try:
+        content_bytes = await file.read()
+        extracted_text, detected_format = TextExtractor.extract(file.filename, content_bytes)
+        
+        if not extracted_text:
+            raise HTTPException(status_code=400, detail="Could not extract readable text from uploaded file.")
+            
+        stats = NLPProcessor.compute_stats(extracted_text)
+        keywords = NLPProcessor.extract_keywords(extracted_text, top_k=6)
+        
+        return {
+            "filename": file.filename,
+            "format": detected_format,
+            "text": extracted_text,
+            "stats": stats,
+            "keywords": keywords
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"File extraction error: {e}")
+
+
 @app.get("/api/metrics", tags=["Telemetry"])
 async def get_metrics():
     metrics_path = os.path.join("artifacts", "model_evaluation", "metrics.csv")
@@ -176,6 +206,7 @@ async def predict_route(request: Request):
         content_type = request.headers.get("content-type", "")
         input_text = ""
         selected_mode = "balanced"
+        selected_method = "auto"
         max_len = None
         min_len = None
 
@@ -183,6 +214,7 @@ async def predict_route(request: Request):
             body = await request.json()
             input_text = body.get("text", "")
             selected_mode = body.get("mode", "balanced")
+            selected_method = body.get("method", "auto")
             max_len = body.get("max_length")
             min_len = body.get("min_length")
         else:
@@ -190,10 +222,12 @@ async def predict_route(request: Request):
                 form = await request.form()
                 input_text = form.get("text", "")
                 selected_mode = form.get("mode", "balanced")
+                selected_method = form.get("method", "auto")
             except Exception:
                 body = await request.json()
                 input_text = body.get("text", "")
                 selected_mode = body.get("mode", "balanced")
+                selected_method = body.get("method", "auto")
 
         if not input_text or not str(input_text).strip():
             raise HTTPException(status_code=400, detail="Input text cannot be empty.")
@@ -202,6 +236,7 @@ async def predict_route(request: Request):
         prediction_result = pipeline_obj.predict(
             str(input_text),
             mode=selected_mode,
+            method=selected_method,
             max_length=max_len,
             min_length=min_len
         )
@@ -217,7 +252,10 @@ async def predict_route(request: Request):
         return {
             "summary": summary_text,
             "mode": selected_mode,
+            "method_used": prediction_result.get("method_used", selected_method),
             "model_source": prediction_result.get("model_source", "unknown"),
+            "keywords": prediction_result.get("keywords", []),
+            "nlp_stats": prediction_result.get("nlp_stats", {}),
             "analytics": {
                 "original_words": orig_words,
                 "summary_words": sum_words,
