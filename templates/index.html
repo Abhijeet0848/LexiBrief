@@ -287,11 +287,14 @@
       const [rougeScores, setRougeScores] = useState(null);
       const [rougeLoading, setRougeLoading] = useState(false);
 
-      // Speech Synthesis & ElevenLabs Voice State
+      // Speech Synthesis, Sarvam AI & ElevenLabs Voice State
       const [isSpeaking, setIsSpeaking] = useState(false);
       const [audioLoading, setAudioLoading] = useState(false);
       const [selectedVoice, setSelectedVoice] = useState(() => {
-        try { return localStorage.getItem('lexibrief_voice') || 'aria'; } catch(e) { return 'aria'; }
+        try { return localStorage.getItem('lexibrief_voice') || 'meera'; } catch(e) { return 'meera'; }
+      });
+      const [sarvamKey, setSarvamKey] = useState(() => {
+        try { return localStorage.getItem('lexibrief_sarvam_key') || ''; } catch(e) { return ''; }
       });
       const [elevenLabsKey, setElevenLabsKey] = useState(() => {
         try { return localStorage.getItem('lexibrief_elevenlabs_key') || ''; } catch(e) { return ''; }
@@ -303,6 +306,12 @@
       const handleSaveVoicePreference = (voiceId) => {
         setSelectedVoice(voiceId);
         try { localStorage.setItem('lexibrief_voice', voiceId); } catch(e) {}
+      };
+
+      const handleSaveSarvamKey = (key) => {
+        setSarvamKey(key);
+        try { localStorage.setItem('lexibrief_sarvam_key', key); } catch(e) {}
+        showToast(key ? "✓ Sarvam AI (Bulbul) Subscription Key saved!" : "Sarvam Key cleared", "success");
       };
 
       const handleSaveElevenLabsKey = (key) => {
@@ -624,7 +633,7 @@
         showToast("Cleared evaluator inputs.", "info");
       };
 
-      // Text to Speech with ElevenLabs Hyper-Realistic & Google Neural Voice Streaming
+      // Text to Speech with Sarvam AI Bulbul, ElevenLabs & Google Neural Audio Streaming
       const handleSpeak = async (text) => {
         if (!text || !text.trim()) return;
 
@@ -654,17 +663,20 @@
         setAudioLoading(true);
 
         try {
-          // Call high-definition ElevenLabs / Neural backend TTS
+          // Call multi-provider backend TTS (Sarvam AI Bulbul / ElevenLabs / Google Neural)
+          const headers = { 'Content-Type': 'application/json' };
+          if (sarvamKey) headers['api-subscription-key'] = sarvamKey;
+          if (elevenLabsKey) headers['xi-api-key'] = elevenLabsKey;
+
           const res = await fetch('/api/tts', {
             method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              ...(elevenLabsKey ? { 'xi-api-key': elevenLabsKey } : {})
-            },
+            headers: headers,
             body: JSON.stringify({ 
               text: cleanText,
               voice: selectedVoice,
-              api_key: elevenLabsKey || undefined
+              sarvam_key: sarvamKey || undefined,
+              elevenlabs_key: elevenLabsKey || undefined,
+              model: "bulbul:v1"
             })
           });
 
@@ -700,9 +712,12 @@
 
           await audio.play();
           
-          const voiceLabel = selectedVoice === 'rishi' ? 'Rishi (Indian Male)' :
-                             selectedVoice === 'indian_female' ? 'Indian Female' :
-                             selectedVoice === 'aria' ? 'Aria (ElevenLabs)' : 'Google Neural';
+          const voiceLabel = selectedVoice === 'meera' ? 'Meera (Sarvam Bulbul)' :
+                             selectedVoice === 'arvind' ? 'Arvind (Sarvam Bulbul)' :
+                             selectedVoice === 'shubh' ? 'Shubh (Sarvam Bulbul)' :
+                             selectedVoice === 'ananya' ? 'Ananya (Sarvam Bulbul)' :
+                             selectedVoice === 'aria' ? 'Aria (ElevenLabs)' :
+                             selectedVoice === 'rishi' ? 'Rishi (ElevenLabs)' : 'Google Neural';
           showToast(`🎙️ Speaking with ${voiceLabel}`, "info");
         } catch (err) {
           console.warn("Backend TTS stream fallback to browser speech synthesis:", err);
@@ -1285,11 +1300,16 @@
                             <button
                               onClick={() => setShowVoiceSettings(true)}
                               className="btn-3d-secondary py-2 px-2 rounded-xl text-slate-700 font-semibold flex items-center gap-1 cursor-pointer text-xs"
-                              title="Voice Model Settings (ElevenLabs Aria, Rishi, Google Neural)"
+                              title="Voice Model & Accent Settings (Sarvam Bulbul, ElevenLabs, Google)"
                             >
                               <span>🎙️</span>
                               <span className="hidden md:inline text-[11px] font-bold text-indigo-600">
-                                {selectedVoice === 'aria' ? 'Aria' : selectedVoice === 'rishi' ? 'Rishi' : selectedVoice === 'indian_female' ? 'Ind. Female' : 'Google'}
+                                {selectedVoice === 'meera' ? 'Meera (Sarvam)' :
+                                 selectedVoice === 'arvind' ? 'Arvind (Sarvam)' :
+                                 selectedVoice === 'shubh' ? 'Shubh (Sarvam)' :
+                                 selectedVoice === 'ananya' ? 'Ananya (Sarvam)' :
+                                 selectedVoice === 'aria' ? 'Aria' :
+                                 selectedVoice === 'rishi' ? 'Rishi' : 'Google'}
                               </span>
                               <span className="text-[8px] text-slate-400">⚙️</span>
                             </button>
@@ -2180,7 +2200,7 @@
 
           </main>
 
-          {/* ElevenLabs & Neural Voice Settings Modal */}
+          {/* Sarvam AI & Neural Voice Settings Modal */}
           {showVoiceSettings && (
             <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
               <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
@@ -2192,10 +2212,10 @@
                     </div>
                     <div>
                       <h3 className="text-base font-bold text-slate-900 font-heading">
-                        Voice & Audio Settings
+                        Voice & Accent Engine
                       </h3>
                       <p className="text-xs text-slate-500">
-                        ElevenLabs Hyper-Realistic & Neural Voice Models
+                        Sarvam AI (Bulbul:v1), ElevenLabs & Free Google Neural
                       </p>
                     </div>
                   </div>
@@ -2213,37 +2233,65 @@
                   {/* Voice Options */}
                   <div>
                     <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-2 font-heading">
-                      Select Neural Voice Model
+                      Select Authentic Indian Voice
                     </label>
                     <div className="space-y-2">
                       {[
                         {
-                          id: 'aria',
-                          name: 'Aria (ElevenLabs)',
-                          badge: 'Hyper-Realistic Female',
-                          desc: 'Expressive, warm voice with natural breathing inflections.',
-                          tag: 'Top Pick 🌟'
+                          id: 'meera',
+                          name: 'Meera (Sarvam AI Bulbul:v1)',
+                          badge: 'Authentic Indian Female',
+                          desc: 'Authentic Indian English pronunciation & cadence.',
+                          tag: '⭐ Sarvam AI Bulbul',
+                          icon: '🇮🇳'
                         },
                         {
-                          id: 'rishi',
-                          name: 'Rishi (ElevenLabs)',
-                          badge: 'Indian Male',
-                          desc: 'Authentic Indian English accent with natural cadence.',
-                          tag: 'Indian Accent 🇮🇳'
+                          id: 'arvind',
+                          name: 'Arvind (Sarvam AI Bulbul:v1)',
+                          badge: 'Authentic Indian Male',
+                          desc: 'Natural Indian male voice for clear, confident delivery.',
+                          tag: '⭐ Sarvam AI Bulbul',
+                          icon: '🇮🇳'
                         },
                         {
-                          id: 'indian_female',
-                          name: 'Indian Female (ElevenLabs)',
-                          badge: 'Indian Female',
-                          desc: 'Clear, crisp, professional conversational tone.',
-                          tag: 'Indian Accent 🇮🇳'
+                          id: 'shubh',
+                          name: 'Shubh (Sarvam AI Bulbul:v1)',
+                          badge: 'Natural Indian Male',
+                          desc: 'Conversational Indian English tone.',
+                          tag: 'Sarvam AI',
+                          icon: '🇮🇳'
+                        },
+                        {
+                          id: 'ananya',
+                          name: 'Ananya (Sarvam AI Bulbul:v1)',
+                          badge: 'Expressive Indian Female',
+                          desc: 'Expressive and friendly Indian delivery.',
+                          tag: 'Sarvam AI',
+                          icon: '🇮🇳'
                         },
                         {
                           id: 'google',
                           name: 'Google Neural en-IN',
                           badge: 'Free / Zero Config',
-                          desc: 'Built-in studio-quality Google Indian English. No API key needed.',
-                          tag: 'Built-in ⚡'
+                          desc: 'Built-in high-definition Indian English. 100% Free, no keys required.',
+                          tag: '⚡ 100% Free',
+                          icon: '🌐'
+                        },
+                        {
+                          id: 'aria',
+                          name: 'Aria (ElevenLabs)',
+                          badge: 'Hyper-Realistic Female',
+                          desc: 'Studio-grade expressive female voice with natural breathing.',
+                          tag: 'ElevenLabs',
+                          icon: '👩'
+                        },
+                        {
+                          id: 'rishi',
+                          name: 'Rishi (ElevenLabs)',
+                          badge: 'Indian Male Accent',
+                          desc: 'Hyper-realistic neural Indian Male accent.',
+                          tag: 'ElevenLabs',
+                          icon: '👨'
                         }
                       ].map(v => (
                         <div
@@ -2251,7 +2299,7 @@
                           onClick={() => handleSaveVoicePreference(v.id)}
                           className={`p-3.5 rounded-2xl border-2 transition cursor-pointer flex items-center justify-between gap-3 ${
                             selectedVoice === v.id
-                              ? 'border-indigo-600 bg-indigo-50/50 shadow-xs'
+                              ? 'border-indigo-600 bg-indigo-50/50 shadow-xs ring-1 ring-indigo-200'
                               : 'border-slate-200 hover:border-indigo-200 bg-white'
                           }`}
                         >
@@ -2273,16 +2321,57 @@
                               <p className="text-[11px] text-slate-500 mt-0.5">{v.desc}</p>
                             </div>
                           </div>
-                          <span className="text-lg">
-                            {v.id === 'aria' ? '👩' : v.id === 'rishi' ? '👨' : v.id === 'indian_female' ? '👩' : '🌐'}
-                          </span>
+                          <span className="text-base sm:text-lg flex-shrink-0">{v.icon}</span>
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  {/* ElevenLabs API Key Config */}
-                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2.5">
+                  {/* Sarvam AI Free Developer Key Config */}
+                  <div className="p-4 rounded-2xl bg-indigo-50/50 border border-indigo-200/80 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-indigo-950 flex items-center gap-1.5 font-heading">
+                        <span>🇮🇳</span> Sarvam AI Subscription Key
+                      </span>
+                      {sarvamKey ? (
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                          ✓ Key Configured
+                        </span>
+                      ) : (
+                        <a
+                          href="https://dashboard.sarvam.ai"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[10px] font-bold text-indigo-600 hover:underline flex items-center gap-0.5"
+                        >
+                          Get Free Key ↗
+                        </a>
+                      )}
+                    </div>
+                    
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      Sign up for free developer credits at <b>dashboard.sarvam.ai</b> for authentic Indian Bulbul:v1 speech.
+                    </p>
+
+                    <div className="flex gap-2 pt-1">
+                      <input
+                        type="password"
+                        value={sarvamKey}
+                        onChange={(e) => setSarvamKey(e.target.value)}
+                        placeholder="Enter Sarvam AI Subscription Key..."
+                        className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-mono focus:outline-none focus:border-indigo-500"
+                      />
+                      <button
+                        onClick={() => handleSaveSarvamKey(sarvamKey)}
+                        className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition shadow-xs"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* ElevenLabs Key Config */}
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5 font-heading">
                         <span>🔑</span> ElevenLabs API Key (Optional)
@@ -2293,14 +2382,10 @@
                         </span>
                       ) : (
                         <span className="text-[10px] font-medium text-slate-400">
-                          Using built-in neural fallback
+                          Optional premium
                         </span>
                       )}
                     </div>
-                    
-                    <p className="text-[11px] text-slate-500 leading-relaxed">
-                      Enter your personal ElevenLabs API key for unrestricted hyper-realistic generation. Your key is stored securely in your browser's local storage.
-                    </p>
 
                     <div className="flex gap-2 pt-1">
                       <input
@@ -2312,7 +2397,7 @@
                       />
                       <button
                         onClick={() => handleSaveElevenLabsKey(elevenLabsKey)}
-                        className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition shadow-xs"
+                        className="px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl transition shadow-xs"
                       >
                         Save
                       </button>
@@ -2322,12 +2407,12 @@
 
                 {/* Footer */}
                 <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400">
-                    Selected: <b>{selectedVoice.toUpperCase()}</b>
+                  <span className="text-[11px] text-slate-500">
+                    Active: <b className="text-indigo-600">{selectedVoice.toUpperCase()}</b>
                   </span>
                   <button
                     onClick={() => setShowVoiceSettings(false)}
-                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition"
+                    className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-xs"
                   >
                     Done
                   </button>
