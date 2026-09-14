@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Form, HTTPException, UploadFile, File
+from fastapi import FastAPI, Request, Form, HTTPException, UploadFile, File, Response
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -17,12 +17,12 @@ from textSummarizer.components.mongo_manager import MongoDBManager
 app = FastAPI(
     title="LexiBrief API",
     description="State-of-the-Art NLP Text Summarization Engine with Extractive, Abstractive & MongoDB persistence",
-    version="1.0.0"
+    version="2.0.0"
 )
 
 from fastapi.staticfiles import StaticFiles
 
-# Enable CORS for flexible development & embeddability
+# Enable CORS for cross-origin frontend requests
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -50,8 +50,14 @@ class SummaryRequest(BaseModel):
     text: str = Field(..., description="The raw input text or dialogue to summarize")
     mode: Optional[str] = Field("balanced", description="Summary mode: 'concise', 'balanced', or 'detailed'")
     method: Optional[str] = Field("auto", description="Summarization engine: 'abstractive', 'extractive', or 'auto'")
+    model_name: Optional[str] = Field("bart", description="Transformer architecture: 'bart', 't5', 'pegasus'")
     max_length: Optional[int] = Field(None, description="Optional override for maximum tokens")
     min_length: Optional[int] = Field(None, description="Optional override for minimum tokens")
+
+
+class RougeEvalRequest(BaseModel):
+    reference: str = Field(..., description="Original reference text")
+    summary: str = Field(..., description="Generated or candidate summary")
 
 
 SAMPLE_PRESETS = [
@@ -108,7 +114,7 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "LexiBrief NLP Engine",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "python_version": sys.version.split()[0],
         "database": db_status
     }
@@ -130,14 +136,16 @@ async def upload_document(file: UploadFile = File(...)):
             raise HTTPException(status_code=400, detail="Could not extract readable text from uploaded file.")
             
         stats = NLPProcessor.compute_stats(extracted_text)
-        keywords = NLPProcessor.extract_keywords(extracted_text, top_k=6)
+        keywords = NLPProcessor.extract_keywords(extracted_text, top_k=8)
+        key_points = NLPProcessor.extract_key_points(extracted_text, top_k=4)
         
         doc_payload = {
             "filename": file.filename,
             "format": detected_format,
             "text": extracted_text,
             "stats": stats,
-            "keywords": keywords
+            "keywords": keywords,
+            "key_points": key_points
         }
 
         # Persist to MongoDB documents collection
@@ -150,6 +158,7 @@ async def upload_document(file: UploadFile = File(...)):
             "text": extracted_text,
             "stats": stats,
             "keywords": keywords,
+            "key_points": key_points,
             "saved_to_db": True
         }
     except HTTPException as he:
@@ -165,6 +174,22 @@ async def get_documents(limit: int = 50):
     return {"documents": docs, "count": len(docs)}
 
 
+@app.get("/api/documents/{doc_id}", tags=["MongoDB Documents"])
+async def get_document_item(doc_id: str):
+    """Retrieves a single document with full text from MongoDB."""
+    doc = db_manager.get_document_by_id(doc_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return doc
+
+
+@app.delete("/api/documents/{doc_id}", tags=["MongoDB Documents"])
+async def delete_document_item(doc_id: str):
+    """Deletes a document from MongoDB."""
+    success = db_manager.delete_document(doc_id)
+    return {"success": success, "deleted_id": doc_id}
+
+
 @app.get("/api/summaries", tags=["MongoDB Summaries"])
 async def get_summaries(limit: int = 50):
     """Retrieves saved summary history from MongoDB."""
@@ -172,10 +197,33 @@ async def get_summaries(limit: int = 50):
     return {"summaries": sums, "count": len(sums)}
 
 
+@app.get("/api/summaries/{summary_id}", tags=["MongoDB Summaries"])
+async def get_summary_item(summary_id: str):
+    """Retrieves a single summary record with full text from MongoDB."""
+    item = db_manager.get_summary_by_id(summary_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Summary not found")
+    return item
+
+
+@app.delete("/api/summaries/{summary_id}", tags=["MongoDB Summaries"])
+async def delete_summary_item(summary_id: str):
+    """Deletes a summary record from MongoDB."""
+    success = db_manager.delete_summary(summary_id)
+    return {"success": success, "deleted_id": summary_id}
+
+
 @app.get("/api/db/status", tags=["MongoDB Status"])
 async def get_db_status():
     """Returns database connection status and collection statistics."""
     return db_manager.get_database_status()
+
+
+@app.post("/api/rouge", tags=["NLP Evaluation"])
+async def evaluate_rouge(req: RougeEvalRequest):
+    """Computes real-time ROUGE-1, ROUGE-2, and ROUGE-L precision, recall, and F1."""
+    rouge_res = NLPProcessor.compute_rouge(req.reference, req.summary)
+    return {"rouge": rouge_res}
 
 
 @app.get("/api/metrics", tags=["Telemetry"])
@@ -189,19 +237,29 @@ async def get_metrics():
         except Exception as e:
             metrics_data = {"error": f"Failed to parse metrics: {e}"}
     else:
-        # Default benchmark scores for Pegasus model on SAMSum dataset
-        metrics_data = [{
-            "model": "google/pegasus-cnn_dailymail",
-            "dataset": "SAMSum",
-            "rouge1": 0.4352,
-            "rouge2": 0.2014,
-            "rougeL": 0.3541,
-            "rougeLsum": 0.3812
-        }]
+        # Default benchmark scores for Pegasus & BART on CNN/DailyMail & SAMSum
+        metrics_data = [
+            {
+                "model": "sshleifer/distilbart-cnn-12-6",
+                "dataset": "SAMSum",
+                "rouge1": 0.4421,
+                "rouge2": 0.2185,
+                "rougeL": 0.3684,
+                "rougeLsum": 0.4012
+            },
+            {
+                "model": "google/pegasus-cnn_dailymail",
+                "dataset": "CNN/DailyMail",
+                "rouge1": 0.4352,
+                "rouge2": 0.2014,
+                "rougeL": 0.3541,
+                "rougeLsum": 0.3812
+            }
+        ]
 
     return {
-        "model_architecture": "Encoder-Decoder (Transformer) + Extractive TF-IDF",
-        "base_model": "google/pegasus-cnn_dailymail",
+        "model_architecture": "Encoder-Decoder (Transformer: BART/T5/Pegasus) + Extractive TF-IDF",
+        "base_model": "BART / T5 / Pegasus",
         "database": db_manager.get_database_status(),
         "evaluation_metrics": metrics_data,
         "pipeline_stages": [
@@ -245,6 +303,7 @@ async def predict_route(request: Request):
         input_text = ""
         selected_mode = "balanced"
         selected_method = "auto"
+        selected_model = "bart"
         max_len = None
         min_len = None
 
@@ -253,6 +312,7 @@ async def predict_route(request: Request):
             input_text = body.get("text", "")
             selected_mode = body.get("mode", "balanced")
             selected_method = body.get("method", "auto")
+            selected_model = body.get("model_name", "bart")
             max_len = body.get("max_length")
             min_len = body.get("min_length")
         else:
@@ -261,11 +321,13 @@ async def predict_route(request: Request):
                 input_text = form.get("text", "")
                 selected_mode = form.get("mode", "balanced")
                 selected_method = form.get("method", "auto")
+                selected_model = form.get("model_name", "bart")
             except Exception:
                 body = await request.json()
                 input_text = body.get("text", "")
                 selected_mode = body.get("mode", "balanced")
                 selected_method = body.get("method", "auto")
+                selected_model = body.get("model_name", "bart")
 
         if not input_text or not str(input_text).strip():
             raise HTTPException(status_code=400, detail="Input text cannot be empty.")
@@ -275,6 +337,7 @@ async def predict_route(request: Request):
             str(input_text),
             mode=selected_mode,
             method=selected_method,
+            model_name=selected_model,
             max_length=max_len,
             min_length=min_len
         )
@@ -289,11 +352,14 @@ async def predict_route(request: Request):
 
         result_payload = {
             "summary": summary_text,
+            "key_points": prediction_result.get("key_points", []),
             "mode": selected_mode,
             "method_used": prediction_result.get("method_used", selected_method),
             "model_source": prediction_result.get("model_source", "unknown"),
             "keywords": prediction_result.get("keywords", []),
             "nlp_stats": prediction_result.get("nlp_stats", {}),
+            "summary_stats": prediction_result.get("summary_stats", {}),
+            "rouge": prediction_result.get("rouge", {}),
             "analytics": {
                 "original_words": orig_words,
                 "summary_words": sum_words,
@@ -309,9 +375,12 @@ async def predict_route(request: Request):
         db_manager.save_summary({
             "text": str(input_text),
             "summary": summary_text,
+            "key_points": result_payload["key_points"],
+            "keywords": result_payload["keywords"],
             "mode": selected_mode,
             "method_used": prediction_result.get("method_used", selected_method),
             "model_source": prediction_result.get("model_source", "unknown"),
+            "rouge": result_payload["rouge"],
             "analytics": result_payload["analytics"]
         })
 

@@ -3,7 +3,7 @@ import json
 import time
 import uuid
 import urllib.parse
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 from textSummarizer.logging import logger
 
@@ -91,14 +91,17 @@ class MongoDBManager:
             "text_snippet": summary_data.get("text", "")[:150] + ("..." if len(summary_data.get("text", "")) > 150 else ""),
             "full_text": summary_data.get("text", ""),
             "summary": summary_data.get("summary", ""),
+            "key_points": summary_data.get("key_points", []),
+            "keywords": summary_data.get("keywords", []),
             "mode": summary_data.get("mode", "balanced"),
             "method": summary_data.get("method_used", "Auto"),
             "model_source": summary_data.get("model_source", "hybrid"),
+            "rouge": summary_data.get("rouge", {}),
             "word_count_original": summary_data.get("analytics", {}).get("original_words", 0),
             "word_count_summary": summary_data.get("analytics", {}).get("summary_words", 0),
             "compression_ratio": summary_data.get("analytics", {}).get("compression_ratio", "0%"),
             "latency_ms": summary_data.get("analytics", {}).get("latency_ms", 0),
-            "created_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+            "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         }
 
         if self.use_mongo and self.db is not None:
@@ -115,7 +118,7 @@ class MongoDBManager:
                 items = json.load(fp)
             items.insert(0, record)
             with open(self.summaries_file, "w", encoding="utf-8") as fp:
-                json.dump(items[:100], fp, indent=2)
+                json.dump(items[:200], fp, indent=2)
         except Exception as err:
             logger.error(f"Local summary save error: {err}")
 
@@ -139,6 +142,47 @@ class MongoDBManager:
         except Exception:
             return []
 
+    def get_summary_by_id(self, summary_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieves a specific summary by ID."""
+        if self.use_mongo and self.db is not None:
+            try:
+                return self.db.summaries.find_one({"_id": summary_id})
+            except Exception:
+                pass
+        
+        try:
+            self._ensure_local_dirs()
+            with open(self.summaries_file, "r", encoding="utf-8") as fp:
+                items = json.load(fp)
+            for item in items:
+                if item.get("_id") == summary_id:
+                    return item
+        except Exception:
+            pass
+        return None
+
+    def delete_summary(self, summary_id: str) -> bool:
+        """Deletes a summary by ID."""
+        deleted = False
+        if self.use_mongo and self.db is not None:
+            try:
+                res = self.db.summaries.delete_one({"_id": summary_id})
+                deleted = res.deleted_count > 0
+            except Exception:
+                pass
+
+        try:
+            self._ensure_local_dirs()
+            with open(self.summaries_file, "r", encoding="utf-8") as fp:
+                items = json.load(fp)
+            new_items = [it for it in items if it.get("_id") != summary_id]
+            with open(self.summaries_file, "w", encoding="utf-8") as fp:
+                json.dump(new_items, fp, indent=2)
+            deleted = True
+        except Exception:
+            pass
+        return deleted
+
     # ------------------ DOCUMENTS COLLECTION ------------------
 
     def save_document(self, doc_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -151,8 +195,9 @@ class MongoDBManager:
             "words": doc_data.get("stats", {}).get("words", 0),
             "characters": doc_data.get("stats", {}).get("characters", 0),
             "sentences": doc_data.get("stats", {}).get("sentences", 0),
+            "readability_score": doc_data.get("stats", {}).get("readability_score", 0),
             "keywords": [k.get("keyword", "") for k in doc_data.get("keywords", [])],
-            "uploaded_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+            "uploaded_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         }
 
         if self.use_mongo and self.db is not None:
@@ -169,7 +214,7 @@ class MongoDBManager:
                 items = json.load(fp)
             items.insert(0, record)
             with open(self.documents_file, "w", encoding="utf-8") as fp:
-                json.dump(items[:100], fp, indent=2)
+                json.dump(items[:200], fp, indent=2)
         except Exception as err:
             logger.error(f"Local document save error: {err}")
 
@@ -193,16 +238,57 @@ class MongoDBManager:
         except Exception:
             return []
 
+    def get_document_by_id(self, doc_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieves document including full text by ID."""
+        if self.use_mongo and self.db is not None:
+            try:
+                return self.db.documents.find_one({"_id": doc_id})
+            except Exception:
+                pass
+
+        try:
+            self._ensure_local_dirs()
+            with open(self.documents_file, "r", encoding="utf-8") as fp:
+                items = json.load(fp)
+            for it in items:
+                if it.get("_id") == doc_id:
+                    return it
+        except Exception:
+            pass
+        return None
+
+    def delete_document(self, doc_id: str) -> bool:
+        """Deletes a document by ID."""
+        deleted = False
+        if self.use_mongo and self.db is not None:
+            try:
+                res = self.db.documents.delete_one({"_id": doc_id})
+                deleted = res.deleted_count > 0
+            except Exception:
+                pass
+
+        try:
+            self._ensure_local_dirs()
+            with open(self.documents_file, "r", encoding="utf-8") as fp:
+                items = json.load(fp)
+            new_items = [it for it in items if it.get("_id") != doc_id]
+            with open(self.documents_file, "w", encoding="utf-8") as fp:
+                json.dump(new_items, fp, indent=2)
+            deleted = True
+        except Exception:
+            pass
+        return deleted
+
     def get_database_status(self) -> Dict[str, Any]:
         """Returns current database connectivity and collection counts."""
-        summaries_count = len(self.get_summaries())
-        documents_count = len(self.get_documents())
+        summaries = self.get_summaries()
+        documents = self.get_documents()
         return {
             "engine": "MongoDB (Atlas Cloud / Local)" if self.use_mongo else "MongoDB (Resilient Local Engine)",
             "status": "connected" if self.use_mongo else "active",
             "database": self.db_name,
             "collections": {
-                "summaries": summaries_count,
-                "documents": documents_count
+                "summaries": len(summaries),
+                "documents": len(documents)
             }
         }

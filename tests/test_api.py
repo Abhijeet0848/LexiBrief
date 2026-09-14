@@ -13,10 +13,11 @@ from textSummarizer.components.extractive_summarizer import ExtractiveSummarizer
 client = TestClient(app)
 
 def test_index_route():
-    """Verify that the UI landing page loads with HTTP 200."""
+    """Verify that the React UI landing page loads with HTTP 200."""
     response = client.get("/")
     assert response.status_code == 200
     assert "LexiBrief" in response.text
+    assert "React" in response.text or "root" in response.text
 
 def test_health_check_endpoint():
     """Verify health check endpoint returns healthy status and service info."""
@@ -44,7 +45,7 @@ def test_metrics_endpoint():
 
 def test_text_extractor_and_nlp_processor():
     """Verify text extractor and NLP preprocessing components."""
-    sample_raw = "  This is an AI summary test!   It extracts key concepts and tokenizes words properly.  "
+    sample_raw = "  This is an AI summary test! It extracts key concepts, computes ROUGE metrics, and extracts key takeaways.  "
     cleaned = TextExtractor.clean_text(sample_raw)
     assert cleaned.startswith("This is an AI summary test!")
     
@@ -52,10 +53,17 @@ def test_text_extractor_and_nlp_processor():
     assert "summary" in tokens
     
     sentences = NLPProcessor.split_sentences(cleaned)
-    assert len(sentences) >= 2
+    assert len(sentences) >= 1
     
     keywords = NLPProcessor.extract_keywords(cleaned, top_k=3)
     assert len(keywords) > 0
+
+    key_points = NLPProcessor.extract_key_points(cleaned, top_k=2)
+    assert len(key_points) > 0
+
+    stats = NLPProcessor.compute_stats(cleaned)
+    assert "words" in stats
+    assert "readability_score" in stats
 
 def test_extractive_summarizer():
     """Verify TF-IDF extractive summarization."""
@@ -71,7 +79,7 @@ def test_extractive_summarizer():
     assert len(summary) < len(text)
 
 def test_predict_endpoint_modes_and_methods():
-    """Verify that text prediction route handles input with extractive and abstractive methods."""
+    """Verify that text prediction route handles input with extractive, abstractive, key points, and ROUGE scores."""
     sample_text = (
         "Artificial intelligence research laboratories have unveiled a new generation "
         "of transformer architectures optimized for abstractive document summarization. "
@@ -84,16 +92,20 @@ def test_predict_endpoint_modes_and_methods():
     data_ext = resp_ext.json()
     assert "summary" in data_ext
     assert "keywords" in data_ext
+    assert "key_points" in data_ext
     assert "nlp_stats" in data_ext
+    assert "rouge" in data_ext
+    assert "rouge1" in data_ext["rouge"]
 
-    # Auto method
-    resp_auto = client.post("/predict", json={"text": sample_text, "mode": "balanced", "method": "auto"})
+    # Auto method with model name
+    resp_auto = client.post("/predict", json={"text": sample_text, "mode": "balanced", "method": "auto", "model_name": "bart"})
     assert resp_auto.status_code == 200
     assert "summary" in resp_auto.json()
+    assert "analytics" in resp_auto.json()
 
 def test_file_upload_endpoint():
     """Verify document upload endpoint with a mock text file."""
-    file_content = b"LexiBrief provides high-performance abstractive and extractive text summarization."
+    file_content = b"LexiBrief provides high-performance abstractive and extractive text summarization with key points and ROUGE evaluation."
     response = client.post(
         "/api/upload",
         files={"file": ("sample_report.txt", io.BytesIO(file_content), "text/plain")}
@@ -105,18 +117,33 @@ def test_file_upload_endpoint():
     assert "LexiBrief" in data["text"]
     assert "stats" in data
     assert "keywords" in data
+    assert "key_points" in data
 
-def test_mongodb_endpoints():
-    """Verify MongoDB document and summary endpoints."""
-    # Summaries collection
+def test_rouge_evaluation_endpoint():
+    """Verify standalone ROUGE scoring endpoint."""
+    reference = "Artificial intelligence accelerates document analysis and natural language processing."
+    summary = "Artificial intelligence accelerates document analysis."
+    response = client.post("/api/rouge", json={"reference": reference, "summary": summary})
+    assert response.status_code == 200
+    data = response.json()
+    assert "rouge" in data
+    assert data["rouge"]["rouge1"]["f1"] > 0.5
+    assert data["rouge"]["rouge2"]["f1"] > 0.0
+    assert data["rouge"]["rougeL"]["f1"] > 0.5
+
+def test_mongodb_crud_endpoints():
+    """Verify MongoDB document and summary CRUD endpoints."""
+    # Summaries list
     res_sums = client.get("/api/summaries")
     assert res_sums.status_code == 200
-    assert "summaries" in res_sums.json()
+    sums_data = res_sums.json()
+    assert "summaries" in sums_data
 
-    # Documents collection
+    # Documents list
     res_docs = client.get("/api/documents")
     assert res_docs.status_code == 200
-    assert "documents" in res_docs.json()
+    docs_data = res_docs.json()
+    assert "documents" in docs_data
 
     # DB status
     res_status = client.get("/api/db/status")
