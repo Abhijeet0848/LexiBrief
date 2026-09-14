@@ -488,25 +488,6 @@
             line-height: 1.55;
         }
 
-        .empty-action-hint {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.4rem;
-            font-size: 0.78rem;
-            color: var(--primary);
-            font-weight: 600;
-            background: #eef2ff;
-            padding: 0.35rem 0.75rem;
-            border-radius: 20px;
-            margin-top: 0.35rem;
-            cursor: pointer;
-            transition: all 0.15s ease;
-        }
-
-        .empty-action-hint:hover {
-            background: #e0e7ff;
-            transform: translateY(-1px);
-        }
 
         /* Summary Result Display */
         .summary-content {
@@ -1069,9 +1050,6 @@
                         </div>
                         <div class="empty-title">Ready for distillation</div>
                         <div class="empty-desc">Paste your text, upload a PDF/DOCX, or pick a sample preset to run extractive or abstractive summarization.</div>
-                        <div class="empty-action-hint" onclick="loadPreset('technews')">
-                            ⚡ Try "AI Breakthrough" sample
-                        </div>
                     </div>
                     <div class="summary-content" id="summaryText"></div>
                     <div class="keywords-bar" id="keywordsBar">
