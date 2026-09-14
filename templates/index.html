@@ -303,7 +303,7 @@
 
       // Summarize
       const handleSummarize = async () => {
-        if (!inputText.trim()) {
+        if (!inputText.trim() || !/[a-zA-Z0-9]/.test(inputText)) {
           showToast("Please enter text or upload a document.", "error");
           return;
         }
@@ -712,9 +712,9 @@
 
                       <button
                         onClick={handleSummarize}
-                        disabled={isLoading || !inputText.trim()}
+                        disabled={isLoading || !inputText.trim() || !/[a-zA-Z0-9]/.test(inputText)}
                         className={`px-5 sm:px-6 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm ${
-                          isLoading || !inputText.trim()
+                          isLoading || !inputText.trim() || !/[a-zA-Z0-9]/.test(inputText)
                             ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                             : 'bg-indigo-600 hover:bg-indigo-700 text-white active:scale-98'
                         }`}

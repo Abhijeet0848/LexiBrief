@@ -33,7 +33,7 @@ class PredictionPipeline:
         and ROUGE scoring in an optimized single-pass workflow.
         """
         cleaned_text = TextExtractor.clean_text(text)
-        if not cleaned_text:
+        if not cleaned_text or not any(c.isalnum() for c in cleaned_text):
             return {
                 "summary": "",
                 "key_points": [],

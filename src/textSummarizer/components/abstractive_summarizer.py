@@ -81,6 +81,11 @@ class AbstractiveSummarizer:
 
     def summarize(self, text: str, model_choice: str = "bart", max_length: int = 128, min_length: int = 30) -> str:
         """Generates abstractive summary using direct AutoModelForSeq2SeqLM inference."""
+        # Short-circuit for very short inputs to avoid forced hallucination / repetition
+        words = text.split()
+        if len(words) <= 10:
+            return text.strip()
+
         model, tokenizer = self.load_model(model_choice=model_choice)
         if model is None or tokenizer is None:
             raise RuntimeError("Transformer model could not be initialized into memory.")
@@ -91,13 +96,19 @@ class AbstractiveSummarizer:
             input_text = f"summarize: {input_text}"
 
         inputs = tokenizer(input_text, return_tensors="pt", max_length=1024, truncation=True)
+        input_token_count = inputs["input_ids"].shape[1]
+        
+        # Adaptively bound lengths to prevent over-generation
+        eff_min_length = min(min_length, max(5, input_token_count // 2))
+        eff_max_length = max(eff_min_length + 10, min(max_length, input_token_count + 15))
+
         gen_kwargs = {
             "length_penalty": 0.8,
             "num_beams": 2,               # Optimized for fast generation
             "early_stopping": True,
             "no_repeat_ngram_size": 3,
-            "max_length": max_length,
-            "min_length": min_length
+            "max_length": eff_max_length,
+            "min_length": eff_min_length
         }
 
         if _TORCH_AVAILABLE:

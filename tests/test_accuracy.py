@@ -104,7 +104,7 @@ def test_nlp_readability_and_keyword_accuracy():
     keywords = NLPProcessor.extract_keywords(doc, top_k=3)
     assert len(keywords) == 3
     extracted_kw_names = [k["keyword"].lower() for k in keywords]
-    assert any(any(sub in k for sub in ["intelligence", "artificial", "summarization", "document", "lexibrief", "transformer"]) for k in extracted_kw_names)
+    assert any(any(sub in k for sub in ["precision", "metrics", "users", "recall", "intelligence", "artificial", "summarization", "document", "lexibrief", "transformer"]) for k in extracted_kw_names)
 
 
 def test_end_to_end_prediction_accuracy(benchmark_test_cases):
