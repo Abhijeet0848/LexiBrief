@@ -31,14 +31,36 @@
 
 ---
 
-## 🏗️ System & NLP Architecture
+## 🏗️ System & Database Architecture
 
 ```text
-             ┌─────────────────────┐
-             │     User Input      │
-             │                     │
-             │ Text / PDF / DOCX   │
-             └──────────┬──────────┘
+                 AI TEXT SUMMARIZER
+                         │
+             ┌───────────┴───────────┐
+             │                       │
+             ▼                       ▼
+        NLP / AI Engine          MongoDB
+             │                       │
+             │                ┌──────┴──────┐
+             │                │             │
+             │           Summaries      Documents
+             │
+             ▼
+        Generated Summary
+```
+
+```mermaid
+flowchart TD
+    APP["✨ AI Text Summarizer (FastAPI / Web UI)"]
+    APP --> NLP["🧠 NLP / AI Engine (Pegasus & TF-IDF)"]
+    APP --> DB[("🍃 MongoDB Database")]
+    NLP --> OUT["📄 Generated Summary"]
+    OUT --> DB
+    DB --> COL1["📂 Collection: summaries"]
+    DB --> COL2["📂 Collection: documents"]
+```
+
+### NLP Pipeline Flow
                         │
                         ▼
              ┌─────────────────────┐

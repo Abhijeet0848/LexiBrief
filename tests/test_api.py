@@ -105,3 +105,20 @@ def test_file_upload_endpoint():
     assert "LexiBrief" in data["text"]
     assert "stats" in data
     assert "keywords" in data
+
+def test_mongodb_endpoints():
+    """Verify MongoDB document and summary endpoints."""
+    # Summaries collection
+    res_sums = client.get("/api/summaries")
+    assert res_sums.status_code == 200
+    assert "summaries" in res_sums.json()
+
+    # Documents collection
+    res_docs = client.get("/api/documents")
+    assert res_docs.status_code == 200
+    assert "documents" in res_docs.json()
+
+    # DB status
+    res_status = client.get("/api/db/status")
+    assert res_status.status_code == 200
+    assert "collections" in res_status.json()

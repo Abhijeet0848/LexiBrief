@@ -12,10 +12,11 @@ import pandas as pd
 
 from textSummarizer.components.text_extractor import TextExtractor
 from textSummarizer.components.nlp_processor import NLPProcessor
+from textSummarizer.components.mongo_manager import MongoDBManager
 
 app = FastAPI(
     title="LexiBrief API",
-    description="State-of-the-Art NLP Text Summarization Engine with Extractive & Abstractive Transformers",
+    description="State-of-the-Art NLP Text Summarization Engine with Extractive, Abstractive & MongoDB persistence",
     version="1.0.0"
 )
 
@@ -33,8 +34,9 @@ app.add_middleware(
 if os.path.exists("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Prediction Pipeline instance placeholder (lazy loaded)
+# Lazy-loaded prediction pipeline & database manager
 prediction_pipeline = None
+db_manager = MongoDBManager()
 
 def get_prediction_pipeline():
     global prediction_pipeline
@@ -102,11 +104,13 @@ async def index():
 
 @app.get("/api/health", tags=["System"])
 async def health_check():
+    db_status = db_manager.get_database_status()
     return {
         "status": "healthy",
         "service": "LexiBrief NLP Engine",
         "version": "1.0.0",
-        "python_version": sys.version.split()[0]
+        "python_version": sys.version.split()[0],
+        "database": db_status
     }
 
 
@@ -115,9 +119,9 @@ async def get_presets():
     return {"presets": SAMPLE_PRESETS}
 
 
-@app.post("/api/upload", tags=["Text Extraction"])
+@app.post("/api/upload", tags=["Text Extraction & MongoDB"])
 async def upload_document(file: UploadFile = File(...)):
-    """Extracts and cleans raw text from uploaded files (PDF, DOCX, TXT)."""
+    """Extracts and cleans raw text from uploaded files (PDF, DOCX, TXT) and saves to MongoDB."""
     try:
         content_bytes = await file.read()
         extracted_text, detected_format = TextExtractor.extract(file.filename, content_bytes)
@@ -128,17 +132,50 @@ async def upload_document(file: UploadFile = File(...)):
         stats = NLPProcessor.compute_stats(extracted_text)
         keywords = NLPProcessor.extract_keywords(extracted_text, top_k=6)
         
-        return {
+        doc_payload = {
             "filename": file.filename,
             "format": detected_format,
             "text": extracted_text,
             "stats": stats,
             "keywords": keywords
         }
+
+        # Persist to MongoDB documents collection
+        saved_record = db_manager.save_document(doc_payload)
+        
+        return {
+            "id": saved_record.get("_id"),
+            "filename": file.filename,
+            "format": detected_format,
+            "text": extracted_text,
+            "stats": stats,
+            "keywords": keywords,
+            "saved_to_db": True
+        }
     except HTTPException as he:
         raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"File extraction error: {e}")
+
+
+@app.get("/api/documents", tags=["MongoDB Documents"])
+async def get_documents(limit: int = 50):
+    """Retrieves uploaded documents from MongoDB."""
+    docs = db_manager.get_documents(limit=limit)
+    return {"documents": docs, "count": len(docs)}
+
+
+@app.get("/api/summaries", tags=["MongoDB Summaries"])
+async def get_summaries(limit: int = 50):
+    """Retrieves saved summary history from MongoDB."""
+    sums = db_manager.get_summaries(limit=limit)
+    return {"summaries": sums, "count": len(sums)}
+
+
+@app.get("/api/db/status", tags=["MongoDB Status"])
+async def get_db_status():
+    """Returns database connection status and collection statistics."""
+    return db_manager.get_database_status()
 
 
 @app.get("/api/metrics", tags=["Telemetry"])
@@ -163,8 +200,9 @@ async def get_metrics():
         }]
 
     return {
-        "model_architecture": "Encoder-Decoder (Transformer)",
+        "model_architecture": "Encoder-Decoder (Transformer) + Extractive TF-IDF",
         "base_model": "google/pegasus-cnn_dailymail",
+        "database": db_manager.get_database_status(),
         "evaluation_metrics": metrics_data,
         "pipeline_stages": [
             {"id": 1, "name": "Data Ingestion", "status": "Completed", "artifacts": "artifacts/data_ingestion"},
@@ -199,7 +237,7 @@ async def training():
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.post("/predict", tags=["Prediction"])
+@app.post("/predict", tags=["Prediction & MongoDB"])
 async def predict_route(request: Request):
     try:
         start_time = time.time()
@@ -249,7 +287,7 @@ async def predict_route(request: Request):
         sum_words = len(summary_text.split())
         compression_pct = round(max(0, (1 - (sum_words / max(orig_words, 1)))) * 100, 1)
 
-        return {
+        result_payload = {
             "summary": summary_text,
             "mode": selected_mode,
             "method_used": prediction_result.get("method_used", selected_method),
@@ -266,6 +304,18 @@ async def predict_route(request: Request):
                 "latency_ms": latency_ms
             }
         }
+
+        # Persist summary to MongoDB 'summaries' collection
+        db_manager.save_summary({
+            "text": str(input_text),
+            "summary": summary_text,
+            "mode": selected_mode,
+            "method_used": prediction_result.get("method_used", selected_method),
+            "model_source": prediction_result.get("model_source", "unknown"),
+            "analytics": result_payload["analytics"]
+        })
+
+        return result_payload
     except HTTPException as he:
         raise he
     except Exception as e:

@@ -938,10 +938,30 @@
                     <p>Upload multi-page PDF, DOCX, and TXT files for automated text ingestion.</p>
                 </div>
 
-                <div class="input-card" style="text-align: center; padding: 2.5rem 1.5rem; border: 2px dashed #cbd5e1; cursor: pointer;" onclick="document.getElementById('fileInput').click()">
+                <div class="input-card" style="text-align: center; padding: 2rem 1.5rem; border: 2px dashed #cbd5e1; cursor: pointer; margin-bottom: 1.25rem;" onclick="document.getElementById('fileInput').click()">
                     <div style="font-size: 2rem; margin-bottom: 0.5rem;">📁</div>
-                    <div style="font-weight: 700; font-size: 1.05rem;">Click to upload document</div>
+                    <div style="font-weight: 700; font-size: 1.05rem;">Click to upload document to MongoDB</div>
                     <div style="font-size: 0.84rem; color: var(--text-muted); margin-top: 0.25rem;">Supports Adobe PDF (.pdf), Microsoft Word (.docx), and Plaintext (.txt)</div>
+                </div>
+
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Filename</th>
+                                <th>Format</th>
+                                <th>Words</th>
+                                <th>Sentences</th>
+                                <th>Uploaded At</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="documentsTableBody">
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">No documents uploaded yet. Click above to upload one!</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
@@ -1027,18 +1047,38 @@
         <div class="modal-content">
             <div class="modal-header">
                 <div>
-                    <h3 style="font-size: 1.1rem; font-weight: 700;">✦ LexiBrief Architecture & Help</h3>
-                    <p style="font-size: 0.8rem; color: var(--text-muted);">How Extractive & Abstractive Summarization Works</p>
+                    <h3 style="font-size: 1.1rem; font-weight: 700;">✦ LexiBrief Architecture & Database Flow</h3>
+                    <p style="font-size: 0.8rem; color: var(--text-muted);">AI NLP Engine & MongoDB Persistence Workflow</p>
                 </div>
                 <button class="modal-close" onclick="closeHelpModal()">&times;</button>
             </div>
 
             <div>
-                <h4 style="font-size: 0.88rem; font-weight: 700; margin-bottom: 0.4rem;">Summarization Engines</h4>
+                <h4 style="font-size: 0.88rem; font-weight: 700; margin-bottom: 0.5rem;">System & Database Architecture</h4>
+                <div style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; overflow-x: auto;">
+                    <pre style="font-family: 'JetBrains Mono', monospace; font-size: 0.76rem; color: #1e293b; line-height: 1.4; margin: 0;">                 AI TEXT SUMMARIZER
+                         │
+             ┌───────────┴───────────┐
+             │                       │
+             ▼                       ▼
+        NLP / AI Engine          MongoDB
+             │                       │
+             │                ┌──────┴──────┐
+             │                │             │
+             │           Summaries      Documents
+             │
+             ▼
+        Generated Summary
+             │
+             ▼</pre>
+                </div>
+            </div>
+
+            <div>
+                <h4 style="font-size: 0.88rem; font-weight: 700; margin-bottom: 0.4rem;">Summarization Engines & Storage</h4>
                 <p style="font-size: 0.84rem; color: var(--text-secondary); line-height: 1.6;">
-                    <strong>Extractive (TF-IDF):</strong> Ranks original sentences based on vocabulary frequency, position bias, and semantic density, returning the most representative excerpts.<br>
-                    <strong>Abstractive (Transformer):</strong> Uses Google Pegasus encoder-decoder neural attention to write fresh sentences distilling high-impact executive briefs.<br>
-                    <strong>Hybrid (Auto):</strong> Automatically routes the document to the optimal pipeline with resilience fallbacks.
+                    <strong>NLP / AI Engine:</strong> Coordinates Extractive (TF-IDF saliency ranking) and Abstractive (Google Pegasus Seq2Seq transformer) pipelines.<br>
+                    <strong>MongoDB Persistence:</strong> Auto-persists all generated summaries into the <code>summaries</code> collection and parsed files into the <code>documents</code> collection.
                 </p>
             </div>
 
@@ -1074,6 +1114,100 @@
             const viewEl = document.getElementById(`view-${tabId}`);
             if (navEl) navEl.classList.add('active');
             if (viewEl) viewEl.classList.add('active');
+
+            if (tabId === 'history') loadSummariesFromDb();
+            if (tabId === 'documents') loadDocumentsFromDb();
+            if (tabId === 'dashboard') loadDbStats();
+        }
+
+        async function loadSummariesFromDb() {
+            try {
+                const res = await fetch('/api/summaries');
+                if (!res.ok) return;
+                const data = await res.json();
+                const sums = data.summaries || [];
+                const tbody = document.getElementById('historyTableBody');
+                if (sums.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">No historical summaries yet. Generate one in the Summarize tab!</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = sums.map(s => `
+                    <tr>
+                        <td>${s.created_at || 'Recently'}</td>
+                        <td><span class="stat-pill">${s.method || 'Auto'}</span></td>
+                        <td style="text-transform: capitalize;">${s.mode || 'balanced'}</td>
+                        <td>${s.word_count_original || 0} &rarr; ${s.word_count_summary || 0} words</td>
+                        <td><span class="stat-pill highlight">${s.compression_ratio || '0%'}</span></td>
+                        <td>
+                            <button class="btn-action" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="loadPastSummaryIntoEditor('${(s.text_snippet || '').replace(/'/g, "\\'")}', '${(s.summary || '').replace(/'/g, "\\'")}')">View</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (e) {
+                console.log("DB load summaries notice:", e);
+            }
+        }
+
+        async function loadDocumentsFromDb() {
+            try {
+                const res = await fetch('/api/documents');
+                if (!res.ok) return;
+                const data = await res.json();
+                const docs = data.documents || [];
+                const tbody = document.getElementById('documentsTableBody');
+                if (docs.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">No documents uploaded yet. Click above to upload one!</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = docs.map(d => `
+                    <tr>
+                        <td><strong>${d.filename}</strong></td>
+                        <td><span class="stat-pill">${d.format}</span></td>
+                        <td>${d.words || 0} words</td>
+                        <td>${d.sentences || 0} sentences</td>
+                        <td>${d.uploaded_at || 'Recently'}</td>
+                        <td>
+                            <button class="btn-action" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="loadDocIntoEditor('${d._id}')">Summarize</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (e) {
+                console.log("DB load documents notice:", e);
+            }
+        }
+
+        async function loadDocIntoEditor(docId) {
+            try {
+                const res = await fetch('/api/documents');
+                const data = await res.json();
+                const doc = (data.documents || []).find(d => d._id === docId);
+                if (doc && doc.text_content) {
+                    document.getElementById('inputText').value = doc.text_content;
+                    switchTab('summarize');
+                    showToast(`Loaded ${doc.filename} into editor!`);
+                }
+            } catch (e) {
+                showToast("Could not load document text.");
+            }
+        }
+
+        function loadPastSummaryIntoEditor(snippet, summary) {
+            document.getElementById('summaryOutput').innerText = summary;
+            document.getElementById('resultCard').style.display = 'flex';
+            switchTab('summarize');
+            showToast("Loaded summary into output view!");
+        }
+
+        async function loadDbStats() {
+            try {
+                const res = await fetch('/api/db/status');
+                if (!res.ok) return;
+                const data = await res.json();
+                const sums = data.collections?.summaries || 0;
+                document.getElementById('dashTotalCount').innerText = `${sums} Summaries`;
+            } catch (e) {
+                console.log("DB stats error:", e);
+            }
         }
 
         function selectAlgorithm(algo) {
@@ -1135,7 +1269,7 @@
                 const data = await res.json();
                 document.getElementById('inputText').value = data.text;
                 switchTab('summarize');
-                showToast(`Extracted ${data.format} file (${data.stats.words} words)!`);
+                showToast(`Saved to MongoDB & extracted ${data.format} file (${data.stats.words} words)!`);
             } catch (err) {
                 showToast("Upload error: " + err.message);
             } finally {
@@ -1189,18 +1323,7 @@
                 document.getElementById('resLatency').innerText = `${a.latency_ms || 120}ms`;
                 document.getElementById('resEngine').innerText = data.method_used ? data.method_used.split(' ')[0] : "Hybrid";
 
-                // Add to history
-                addHistoryRecord({
-                    time: new Date().toLocaleTimeString(),
-                    algo: data.method_used || selectedAlgorithm,
-                    mode: currentMode,
-                    origWords: a.original_words || text.split(/\s+/).length,
-                    sumWords: sumWords,
-                    reduction: a.compression_ratio || '50%',
-                    summary: summary
-                });
-
-                showToast("Summary generated successfully!");
+                showToast("Summary generated and saved to MongoDB!");
             } catch (err) {
                 showToast("Error: " + err.message);
             } finally {
@@ -1208,25 +1331,6 @@
                 icon.innerText = '✨';
                 label.innerText = 'Generate Summary';
             }
-        }
-
-        function addHistoryRecord(item) {
-            historyLog.unshift(item);
-            document.getElementById('dashTotalCount').innerText = `${historyLog.length} Documents`;
-            
-            const tbody = document.getElementById('historyTableBody');
-            tbody.innerHTML = historyLog.map((h, i) => `
-                <tr>
-                    <td>${h.time}</td>
-                    <td><span class="stat-pill">${h.algo}</span></td>
-                    <td style="text-transform: capitalize;">${h.mode}</td>
-                    <td>${h.origWords} &rarr; ${h.sumWords} words</td>
-                    <td><span class="stat-pill highlight">${h.reduction}</span></td>
-                    <td>
-                        <button class="btn-action" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="navigator.clipboard.writeText('${h.summary.replace(/'/g, "\\'")}'); showToast('Copied to clipboard!');">Copy</button>
-                    </td>
-                </tr>
-            `).join('');
         }
 
         function copyResultText() {
@@ -1298,11 +1402,16 @@
             try {
                 const res = await fetch('/api/health');
                 const data = await res.json();
-                showToast("API Status: " + data.status.toUpperCase());
+                showToast("API & DB Status: " + data.status.toUpperCase());
             } catch (e) {
                 showToast("API unreachable: " + e.message);
             }
         }
+
+        // On initial page load
+        window.addEventListener('DOMContentLoaded', () => {
+            loadDbStats();
+        });
     </script>
 </body>
 </html>

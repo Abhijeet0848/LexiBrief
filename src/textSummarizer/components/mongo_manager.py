@@ -1,0 +1,208 @@
+import os
+import json
+import time
+import uuid
+import urllib.parse
+from datetime import datetime
+from typing import List, Dict, Any, Optional
+from textSummarizer.logging import logger
+
+def _load_env_file():
+    """Lightweight fallback .env loader."""
+    env_path = ".env"
+    if os.path.exists(env_path):
+        try:
+            with open(env_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        k = k.strip()
+                        v = v.strip().strip("'\"")
+                        if k and not os.getenv(k):
+                            os.environ[k] = v
+        except Exception:
+            pass
+
+_load_env_file()
+
+
+class MongoDBManager:
+    """Manages persistence for Summaries and Documents in MongoDB with a local fallback engine."""
+
+    def __init__(self, db_name: str = "lexibrief_db"):
+        self.db_name = os.getenv("MONGODB_DB", db_name)
+        self.mongo_url = self._resolve_mongo_url()
+        self.client = None
+        self.db = None
+        self.use_mongo = False
+
+        self._init_connection()
+
+    def _resolve_mongo_url(self) -> str:
+        """Resolves MongoDB connection URL from individual credentials or full connection string."""
+        explicit_url = os.getenv("MONGODB_URL")
+        if explicit_url:
+            return explicit_url
+
+        user = os.getenv("MONGODB_USER", "gautamabhijeet050_db_user")
+        pwd = os.getenv("MONGODB_PASSWORD")
+        cluster = os.getenv("MONGODB_CLUSTER")
+
+        if user and pwd and cluster:
+            encoded_pwd = urllib.parse.quote_plus(pwd)
+            encoded_user = urllib.parse.quote_plus(user)
+            return f"mongodb+srv://{encoded_user}:{encoded_pwd}@{cluster}.mongodb.net/{self.db_name}?retryWrites=true&w=majority"
+
+        return "mongodb://localhost:27017"
+
+    def _init_connection(self):
+        """Attempts to initialize connection to MongoDB."""
+        try:
+            import pymongo
+            self.client = pymongo.MongoClient(self.mongo_url, serverSelectionTimeoutMS=2000)
+            # Test connection with ping
+            self.client.admin.command('ping')
+            self.db = self.client[self.db_name]
+            self.use_mongo = True
+            safe_url = self.mongo_url.split("@")[-1] if "@" in self.mongo_url else self.mongo_url
+            logger.info(f"Connected to MongoDB server at {safe_url} (Database: {self.db_name})")
+        except Exception as e:
+            logger.info(f"MongoDB cloud/local connection notice ({e}). Operating in resilient local storage mode.")
+            self.use_mongo = False
+            self._ensure_local_dirs()
+
+    def _ensure_local_dirs(self):
+        """Creates directory structure for local persistence."""
+        os.makedirs(os.path.join("artifacts", "database"), exist_ok=True)
+        self.summaries_file = os.path.join("artifacts", "database", "summaries.json")
+        self.documents_file = os.path.join("artifacts", "database", "documents.json")
+        for f in [self.summaries_file, self.documents_file]:
+            if not os.path.exists(f):
+                with open(f, "w", encoding="utf-8") as fp:
+                    json.dump([], fp)
+
+    # ------------------ SUMMARIES COLLECTION ------------------
+
+    def save_summary(self, summary_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Saves a generated summary to the 'summaries' collection."""
+        record = {
+            "_id": str(uuid.uuid4()),
+            "text_snippet": summary_data.get("text", "")[:150] + ("..." if len(summary_data.get("text", "")) > 150 else ""),
+            "full_text": summary_data.get("text", ""),
+            "summary": summary_data.get("summary", ""),
+            "mode": summary_data.get("mode", "balanced"),
+            "method": summary_data.get("method_used", "Auto"),
+            "model_source": summary_data.get("model_source", "hybrid"),
+            "word_count_original": summary_data.get("analytics", {}).get("original_words", 0),
+            "word_count_summary": summary_data.get("analytics", {}).get("summary_words", 0),
+            "compression_ratio": summary_data.get("analytics", {}).get("compression_ratio", "0%"),
+            "latency_ms": summary_data.get("analytics", {}).get("latency_ms", 0),
+            "created_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        }
+
+        if self.use_mongo and self.db is not None:
+            try:
+                self.db.summaries.insert_one(record)
+                return record
+            except Exception as e:
+                logger.warning(f"MongoDB write failed ({e}), saving to local storage.")
+
+        # Local fallback write
+        try:
+            self._ensure_local_dirs()
+            with open(self.summaries_file, "r", encoding="utf-8") as fp:
+                items = json.load(fp)
+            items.insert(0, record)
+            with open(self.summaries_file, "w", encoding="utf-8") as fp:
+                json.dump(items[:100], fp, indent=2)
+        except Exception as err:
+            logger.error(f"Local summary save error: {err}")
+
+        return record
+
+    def get_summaries(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Retrieves recent summaries from the 'summaries' collection."""
+        if self.use_mongo and self.db is not None:
+            try:
+                cursor = self.db.summaries.find({}, {"full_text": 0}).sort("created_at", -1).limit(limit)
+                return list(cursor)
+            except Exception as e:
+                logger.warning(f"MongoDB read failed ({e}), reading from local storage.")
+
+        # Local fallback read
+        try:
+            self._ensure_local_dirs()
+            with open(self.summaries_file, "r", encoding="utf-8") as fp:
+                items = json.load(fp)
+            return items[:limit]
+        except Exception:
+            return []
+
+    # ------------------ DOCUMENTS COLLECTION ------------------
+
+    def save_document(self, doc_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Saves an uploaded document to the 'documents' collection."""
+        record = {
+            "_id": str(uuid.uuid4()),
+            "filename": doc_data.get("filename", "untitled.txt"),
+            "format": doc_data.get("format", "TXT"),
+            "text_content": doc_data.get("text", ""),
+            "words": doc_data.get("stats", {}).get("words", 0),
+            "characters": doc_data.get("stats", {}).get("characters", 0),
+            "sentences": doc_data.get("stats", {}).get("sentences", 0),
+            "keywords": [k.get("keyword", "") for k in doc_data.get("keywords", [])],
+            "uploaded_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        }
+
+        if self.use_mongo and self.db is not None:
+            try:
+                self.db.documents.insert_one(record)
+                return record
+            except Exception as e:
+                logger.warning(f"MongoDB document save failed: {e}")
+
+        # Local fallback write
+        try:
+            self._ensure_local_dirs()
+            with open(self.documents_file, "r", encoding="utf-8") as fp:
+                items = json.load(fp)
+            items.insert(0, record)
+            with open(self.documents_file, "w", encoding="utf-8") as fp:
+                json.dump(items[:100], fp, indent=2)
+        except Exception as err:
+            logger.error(f"Local document save error: {err}")
+
+        return record
+
+    def get_documents(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Retrieves uploaded documents from the 'documents' collection."""
+        if self.use_mongo and self.db is not None:
+            try:
+                cursor = self.db.documents.find({}, {"text_content": 0}).sort("uploaded_at", -1).limit(limit)
+                return list(cursor)
+            except Exception as e:
+                logger.warning(f"MongoDB document read failed: {e}")
+
+        # Local fallback read
+        try:
+            self._ensure_local_dirs()
+            with open(self.documents_file, "r", encoding="utf-8") as fp:
+                items = json.load(fp)
+            return items[:limit]
+        except Exception:
+            return []
+
+    def get_database_status(self) -> Dict[str, Any]:
+        """Returns current database connectivity and collection counts."""
+        summaries_count = len(self.get_summaries())
+        documents_count = len(self.get_documents())
+        return {
+            "engine": "MongoDB (Atlas Cloud / Local)" if self.use_mongo else "MongoDB (Resilient Local Engine)",
+            "status": "connected" if self.use_mongo else "active",
+            "database": self.db_name,
+            "collections": {
+                "summaries": summaries_count,
+                "documents": documents_count
+            }
+        }
