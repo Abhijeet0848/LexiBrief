@@ -45,15 +45,46 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <style>
+    html {
+      scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-y: none;
+    }
     * {
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
+      -webkit-overflow-scrolling: touch;
     }
     body {
       font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
       background-color: #f8fafc;
       color: #0f172a;
       min-height: 100vh;
+      overflow-x: hidden;
+      scroll-behavior: smooth;
+    }
+    /* GPU Hardware Acceleration for smooth scrolling & no jank */
+    .gpu-layer {
+      transform: translate3d(0, 0, 0);
+      -webkit-transform: translate3d(0, 0, 0);
+      will-change: transform;
+      backface-visibility: hidden;
+    }
+    /* Premium custom smooth scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.4);
+      border-radius: 9999px;
+      transition: background-color 0.2s ease;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(99, 102, 241, 0.7);
     }
     .card-shadow {
       box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
@@ -64,6 +95,7 @@
     textarea {
       font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
       letter-spacing: -0.01em;
+      scroll-behavior: smooth;
     }
     ::placeholder {
       color: #94a3b8 !important;
@@ -85,10 +117,13 @@
     }
   </style>
 </head>
-<body class="text-slate-900 antialiased selection:bg-indigo-600 selection:text-white min-h-screen relative overflow-x-hidden bg-slate-100" style="background-image: url('/static/background.jpg'); background-size: cover; background-position: center; background-attachment: fixed; background-repeat: no-repeat;">
+<body class="text-slate-900 antialiased selection:bg-indigo-600 selection:text-white min-h-screen relative overflow-x-hidden bg-slate-50">
   
-  <!-- Ambient Soft Overlay for contrast & readability -->
-  <div class="fixed inset-0 pointer-events-none z-0 bg-slate-50/60 backdrop-blur-[0.5px]"></div>
+  <!-- GPU-Accelerated Fixed Background Layer (Zero Scroll-Repaint Jank) -->
+  <div id="bg-canvas" class="fixed inset-0 pointer-events-none -z-20 bg-cover bg-center bg-no-repeat gpu-layer" style="background-image: url('/static/background.jpg');"></div>
+  
+  <!-- Soft Ambient Overlay for Optimal Reading Contrast -->
+  <div id="bg-overlay" class="fixed inset-0 pointer-events-none -z-10 bg-slate-50/70 gpu-layer"></div>
 
   <div id="root" class="relative z-10"></div>
 
