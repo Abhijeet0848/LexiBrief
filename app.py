@@ -108,11 +108,14 @@ app.add_middleware(
 async def normalize_vercel_path(request: Request, call_next):
     """Normalizes request paths when invoked through Vercel serverless rewrites."""
     raw_path = request.scope.get("path", "")
+    matched_path = request.headers.get("x-matched-path")
+    
+    target_path = matched_path if (matched_path and matched_path != raw_path) else raw_path
     for prefix in ["/api/index.py", "/api/index", "/index.py", "/index"]:
-        if raw_path == prefix or raw_path.startswith(prefix + "/"):
-            new_path = raw_path[len(prefix):] or "/"
-            request.scope["path"] = new_path
+        if target_path == prefix or target_path.startswith(prefix + "/"):
+            target_path = target_path[len(prefix):] or "/"
             break
+    request.scope["path"] = target_path
     return await call_next(request)
 
 if os.path.exists(STATIC_DIR):
@@ -271,6 +274,7 @@ async def get_presets():
 
 
 @app.post("/api/upload", tags=["Text Extraction & MongoDB"])
+@app.post("/upload", tags=["Text Extraction & MongoDB"], include_in_schema=False)
 async def upload_document(file: UploadFile = File(...)):
     """Extracts and cleans raw text from uploaded files (PDF, DOCX, TXT) and saves to MongoDB."""
     try:
@@ -394,6 +398,7 @@ async def get_db_status():
 
 
 @app.post("/api/rouge", tags=["NLP Evaluation"])
+@app.post("/rouge", tags=["NLP Evaluation"], include_in_schema=False)
 async def evaluate_rouge(req: RougeEvalRequest):
     """Computes real-time ROUGE-1, ROUGE-2, and ROUGE-L precision, recall, and F1."""
     rouge_res = NLPProcessor.compute_rouge(req.reference, req.summary)
@@ -512,6 +517,7 @@ async def synthesize_edge_neural(text: str, voice_key: str = "neerja", rate: str
 
 
 @app.post("/api/tts", tags=["Text-to-Speech"])
+@app.post("/tts", tags=["Text-to-Speech"], include_in_schema=False)
 async def text_to_speech(req: TTSRequest):
     """
     Synthesizes ultra-realistic, multilingual neural voice audio.
@@ -564,6 +570,8 @@ async def text_to_speech(req: TTSRequest):
 
 
 @app.post("/predict", tags=["Prediction & MongoDB"])
+@app.post("/api/predict", tags=["Prediction & MongoDB"], include_in_schema=False)
+@app.post("/", tags=["Prediction & MongoDB"], include_in_schema=False)
 async def predict_route(request: Request, background_tasks: BackgroundTasks):
     try:
         start_time = time.time()
