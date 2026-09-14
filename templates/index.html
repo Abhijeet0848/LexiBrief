@@ -1147,52 +1147,69 @@
                       )}
                     </div>
 
-                    {/* Toolbar Actions */}
+                    {/* Toolbar Actions - Responsive Mobile-Optimized Layout */}
                     {summaryResult && (
-                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-3 border-t border-slate-100 text-xs">
-                        <div className="text-slate-600 font-medium">
-                          📉 <span className="text-emerald-700 font-bold">{summaryResult.analytics?.compression_ratio}</span> compressed • {summaryResult.analytics?.latency_ms}ms
+                      <div className="flex flex-col gap-2.5 pt-3.5 border-t border-slate-100 text-xs">
+                        {/* Compression & Latency Stats Row */}
+                        <div className="flex items-center justify-between text-xs text-slate-600 font-medium">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200/80 font-bold text-[11px]">
+                            <span>📉</span> {summaryResult.analytics?.compression_ratio || '0%'} compressed
+                          </span>
+                          <span className="text-[11px] text-slate-400 font-mono">
+                            ⚡ {summaryResult.analytics?.latency_ms || 0}ms
+                          </span>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                        {/* Action Buttons Row */}
+                        <div className="flex flex-wrap items-center justify-between gap-2">
                           <button
                             onClick={handleSaveSummary}
                             disabled={saveLoading}
-                            className="btn-3d-primary px-3.5 py-1.5 rounded-xl text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+                            className="flex-1 sm:flex-initial btn-3d-primary py-2 px-3.5 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer min-w-[110px]"
                           >
-                            <span>{saveLoading ? '⏳ Saving...' : '💾 Save Summary'}</span>
+                            <span>💾</span>
+                            <span>{saveLoading ? 'Saving...' : 'Save Summary'}</span>
                           </button>
 
-                          <button
-                            onClick={() => handleSpeak(summaryResult.summary)}
-                            className={`btn-3d-secondary px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer ${
-                              isSpeaking ? 'bg-rose-50 text-rose-600 border-rose-200' : 'text-slate-700'
-                            }`}
-                            title="Listen"
-                          >
-                            {isSpeaking ? '⏹️ Stop' : '🔊 Listen'}
-                          </button>
+                          <div className="flex items-center gap-1.5 flex-1 sm:flex-initial justify-end">
+                            <button
+                              onClick={() => handleSpeak(summaryResult.summary)}
+                              className={`btn-3d-secondary py-2 px-2.5 rounded-xl text-xs font-semibold flex items-center gap-1 cursor-pointer ${
+                                isSpeaking ? 'bg-rose-50 text-rose-600 border-rose-200' : 'text-slate-700'
+                              }`}
+                              title="Listen in Indian English"
+                            >
+                              <span>{isSpeaking ? '⏹️' : '🔊'}</span>
+                              <span className="hidden sm:inline">Listen</span>
+                            </button>
 
-                          <button
-                            onClick={() => copyToClipboard(summaryResult.summary)}
-                            className="btn-3d-secondary px-3 py-1.5 rounded-xl text-slate-700 font-semibold cursor-pointer"
-                          >
-                            📋 Copy
-                          </button>
+                            <button
+                              onClick={() => copyToClipboard(summaryResult.summary)}
+                              className="btn-3d-secondary py-2 px-2.5 rounded-xl text-slate-700 font-semibold flex items-center gap-1 cursor-pointer text-xs"
+                              title="Copy Summary"
+                            >
+                              <span>📋</span>
+                              <span className="hidden sm:inline">Copy</span>
+                            </button>
 
-                          <button
-                            onClick={() => exportTxt(summaryResult.summary)}
-                            className="btn-3d-secondary px-3 py-1.5 rounded-xl text-slate-700 font-semibold cursor-pointer"
-                          >
-                            📥 TXT
-                          </button>
+                            <button
+                              onClick={() => exportTxt(summaryResult.summary)}
+                              className="btn-3d-secondary py-2 px-2 rounded-xl text-slate-700 font-semibold flex items-center gap-1 cursor-pointer text-xs"
+                              title="Download TXT"
+                            >
+                              <span>📥</span>
+                              <span className="hidden sm:inline">TXT</span>
+                            </button>
 
-                          <button
-                            onClick={() => exportJson(summaryResult)}
-                            className="btn-3d-secondary px-3 py-1.5 rounded-xl text-slate-700 font-semibold cursor-pointer"
-                          >
-                            💾 JSON
-                          </button>
+                            <button
+                              onClick={() => exportJson(summaryResult)}
+                              className="btn-3d-secondary py-2 px-2 rounded-xl text-slate-700 font-semibold flex items-center gap-1 cursor-pointer text-xs"
+                              title="Download JSON"
+                            >
+                              <span>💾</span>
+                              <span className="hidden sm:inline">JSON</span>
+                            </button>
+                          </div>
                         </div>
                       </div>
                     )}
