@@ -406,30 +406,6 @@
         }
       };
 
-      // File Upload
-      const handleFileUpload = async (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        const formData = new FormData();
-        formData.append('file', file);
-
-        setUploadLoading(true);
-        try {
-          const res = await fetch('/api/upload', { method: 'POST', body: formData });
-          if (!res.ok) throw new Error("Could not extract file text");
-          const data = await res.json();
-          setInputText(data.text || '');
-          showToast(`Uploaded ${data.filename}`, "success");
-          fetchDocuments();
-        } catch (err) {
-          showToast(err.message, "error");
-        } finally {
-          setUploadLoading(false);
-          e.target.value = '';
-        }
-      };
-
       // Delete Summary
       const handleDeleteSummary = async (id, e) => {
         e?.stopPropagation();
