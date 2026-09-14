@@ -440,7 +440,7 @@
           
           {/* Top Clean Header */}
           <header className="bg-white border-b border-slate-200 sticky top-0 z-30 card-shadow">
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
               
               {/* Brand Logo */}
               <div className="flex items-center gap-3">
@@ -500,7 +500,7 @@
           </header>
 
           {/* Main Content Area */}
-          <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6">
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
 
             {/* TAB 1: SUMMARIZE */}
             {activeTab === 'summarize' && (
@@ -565,7 +565,7 @@
                         value={inputText}
                         onChange={(e) => setInputText(e.target.value)}
                         placeholder="Paste or type text to summarize here..."
-                        className="w-full h-84 p-4 rounded-xl bg-slate-50/70 border border-slate-200 text-slate-800 text-sm leading-relaxed placeholder-slate-400 focus:bg-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 resize-none transition"
+                        className="w-full h-[450px] min-h-[420px] p-4 rounded-xl bg-slate-50/70 border border-slate-200 text-slate-800 text-sm leading-relaxed placeholder-slate-400 focus:bg-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 resize-y transition shadow-2xs font-sans"
                       />
                     </div>
 
@@ -619,7 +619,7 @@
                         <div className="space-y-4">
                           
                           {/* Summary Output Box */}
-                          <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200 text-slate-800 text-sm leading-relaxed min-h-[140px]">
+                          <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200 text-slate-800 text-sm leading-relaxed min-h-[180px]">
                             {summaryResult.summary}
                           </div>
 
@@ -674,10 +674,10 @@
 
                         </div>
                       ) : (
-                        <div className="h-84 flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-slate-200 rounded-xl text-slate-400">
-                          <span className="text-3xl mb-2">📄</span>
+                        <div className="h-[450px] min-h-[420px] flex flex-col items-center justify-center text-center p-8 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 bg-slate-50/40">
+                          <span className="text-4xl mb-3">📄</span>
                           <span className="text-sm font-bold text-slate-700">Summary will appear here</span>
-                          <span className="text-xs text-slate-500 max-w-xs mt-1">
+                          <span className="text-xs text-slate-500 max-w-xs mt-1.5 leading-relaxed">
                             Type or paste your text on the left, then click Summarize to generate an abstractive or extractive summary.
                           </span>
                         </div>
@@ -1811,7 +1811,7 @@
 
           {/* Enhanced Clean Footer */}
           <footer className="border-t border-slate-200/80 bg-white py-6 mt-8">
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
               <div className="flex items-center gap-2 font-medium">
                 <div className="w-5 h-5 rounded-md bg-indigo-600 flex items-center justify-center text-[10px] text-white font-bold">L</div>
                 <span className="font-bold text-slate-800">LexiBrief</span>
