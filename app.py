@@ -104,6 +104,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def normalize_vercel_path(request: Request, call_next):
+    """Normalizes request paths when invoked through Vercel serverless rewrites."""
+    raw_path = request.scope.get("path", "")
+    for prefix in ["/api/index.py", "/api/index", "/index.py", "/index"]:
+        if raw_path == prefix or raw_path.startswith(prefix + "/"):
+            new_path = raw_path[len(prefix):] or "/"
+            request.scope["path"] = new_path
+            break
+    return await call_next(request)
+
 if os.path.exists(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
@@ -209,6 +220,10 @@ def _find_index_html() -> Optional[str]:
 
 
 @app.get("/", response_class=HTMLResponse, tags=["UI"])
+@app.get("/api/index.py", response_class=HTMLResponse, tags=["UI"], include_in_schema=False)
+@app.get("/api/index", response_class=HTMLResponse, tags=["UI"], include_in_schema=False)
+@app.get("/index.py", response_class=HTMLResponse, tags=["UI"], include_in_schema=False)
+@app.get("/index", response_class=HTMLResponse, tags=["UI"], include_in_schema=False)
 async def index():
     html_content = _find_index_html()
     if html_content:
