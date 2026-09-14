@@ -52,7 +52,8 @@ class MongoDBManager:
         if user and pwd and cluster:
             encoded_pwd = urllib.parse.quote_plus(pwd)
             encoded_user = urllib.parse.quote_plus(user)
-            return f"mongodb+srv://{encoded_user}:{encoded_pwd}@{cluster}.mongodb.net/{self.db_name}?retryWrites=true&w=majority"
+            cluster_host = cluster if ".mongodb.net" in cluster else f"{cluster}.mongodb.net"
+            return f"mongodb+srv://{encoded_user}:{encoded_pwd}@{cluster_host}/{self.db_name}?retryWrites=true&w=majority"
 
         return "mongodb://localhost:27017"
 
