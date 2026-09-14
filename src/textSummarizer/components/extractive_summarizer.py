@@ -72,8 +72,8 @@ class ExtractiveSummarizer:
             token_count = len(tokens)
             length_norm = math.sqrt(token_count) if token_count > 0 else 1.0
             
-            # Position bias (lead sentences convey introductory thesis)
-            position_multiplier = 1.30 if idx == 0 else (1.15 if idx == 1 else (1.10 if idx == num_sentences - 1 else 1.0))
+            # Gentle position bias that respects semantic content saliency
+            position_multiplier = 1.05 if idx == 0 else 1.0
 
             final_score = (raw_score / length_norm) * position_multiplier
             scored_sentences.append((idx, final_score, sentence))
