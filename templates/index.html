@@ -742,6 +742,125 @@
             border-color: #c7d2fe;
         }
 
+        /* Visual Architecture Flowchart */
+        .arch-visual-flow {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.45rem;
+            background: #f8fafc;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 1.25rem 1rem;
+        }
+
+        .flow-card {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 0.55rem 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            box-shadow: var(--shadow-xs);
+            width: 100%;
+            max-width: 460px;
+            transition: all 0.15s ease;
+        }
+
+        .flow-card.highlight {
+            background: #ecfdf5;
+            border-color: #a7f3d0;
+        }
+
+        .flow-card:hover {
+            transform: translateY(-1px);
+            border-color: #c7d2fe;
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.08);
+        }
+
+        .flow-icon {
+            font-size: 1.15rem;
+            flex-shrink: 0;
+        }
+
+        .flow-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.1rem;
+        }
+
+        .flow-title {
+            font-size: 0.84rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .flow-sub {
+            font-size: 0.73rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .flow-arrow {
+            color: #94a3b8;
+            font-size: 1rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .flow-branches {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+            width: 100%;
+            max-width: 460px;
+        }
+
+        .branch-card {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 0.65rem 0.8rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            box-shadow: var(--shadow-xs);
+            transition: all 0.15s ease;
+        }
+
+        .branch-card:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+        }
+
+        .branch-badge {
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .branch-card.extractive .branch-badge {
+            color: #0284c7;
+        }
+
+        .branch-card.abstractive .branch-badge {
+            color: #7c3aed;
+        }
+
+        .branch-title {
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .branch-desc {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            line-height: 1.35;
+        }
+
         .table-light {
             width: 100%;
             border-collapse: collapse;
@@ -1000,46 +1119,65 @@
             </div>
 
             <div>
-                <h4 style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.6rem; font-weight: 700;">Architecture Flow</h4>
-                <div style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.9rem; overflow-x: auto;">
-                    <pre style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: #1e293b; line-height: 1.35; margin: 0;">             ┌─────────────────────┐
-             │     User Input      │
-             │ Text / PDF / DOCX   │
-             └──────────┬──────────┘
-                        │
-                        ▼
-             ┌─────────────────────┐
-             │ Text Extraction     │
-             │ & Preprocessing     │
-             └──────────┬──────────┘
-                        │
-                        ▼
-             ┌─────────────────────┐
-             │   NLP Processing    │
-             │ Tokenization        │
-             │ Sentence Splitting  │
-             │ Keywords            │
-             └──────────┬──────────┘
-                        │
-             ┌──────────┴──────────┐
-             ▼                     ▼
- ┌────────────────────┐   ┌────────────────────┐
- │ Extractive         │   │ Abstractive        │
- │ Summarization      │   │ Summarization      │
- │ TF-IDF / TextRank  │   │ Transformer Model  │
- └─────────┬──────────┘   └─────────┬──────────┘
-           │                        │
-           └──────────┬─────────────┘
-                      ▼
-             ┌─────────────────────┐
-             │ Generated Summary   │
-             └──────────┬──────────┘
-                        │
-                        ▼
-             ┌─────────────────────┐
-             │ Evaluation          │
-             │ ROUGE / Similarity  │
-             └─────────────────────┘</pre>
+                <h4 style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.6rem; font-weight: 700;">System & NLP Architecture Flow</h4>
+                <div class="arch-visual-flow">
+                    <div class="flow-card">
+                        <div class="flow-icon">📥</div>
+                        <div class="flow-info">
+                            <div class="flow-title">User Input</div>
+                            <div class="flow-sub">Direct Text &bull; PDF &bull; DOCX &bull; TXT Multi-Format</div>
+                        </div>
+                    </div>
+                    <div class="flow-arrow">&darr;</div>
+
+                    <div class="flow-card">
+                        <div class="flow-icon">⚙️</div>
+                        <div class="flow-info">
+                            <div class="flow-title">Text Extraction & Preprocessing</div>
+                            <div class="flow-sub">DOCX XML extraction, stream parsing, whitespace normalization</div>
+                        </div>
+                    </div>
+                    <div class="flow-arrow">&darr;</div>
+
+                    <div class="flow-card">
+                        <div class="flow-icon">🔍</div>
+                        <div class="flow-info">
+                            <div class="flow-title">NLP Processing</div>
+                            <div class="flow-sub">Tokenization &bull; Sentence Splitting &bull; Keyword Saliency</div>
+                        </div>
+                    </div>
+                    <div class="flow-arrow">&darr;</div>
+
+                    <div class="flow-branches">
+                        <div class="branch-card extractive">
+                            <div class="branch-badge">Extractive Engine</div>
+                            <div class="branch-title">TF-IDF / TextRank</div>
+                            <div class="branch-desc">Sentence scoring, position weighting & keyword density</div>
+                        </div>
+                        <div class="branch-card abstractive">
+                            <div class="branch-badge">Abstractive Engine</div>
+                            <div class="branch-title">Pegasus Transformer</div>
+                            <div class="branch-desc">Deep Seq2Seq neural encoder-decoder beam search</div>
+                        </div>
+                    </div>
+                    <div class="flow-arrow">&darr;</div>
+
+                    <div class="flow-card highlight">
+                        <div class="flow-icon">📄</div>
+                        <div class="flow-info">
+                            <div class="flow-title">Generated Summary</div>
+                            <div class="flow-sub">Distilled Executive Brief + Compression Analytics</div>
+                        </div>
+                    </div>
+                    <div class="flow-arrow">&darr;</div>
+
+                    <div class="flow-card">
+                        <div class="flow-icon">📈</div>
+                        <div class="flow-info">
+                            <div class="flow-title">Evaluation & Benchmarking</div>
+                            <div class="flow-sub">ROUGE-1, ROUGE-2, ROUGE-L & Latency Telemetry</div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
