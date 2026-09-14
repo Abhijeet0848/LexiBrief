@@ -7,7 +7,7 @@
     <link rel="icon" type="image/jpeg" href="/static/icon.jpg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-page: #f8fafc;
@@ -18,16 +18,19 @@
             --primary: #4f46e5;
             --primary-hover: #4338ca;
             --primary-light: #eef2ff;
+            --primary-glow: rgba(79, 70, 229, 0.25);
             --text-main: #0f172a;
             --text-secondary: #475569;
             --text-muted: #64748b;
             --success: #10b981;
             --success-bg: #ecfdf5;
-            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
-            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+            --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+            --shadow-sm: 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-card: 0 4px 20px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
+            --shadow-card-hover: 0 8px 30px -4px rgba(15, 23, 42, 0.1), 0 4px 10px -2px rgba(15, 23, 42, 0.04);
+            --radius-xl: 18px;
             --radius-lg: 14px;
-            --radius-md: 8px;
+            --radius-md: 10px;
             --radius-sm: 6px;
         }
 
@@ -35,70 +38,89 @@
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             -webkit-font-smoothing: antialiased;
         }
 
         body {
             background-color: var(--bg-page);
+            background-image: 
+                radial-gradient(1200px circle at 50% -100px, rgba(99, 102, 241, 0.08) 0%, transparent 80%),
+                radial-gradient(800px circle at 90% 80%, rgba(244, 114, 182, 0.04) 0%, transparent 60%);
+            background-attachment: fixed;
             color: var(--text-main);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
         }
 
-        /* Clean Light Header */
+        /* Top Navigation */
         header {
-            background: #ffffff;
-            border-bottom: 1px solid var(--border-color);
-            padding: 0.9rem 2rem;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border-bottom: 1px solid rgba(226, 232, 240, 0.85);
+            padding: 0.85rem 2rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
             position: sticky;
             top: 0;
             z-index: 50;
-            box-shadow: var(--shadow-sm);
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.03);
         }
 
         .brand {
             display: inline-flex;
             align-items: center;
-            gap: 0.65rem;
+            gap: 0.75rem;
             text-decoration: none;
             color: var(--text-main);
             transition: opacity 0.15s ease;
         }
 
         .brand:hover {
-            opacity: 0.88;
+            opacity: 0.9;
         }
 
         .logo-symbol {
             display: flex;
             align-items: center;
             justify-content: center;
-            width: 32px;
-            height: 32px;
-            border-radius: 8px;
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
             background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
             color: #ffffff;
-            box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);
+            box-shadow: 0 3px 10px rgba(79, 70, 229, 0.3);
             flex-shrink: 0;
+        }
+
+        .brand-text-wrap {
+            display: flex;
+            align-items: baseline;
+            gap: 0.45rem;
         }
 
         .brand-title {
             font-size: 1.15rem;
-            font-weight: 700;
-            letter-spacing: -0.025em;
-            color: var(--text-main);
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            color: #0f172a;
+            background: linear-gradient(135deg, #0f172a 60%, #4338ca 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
-        .brand-subtitle {
-            font-size: 0.72rem;
-            color: var(--text-muted);
-            font-weight: 500;
-            margin-left: 2px;
+        .brand-tag {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #6366f1;
+            background: #eef2ff;
+            padding: 0.15rem 0.45rem;
+            border-radius: 6px;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
         }
 
         .nav-right {
@@ -107,72 +129,118 @@
             gap: 0.65rem;
         }
 
-        .version-badge {
-            background: var(--bg-card-subtle);
-            border: 1px solid var(--border-color);
-            color: var(--text-muted);
-            font-size: 0.75rem;
-            font-weight: 600;
-            padding: 0.2rem 0.55rem;
-            border-radius: 12px;
-            font-family: 'JetBrains Mono', monospace;
-        }
-
-        .nav-link-btn {
+        .nav-btn {
             background: #ffffff;
             border: 1px solid var(--border-color);
             color: var(--text-secondary);
-            padding: 0.4rem 0.8rem;
+            padding: 0.42rem 0.85rem;
             border-radius: var(--radius-md);
             font-size: 0.82rem;
-            font-weight: 500;
+            font-weight: 600;
             text-decoration: none;
             display: inline-flex;
             align-items: center;
-            gap: 0.4rem;
-            transition: all 0.15s ease;
+            gap: 0.45rem;
+            cursor: pointer;
+            transition: all 0.18s ease;
         }
 
-        .nav-link-btn:hover {
+        .nav-btn:hover {
             background: var(--bg-card-subtle);
             color: var(--text-main);
             border-color: var(--border-hover);
+            transform: translateY(-1px);
         }
 
         .nav-github-btn {
             background: #0f172a;
             border: 1px solid #0f172a;
             color: #ffffff;
-            padding: 0.4rem 0.85rem;
+            padding: 0.42rem 0.95rem;
             border-radius: var(--radius-md);
             font-size: 0.82rem;
-            font-weight: 500;
+            font-weight: 600;
             text-decoration: none;
             display: inline-flex;
             align-items: center;
             gap: 0.45rem;
-            transition: all 0.15s ease;
+            transition: all 0.18s ease;
+            box-shadow: 0 2px 6px rgba(15, 23, 42, 0.15);
         }
 
         .nav-github-btn:hover {
             background: #1e293b;
+            border-color: #1e293b;
             transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(15, 23, 42, 0.22);
         }
-
 
         /* Main Workspace Container */
         main {
             flex: 1;
-            max-width: 1240px;
+            max-width: 1280px;
             width: 100%;
             margin: 0 auto;
-            padding: 1.75rem 1.5rem 2.5rem 1.5rem;
+            padding: 1.5rem 1.75rem 2.5rem 1.75rem;
             display: flex;
             flex-direction: column;
-            gap: 1.25rem;
+            gap: 1.15rem;
         }
 
+        /* Sample Quick Presets Bar */
+        .sample-bar {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            overflow-x: auto;
+            padding: 0.35rem 0.2rem;
+            scrollbar-width: none;
+        }
 
+        .sample-bar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .sample-label {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            white-space: nowrap;
+        }
+
+        .sample-chip {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 0.32rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: var(--shadow-xs);
+        }
+
+        .sample-chip:hover {
+            background: #f8fafc;
+            border-color: #a5b4fc;
+            color: var(--primary);
+            transform: translateY(-1px);
+            box-shadow: 0 3px 8px rgba(79, 70, 229, 0.08);
+        }
+
+        .sample-chip svg {
+            color: var(--primary);
+        }
 
         /* Dual Editor Grid */
         .editor-grid {
@@ -181,51 +249,83 @@
             gap: 1.25rem;
         }
 
-        @media (max-width: 860px) {
+        @media (max-width: 920px) {
             .editor-grid {
                 grid-template-columns: 1fr;
             }
         }
 
+        /* Workspace Cards */
         .card {
             background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-lg);
-            padding: 1.25rem;
+            border: 1px solid rgba(226, 232, 240, 0.9);
+            border-radius: var(--radius-xl);
+            padding: 1.35rem;
             display: flex;
             flex-direction: column;
-            gap: 0.85rem;
-            box-shadow: var(--shadow-sm);
+            gap: 1rem;
+            box-shadow: var(--shadow-card);
             transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            position: relative;
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-card-hover);
         }
 
         .card:focus-within {
-            border-color: #a5b4fc;
-            box-shadow: var(--shadow-md);
+            border-color: #c7d2fe;
+            box-shadow: 0 8px 30px -4px rgba(79, 70, 229, 0.1), 0 2px 6px -1px rgba(0, 0, 0, 0.02);
         }
 
         .card-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            padding-bottom: 0.25rem;
+        }
+
+        .card-title-group {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+        }
+
+        .card-icon-badge {
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+        }
+
+        .icon-input {
+            background: #eef2ff;
+            color: #4f46e5;
+        }
+
+        .icon-output {
+            background: #fdf2f8;
+            color: #db2777;
         }
 
         .card-title {
             font-size: 0.95rem;
-            font-weight: 600;
+            font-weight: 700;
+            letter-spacing: -0.01em;
             color: var(--text-main);
-            display: flex;
-            align-items: center;
-            gap: 0.4rem;
         }
 
         /* Mode Selector */
         .mode-group {
             display: flex;
-            background: var(--bg-card-subtle);
-            border: 1px solid var(--border-color);
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
             border-radius: 20px;
-            padding: 2px;
+            padding: 3px;
+            gap: 2px;
         }
 
         .mode-btn {
@@ -237,147 +337,181 @@
             font-size: 0.75rem;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.15s ease;
+            transition: all 0.18s ease;
+        }
+
+        .mode-btn:hover {
+            color: var(--text-main);
         }
 
         .mode-btn.active {
             background: #ffffff;
             color: var(--primary);
-            box-shadow: var(--shadow-sm);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+
+        /* Status Badge in Output Card */
+        .status-badge {
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 0.2rem 0.55rem;
+            border-radius: 12px;
+            background: #f1f5f9;
+            color: var(--text-muted);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .status-badge .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #94a3b8;
+        }
+
+        .status-badge.active {
+            background: #ecfdf5;
+            color: #047857;
+        }
+
+        .status-badge.active .dot {
+            background: #10b981;
+            box-shadow: 0 0 6px #10b981;
         }
 
         /* Textareas & Output Area */
-        textarea {
-            width: 100%;
-            height: 340px;
-            background: #ffffff;
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-md);
-            padding: 1rem;
-            color: var(--text-main);
-            font-size: 0.92rem;
-            line-height: 1.65;
-            resize: none;
-            outline: none;
-            transition: border-color 0.15s ease;
+        .editor-box-wrap {
+            position: relative;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: var(--radius-lg);
+            transition: all 0.18s ease;
+            overflow: hidden;
         }
 
-        textarea:focus {
-            border-color: var(--primary);
+        .editor-box-wrap:focus-within {
+            background: #ffffff;
+            border-color: #a5b4fc;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        textarea {
+            width: 100%;
+            height: 360px;
+            background: transparent;
+            border: none;
+            padding: 1.15rem;
+            color: var(--text-main);
+            font-size: 0.93rem;
+            line-height: 1.7;
+            resize: none;
+            outline: none;
+            font-family: inherit;
         }
 
         textarea::placeholder {
             color: #94a3b8;
+            font-weight: 400;
         }
 
         .output-box {
             width: 100%;
-            height: 340px;
+            height: 360px;
             background: #f8fafc;
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-md);
-            padding: 1rem;
+            border: 1px solid #e2e8f0;
+            border-radius: var(--radius-lg);
+            padding: 1.15rem;
             color: var(--text-main);
             font-size: 0.95rem;
-            line-height: 1.7;
+            line-height: 1.75;
             overflow-y: auto;
             position: relative;
         }
 
+        /* Modern Empty State */
         .empty-state {
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             height: 100%;
-            color: #94a3b8;
+            color: var(--text-muted);
             text-align: center;
-            gap: 0.5rem;
+            gap: 0.75rem;
+            padding: 2rem;
         }
 
-        .empty-icon {
-            font-size: 1.8rem;
-            opacity: 0.6;
+        .empty-icon-wrap {
+            width: 54px;
+            height: 54px;
+            border-radius: 16px;
+            background: linear-gradient(135deg, #eef2ff 0%, #fdf2f8 100%);
+            border: 1px solid #e0e7ff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6366f1;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.12);
         }
 
+        .empty-title {
+            font-size: 0.98rem;
+            font-weight: 700;
+            color: var(--text-main);
+            letter-spacing: -0.01em;
+        }
+
+        .empty-desc {
+            font-size: 0.84rem;
+            color: var(--text-muted);
+            max-width: 320px;
+            line-height: 1.55;
+        }
+
+        .empty-action-hint {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.78rem;
+            color: var(--primary);
+            font-weight: 600;
+            background: #eef2ff;
+            padding: 0.35rem 0.75rem;
+            border-radius: 20px;
+            margin-top: 0.35rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .empty-action-hint:hover {
+            background: #e0e7ff;
+            transform: translateY(-1px);
+        }
+
+        /* Summary Result Display */
+        .summary-content {
+            display: none;
+            animation: fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            color: #1e293b;
+            font-size: 0.95rem;
+            line-height: 1.75;
+            white-space: pre-line;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Card Footers & Stats */
         .card-footer {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding-top: 0.25rem;
+            padding-top: 0.15rem;
         }
 
-        .stats-text {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.78rem;
-            color: var(--text-muted);
-            display: flex;
-            align-items: center;
-            gap: 0.85rem;
-        }
-
-        .stats-text span {
-            color: var(--text-secondary);
-            font-weight: 500;
-        }
-
-        /* Buttons */
-        .btn-primary {
-            background: var(--primary);
-            border: 1px solid var(--primary);
-            color: #ffffff;
-            padding: 0.55rem 1.4rem;
-            border-radius: var(--radius-md);
-            font-size: 0.9rem;
-            font-weight: 600;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 0.45rem;
-            transition: all 0.15s ease;
-            box-shadow: 0 2px 4px rgba(79, 70, 229, 0.2);
-        }
-
-        .btn-primary:hover {
-            background: var(--primary-hover);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(79, 70, 229, 0.3);
-        }
-
-        .btn-primary:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .btn-group {
-            display: flex;
-            align-items: center;
-            gap: 0.45rem;
-        }
-
-        .btn-sm {
-            background: #ffffff;
-            border: 1px solid var(--border-color);
-            color: var(--text-secondary);
-            padding: 0.45rem 0.75rem;
-            border-radius: var(--radius-md);
-            font-size: 0.82rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.15s ease;
-            display: flex;
-            align-items: center;
-            gap: 0.35rem;
-        }
-
-        .btn-sm:hover {
-            background: var(--bg-card-subtle);
-            color: var(--text-main);
-            border-color: var(--border-hover);
-        }
-
-        /* Sleek Inline Stat Pills */
         .stats-pills {
             display: flex;
             align-items: center;
@@ -388,13 +522,13 @@
         .stat-pill {
             display: inline-flex;
             align-items: center;
-            gap: 0.25rem;
-            background: var(--bg-card-subtle);
-            border: 1px solid var(--border-color);
-            padding: 0.2rem 0.55rem;
+            gap: 0.3rem;
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            padding: 0.22rem 0.6rem;
             border-radius: 12px;
-            font-size: 0.75rem;
-            font-weight: 500;
+            font-size: 0.74rem;
+            font-weight: 600;
             color: var(--text-secondary);
             font-family: 'JetBrains Mono', monospace;
         }
@@ -403,36 +537,113 @@
             background: #ecfdf5;
             border-color: #a7f3d0;
             color: #047857;
+            font-weight: 700;
+        }
+
+        .stat-pill.speed {
+            background: #eff6ff;
+            border-color: #bfdbfe;
+            color: #1d4ed8;
             font-weight: 600;
         }
 
-        /* Clean Light Modal */
+        /* Buttons & Actions */
+        .btn-group {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+            border: 1px solid #4338ca;
+            color: #ffffff;
+            padding: 0.55rem 1.45rem;
+            border-radius: var(--radius-md);
+            font-size: 0.88rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 8px rgba(79, 70, 229, 0.28);
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #4338ca 0%, #4f46e5 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-sm {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 0.44rem 0.8rem;
+            border-radius: var(--radius-md);
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            box-shadow: var(--shadow-xs);
+        }
+
+        .btn-sm:hover {
+            background: var(--bg-card-subtle);
+            color: var(--text-main);
+            border-color: var(--border-hover);
+            transform: translateY(-1px);
+        }
+
+        /* Modal Architecture Dialog */
         .modal-overlay {
             position: fixed;
             top: 0;
             left: 0;
             width: 100vw;
             height: 100vh;
-            background: rgba(15, 23, 42, 0.4);
-            backdrop-filter: blur(4px);
+            background: rgba(15, 23, 42, 0.45);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
             display: none;
             align-items: center;
             justify-content: center;
             z-index: 1000;
-            padding: 1rem;
+            padding: 1.5rem;
         }
 
         .modal-content {
             background: #ffffff;
             border: 1px solid var(--border-color);
-            border-radius: var(--radius-lg);
-            max-width: 760px;
+            border-radius: var(--radius-xl);
+            max-width: 780px;
             width: 100%;
-            padding: 1.75rem;
-            box-shadow: var(--shadow-lg);
+            padding: 2rem;
+            box-shadow: 0 20px 40px -8px rgba(15, 23, 42, 0.2);
             display: flex;
             flex-direction: column;
-            gap: 1.25rem;
+            gap: 1.5rem;
+            animation: modalPop 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes modalPop {
+            from { opacity: 0; transform: scale(0.96) translateY(8px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
         }
 
         .modal-header {
@@ -440,15 +651,27 @@
             justify-content: space-between;
             align-items: center;
             border-bottom: 1px solid var(--border-color);
-            padding-bottom: 0.75rem;
+            padding-bottom: 1rem;
         }
 
         .modal-close {
-            background: transparent;
-            border: none;
+            background: #f1f5f9;
+            border: 1px solid var(--border-color);
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             color: var(--text-muted);
-            font-size: 1.4rem;
+            font-size: 1.2rem;
             cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .modal-close:hover {
+            background: #e2e8f0;
+            color: var(--text-main);
         }
 
         .pipeline-steps {
@@ -457,20 +680,21 @@
             justify-content: space-between;
             gap: 0.5rem;
             overflow-x: auto;
-            padding: 0.75rem 0;
+            padding: 0.5rem 0;
         }
 
         .step-item {
-            background: var(--bg-card-subtle);
+            background: #f8fafc;
             border: 1px solid var(--border-color);
             border-radius: var(--radius-md);
-            padding: 0.65rem 0.85rem;
+            padding: 0.75rem 0.85rem;
             text-align: center;
-            min-width: 110px;
+            min-width: 115px;
+            flex: 1;
         }
 
         .step-item.active {
-            background: var(--primary-light);
+            background: #eef2ff;
             border-color: #c7d2fe;
         }
 
@@ -478,11 +702,11 @@
             width: 100%;
             border-collapse: collapse;
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.85rem;
+            font-size: 0.84rem;
         }
 
         .table-light th, .table-light td {
-            padding: 0.65rem 0.85rem;
+            padding: 0.75rem 0.9rem;
             text-align: left;
             border-bottom: 1px solid var(--border-color);
         }
@@ -490,34 +714,41 @@
         .table-light th {
             color: var(--text-muted);
             font-weight: 600;
+            background: #f8fafc;
         }
 
-        /* Toast */
+        /* Toast Notification */
         .toast {
             position: fixed;
-            bottom: 1.5rem;
-            right: 1.5rem;
+            bottom: 2rem;
+            right: 2rem;
             background: #0f172a;
             color: #ffffff;
-            padding: 0.75rem 1.25rem;
+            padding: 0.8rem 1.4rem;
             border-radius: var(--radius-md);
-            box-shadow: var(--shadow-lg);
+            box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.25);
             display: none;
             align-items: center;
-            gap: 0.5rem;
-            font-size: 0.85rem;
-            font-weight: 500;
+            gap: 0.6rem;
+            font-size: 0.86rem;
+            font-weight: 600;
             z-index: 2000;
+            animation: toastSlide 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes toastSlide {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         /* Spinner */
         .spinner {
             width: 16px;
             height: 16px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.35);
             border-top-color: #ffffff;
             border-radius: 50%;
-            animation: spin 0.7s linear infinite;
+            animation: spin 0.65s linear infinite;
         }
 
         @keyframes spin {
@@ -529,16 +760,27 @@
             background: #ffffff;
             border-top: 1px solid var(--border-color);
             text-align: center;
-            padding: 1.25rem;
+            padding: 1.15rem 2rem;
             color: var(--text-muted);
             font-size: 0.82rem;
+            font-weight: 500;
             margin-top: auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        @media (max-width: 640px) {
+            footer {
+                flex-direction: column;
+                gap: 0.4rem;
+            }
         }
     </style>
 </head>
 <body>
 
-    <!-- Light Clean Header -->
+    <!-- Header -->
     <header>
         <a href="/" class="brand">
             <div class="logo-symbol">
@@ -548,16 +790,22 @@
                     <path d="M10 12h5" stroke-width="2" opacity="0.85" />
                 </svg>
             </div>
-            <span class="brand-title">LexiBrief</span>
+            <div class="brand-text-wrap">
+                <span class="brand-title">LexiBrief</span>
+                <span class="brand-tag">Pegasus NLP</span>
+            </div>
         </a>
 
         <div class="nav-right">
-            <span class="version-badge">v1.0.0</span>
-            <a href="/docs" target="_blank" class="nav-link-btn" title="API Documentation">
+            <button class="nav-btn" onclick="openModal()" title="View Pipeline Architecture & Benchmarks">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                Architecture
+            </button>
+            <a href="/docs" target="_blank" class="nav-btn" title="FastAPI Interactive Documentation">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                API Docs
+                API
             </a>
-            <a href="https://github.com/Abhijeet0848/LexiBrief" target="_blank" class="nav-github-btn" title="View Source on GitHub">
+            <a href="https://github.com/Abhijeet0848/LexiBrief" target="_blank" class="nav-github-btn" title="View Source Repository on GitHub">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
                 GitHub
             </a>
@@ -566,22 +814,47 @@
 
     <!-- Main Workspace -->
     <main>
-
+        <!-- Quick Load Samples Toolbar -->
+        <div class="sample-bar">
+            <span class="sample-label">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                Quick Samples:
+            </span>
+            <button class="sample-chip" onclick="loadPreset('meeting')">
+                👥 Project Standup
+            </button>
+            <button class="sample-chip" onclick="loadPreset('technews')">
+                📰 AI Breakthrough
+            </button>
+            <button class="sample-chip" onclick="loadPreset('support')">
+                🎧 Customer Incident
+            </button>
+            <button class="sample-chip" onclick="loadPreset('research')">
+                🔬 Scientific Abstract
+            </button>
+        </div>
 
         <!-- Dual Card Workspace -->
         <div class="editor-grid">
             <!-- Source Input Card -->
             <div class="card">
                 <div class="card-header">
-                    <span class="card-title">📝 Input Text</span>
-                    <div class="mode-group">
+                    <div class="card-title-group">
+                        <div class="card-icon-badge icon-input">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                        </div>
+                        <span class="card-title">Source Content</span>
+                    </div>
+                    <div class="mode-group" title="Summary density mode">
                         <button class="mode-btn" id="mode-concise" onclick="setMode('concise')">Concise</button>
                         <button class="mode-btn active" id="mode-balanced" onclick="setMode('balanced')">Balanced</button>
                         <button class="mode-btn" id="mode-detailed" onclick="setMode('detailed')">Detailed</button>
                     </div>
                 </div>
 
-                <textarea id="inputText" placeholder="Paste your article, meeting notes, conversation, or document text here..." oninput="updateStats()"></textarea>
+                <div class="editor-box-wrap">
+                    <textarea id="inputText" placeholder="Paste your article, meeting transcript, conversation, or technical paper here to generate an executive summary..." oninput="updateStats()"></textarea>
+                </div>
 
                 <div class="card-footer">
                     <div class="stats-pills">
@@ -589,10 +862,13 @@
                         <span class="stat-pill" id="inputCharCount">0 chars</span>
                     </div>
                     <div class="btn-group">
-                        <button class="btn-sm" onclick="clearText()" title="Clear text">Clear</button>
+                        <button class="btn-sm" onclick="clearText()" title="Clear text">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            Clear
+                        </button>
                         <button class="btn-primary" id="summarizeBtn" onclick="generateSummary()">
                             <span id="btnIcon">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                             </span>
                             <span id="btnLabel">Summarize</span>
                         </button>
@@ -603,23 +879,37 @@
             <!-- Output Summary Card -->
             <div class="card">
                 <div class="card-header">
-                    <span class="card-title">🎯 Summary</span>
+                    <div class="card-title-group">
+                        <div class="card-icon-badge icon-output">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+                        </div>
+                        <span class="card-title">Executive Brief</span>
+                    </div>
+                    <div class="status-badge" id="statusBadge">
+                        <span class="dot"></span>
+                        <span id="statusText">Ready</span>
+                    </div>
                 </div>
 
                 <div class="output-box" id="outputBox">
                     <div class="empty-state" id="emptyState">
-                        <div class="empty-icon">📄</div>
-                        <div style="font-weight: 600; color: var(--text-secondary);">No summary generated</div>
-                        <div style="font-size: 0.82rem;">Enter or paste your text on the left and click Summarize.</div>
+                        <div class="empty-icon-wrap">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                        </div>
+                        <div class="empty-title">Ready for distillation</div>
+                        <div class="empty-desc">Paste your text into the editor or pick one of the sample presets to run the neural transformer pipeline.</div>
+                        <div class="empty-action-hint" onclick="loadPreset('technews')">
+                            ⚡ Try "AI Breakthrough" sample
+                        </div>
                     </div>
-                    <div id="summaryText" style="display: none; white-space: pre-line;"></div>
+                    <div class="summary-content" id="summaryText"></div>
                 </div>
 
                 <div class="card-footer">
                     <div class="stats-pills">
                         <span class="stat-pill" id="statWords">0 words</span>
                         <span class="stat-pill highlight" id="statReduction" style="display: none;">0% reduced</span>
-                        <span class="stat-pill" id="statTime" style="display: none;">0ms</span>
+                        <span class="stat-pill speed" id="statTime" style="display: none;">0ms</span>
                     </div>
                     <div class="btn-group">
                         <button class="btn-sm" onclick="toggleSpeech()" id="speechBtn" title="Read summary aloud">
@@ -642,53 +932,53 @@
         </div>
     </main>
 
-    <!-- Architecture Modal -->
+    <!-- Architecture & Evaluation Modal -->
     <div class="modal-overlay" id="telemetryModal" onclick="closeModalOnBackdrop(event)">
         <div class="modal-content">
             <div class="modal-header">
                 <div>
-                    <h3 style="color: var(--text-main);">Pipeline Architecture & ROUGE Scores</h3>
-                    <p style="font-size: 0.8rem; color: var(--text-muted);">End-to-End NLP Transformer Workflow</p>
+                    <h3 style="color: var(--text-main); font-size: 1.15rem; font-weight: 700;">Pipeline Architecture & ROUGE Evaluation</h3>
+                    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">End-to-End MLOps Pipeline & Transformer Performance</p>
                 </div>
                 <button class="modal-close" onclick="closeModal()">&times;</button>
             </div>
 
             <div>
-                <h4 style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Pipeline Stages</h4>
+                <h4 style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.6rem; font-weight: 700;">Modular Pipeline Stages</h4>
                 <div class="pipeline-steps">
                     <div class="step-item active">
-                        <div style="font-size: 0.72rem; color: var(--primary); font-weight: 600;">Stage 01</div>
-                        <div style="font-size: 0.82rem; font-weight: 600;">Data Ingestion</div>
+                        <div style="font-size: 0.7rem; color: var(--primary); font-weight: 700;">STAGE 01</div>
+                        <div style="font-size: 0.8rem; font-weight: 700; margin-top: 2px;">Data Ingestion</div>
                     </div>
-                    <div>&rarr;</div>
+                    <div style="color: var(--text-muted);">&rarr;</div>
                     <div class="step-item active">
-                        <div style="font-size: 0.72rem; color: var(--primary); font-weight: 600;">Stage 02</div>
-                        <div style="font-size: 0.82rem; font-weight: 600;">Validation</div>
+                        <div style="font-size: 0.7rem; color: var(--primary); font-weight: 700;">STAGE 02</div>
+                        <div style="font-size: 0.8rem; font-weight: 700; margin-top: 2px;">Validation</div>
                     </div>
-                    <div>&rarr;</div>
+                    <div style="color: var(--text-muted);">&rarr;</div>
                     <div class="step-item active">
-                        <div style="font-size: 0.72rem; color: var(--primary); font-weight: 600;">Stage 03</div>
-                        <div style="font-size: 0.82rem; font-weight: 600;">Transformation</div>
+                        <div style="font-size: 0.7rem; color: var(--primary); font-weight: 700;">STAGE 03</div>
+                        <div style="font-size: 0.8rem; font-weight: 700; margin-top: 2px;">Transformation</div>
                     </div>
-                    <div>&rarr;</div>
+                    <div style="color: var(--text-muted);">&rarr;</div>
                     <div class="step-item active">
-                        <div style="font-size: 0.72rem; color: var(--primary); font-weight: 600;">Stage 04</div>
-                        <div style="font-size: 0.82rem; font-weight: 600;">Model Trainer</div>
+                        <div style="font-size: 0.7rem; color: var(--primary); font-weight: 700;">STAGE 04</div>
+                        <div style="font-size: 0.8rem; font-weight: 700; margin-top: 2px;">Model Trainer</div>
                     </div>
-                    <div>&rarr;</div>
+                    <div style="color: var(--text-muted);">&rarr;</div>
                     <div class="step-item active">
-                        <div style="font-size: 0.72rem; color: var(--primary); font-weight: 600;">Stage 05</div>
-                        <div style="font-size: 0.82rem; font-weight: 600;">Evaluation</div>
+                        <div style="font-size: 0.7rem; color: var(--primary); font-weight: 700;">STAGE 05</div>
+                        <div style="font-size: 0.8rem; font-weight: 700; margin-top: 2px;">Evaluation</div>
                     </div>
                 </div>
             </div>
 
             <div>
-                <h4 style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Evaluation Metrics (SAMSum Dataset)</h4>
+                <h4 style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.6rem; font-weight: 700;">Benchmark Metrics (SAMSum Test Split)</h4>
                 <table class="table-light">
                     <thead>
                         <tr>
-                            <th>Model</th>
+                            <th>Model Architecture</th>
                             <th>ROUGE-1</th>
                             <th>ROUGE-2</th>
                             <th>ROUGE-L</th>
@@ -697,7 +987,7 @@
                     </thead>
                     <tbody>
                         <tr>
-                            <td style="font-weight: 600; color: var(--primary);">google/pegasus-cnn_dailymail</td>
+                            <td style="font-weight: 700; color: var(--primary);">google/pegasus-cnn_dailymail</td>
                             <td>0.4352</td>
                             <td>0.2014</td>
                             <td>0.3541</td>
@@ -707,37 +997,47 @@
                 </table>
             </div>
 
-            <div style="display: flex; justify-content: flex-end; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
-                <button class="btn-outline" onclick="closeModal()">Close</button>
+            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Trained with PyTorch & HuggingFace Transformers</span>
+                <button class="btn-sm" onclick="closeModal()">Close</button>
             </div>
         </div>
     </div>
 
-    <!-- Toast -->
+    <!-- Toast Notification -->
     <div class="toast" id="toast">
         <span id="toastMsg">Action completed</span>
     </div>
 
+    <!-- Footer -->
     <footer>
-        <p>LexiBrief &bull; Built with Transformers, PyTorch, and FastAPI</p>
+        <div>LexiBrief &bull; High-Performance NLP Summarization Engine</div>
+        <div>FastAPI &bull; Hugging Face Transformers &bull; PyTorch</div>
     </footer>
 
     <script>
         let currentMode = "balanced";
-        let presets = {};
+        let presets = {
+            "meeting": `Alex: Hey everyone, let's do a quick sync on the Q3 release deliverables.\nSarah: The data pipeline refactoring is finished. Ingestion throughput is up by 45%.\nMichael: Awesome. Frontend migration to the new design system is 90% done. Just ironing out a few responsive glitches on tablet views.\nAlex: Great work. What about the model training and AWS ECR CI/CD pipeline?\nDavid: Docker images are building cleanly, and the automated evaluation tests passed with ROUGE-1 score of 0.42. We're scheduled to deploy to EC2 on Thursday.\nAlex: Perfect! Let's lock in Thursday morning for the staging deployment and notify the product team.\nSarah: Sounds like a plan. I'll prepare the release notes.`,
+            "technews": `Artificial intelligence research laboratories have unveiled a new generation of encoder-decoder transformer architectures specifically optimized for abstractive document comprehension and summarization. By employing advanced sparse attention mechanisms and memory-efficient sequence-to-sequence fine-tuning, the new models achieve human-parity synthesis while reducing computational energy requirements by over 60 percent. Industry analysts predict this breakthrough will drastically streamline corporate workflows across legal discovery, medical literature review, and financial reporting, allowing knowledge workers to distill multi-hundred-page dossiers into actionable executive briefs in real time.`,
+            "support": `Customer: Hi, our production API integration began throwing 429 rate limit errors starting at 08:00 UTC today despite us being on the Enterprise tier.\nAgent: Hello! I apologize for the disruption. Let me pull up your account credentials and system logs right away.\nCustomer: Thanks, our payment webhook processing is currently queued up.\nAgent: I have located the issue. A recent load balancer update temporarily misclassified your API key pool. I have applied an immediate hotfix to whitelist your endpoint and doubled your burst concurrency limits.\nCustomer: Verified on our dashboard! Traffic is clearing normally now and queue is draining.\nAgent: Excellent to hear. I have filed an internal incident report to ensure this edge case is permanently prevented in future deployments.`,
+            "research": `Recent investigations into multi-modal deep learning architectures have demonstrated substantial efficacy in unifying cross-domain sequence reasoning. This study evaluates the generalization capability of pre-trained language models when fine-tuned on highly specialized domain taxonomies without auxiliary knowledge graphs. Empirical benchmarking across five diverse corpora reveals that selective layer unfreezing paired with adaptive learning rate warmup yields a 14.8% relative gain in semantic fidelity and reduces hallucination rates from 8.2% to 1.9%. These findings validate the hypothesis that intermediate representation regularization is critical for robust domain-adapted abstractive summarization.`
+        };
         let synth = window.speechSynthesis;
         let isSpeaking = false;
 
-        // Load Presets
+        // Fetch presets from API dynamically as well
         window.addEventListener('DOMContentLoaded', async () => {
             try {
                 const res = await fetch('/api/presets');
-                const data = await res.json();
-                if (data.presets) {
-                    data.presets.forEach(p => presets[p.id] = p.text);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.presets) {
+                        data.presets.forEach(p => presets[p.id] = p.text);
+                    }
                 }
             } catch (e) {
-                console.error("Presets error:", e);
+                console.log("Using built-in presets");
             }
         });
 
@@ -768,18 +1068,23 @@
             document.getElementById('inputText').value = "";
             updateStats();
             stopSpeech();
-            document.getElementById('summaryText').innerText = "";
-            document.getElementById('summaryText').style.display = "none";
+            const summaryEl = document.getElementById('summaryText');
+            summaryEl.innerText = "";
+            summaryEl.style.display = "none";
             document.getElementById('emptyState').style.display = "flex";
             document.getElementById('statWords').innerText = "0 words";
             document.getElementById('statReduction').style.display = "none";
             document.getElementById('statTime').style.display = "none";
+            
+            const badge = document.getElementById('statusBadge');
+            badge.className = "status-badge";
+            document.getElementById('statusText').innerText = "Ready";
         }
 
         async function generateSummary() {
             const text = document.getElementById('inputText').value.trim();
             if (!text) {
-                showToast("Please enter some text to summarize.");
+                showToast("Please enter or paste text to summarize.");
                 return;
             }
 
@@ -788,14 +1093,20 @@
             const btnLabel = document.getElementById('btnLabel');
             const emptyState = document.getElementById('emptyState');
             const summaryText = document.getElementById('summaryText');
+            const badge = document.getElementById('statusBadge');
+            const statusText = document.getElementById('statusText');
 
             btn.disabled = true;
             btnIcon.innerHTML = '<div class="spinner"></div>';
-            btnLabel.innerText = 'Summarizing...';
+            btnLabel.innerText = 'Processing...';
+
+            badge.className = "status-badge active";
+            statusText.innerText = "Summarizing...";
 
             emptyState.innerHTML = `
-                <div class="spinner" style="border-color: rgba(79, 70, 229, 0.2); border-top-color: var(--primary); width: 22px; height: 22px;"></div>
-                <div style="font-weight: 600; color: var(--primary); margin-top: 0.5rem;">Generating summary...</div>
+                <div class="spinner" style="border-color: rgba(79, 70, 229, 0.2); border-top-color: var(--primary); width: 28px; height: 28px;"></div>
+                <div class="empty-title" style="color: var(--primary); margin-top: 0.6rem;">Generating Executive Brief...</div>
+                <div class="empty-desc">Running transformer sequence-to-sequence model inference.</div>
             `;
             emptyState.style.display = 'flex';
             summaryText.style.display = 'none';
@@ -835,13 +1146,20 @@
                     timeEl.innerText = `${a.latency_ms}ms`;
                 }
 
-                showToast("Summary generated successfully!");
+                badge.className = "status-badge active";
+                statusText.innerText = "Generated";
+                showToast("Executive Brief generated!");
             } catch (err) {
                 emptyState.style.display = 'flex';
-                emptyState.innerHTML = `<div style="color: #dc2626; font-weight: 500;">Error: ${err.message}</div>`;
+                emptyState.innerHTML = `
+                    <div style="color: #dc2626; font-weight: 700; font-size: 0.95rem;">Inference Notice</div>
+                    <div style="color: var(--text-muted); font-size: 0.85rem; max-width: 320px;">${err.message}</div>
+                `;
+                badge.className = "status-badge";
+                statusText.innerText = "Error";
             } finally {
                 btn.disabled = false;
-                btnIcon.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
+                btnIcon.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
                 btnLabel.innerText = 'Summarize';
             }
         }
@@ -867,7 +1185,7 @@
             link.href = URL.createObjectURL(blob);
             link.download = `LexiBrief_Summary_${Date.now()}.txt`;
             link.click();
-            showToast("Summary downloaded!");
+            showToast("Summary exported!");
         }
 
         function toggleSpeech() {
@@ -891,20 +1209,20 @@
             utterance.onerror = () => stopSpeech();
             synth.speak(utterance);
             isSpeaking = true;
-            document.getElementById('speechIcon').innerText = '⏹️';
+            document.getElementById('speechIcon').innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
         }
 
         function stopSpeech() {
             if (synth) synth.cancel();
             isSpeaking = false;
-            document.getElementById('speechIcon').innerText = '🔊';
+            document.getElementById('speechIcon').innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>';
         }
 
         function showToast(msg) {
             const toast = document.getElementById('toast');
             document.getElementById('toastMsg').innerText = msg;
             toast.style.display = 'flex';
-            setTimeout(() => { toast.style.display = 'none'; }, 2500);
+            setTimeout(() => { toast.style.display = 'none'; }, 2600);
         }
 
         function openModal() {
@@ -917,24 +1235,6 @@
 
         function closeModalOnBackdrop(e) {
             if (e.target.id === 'telemetryModal') closeModal();
-        }
-
-        async function triggerTraining() {
-            if (!confirm("Start model training pipeline?")) return;
-            const btn = document.getElementById('trainBtn');
-            btn.disabled = true;
-            btn.innerText = 'Training...';
-            showToast("Pipeline started in background...");
-            try {
-                const res = await fetch('/train');
-                const data = await res.json();
-                alert(data.message || "Training finished!");
-            } catch (e) {
-                alert("Notice: " + e.message);
-            } finally {
-                btn.disabled = false;
-                btn.innerText = '🔄 Train Model';
-            }
         }
     </script>
 </body>
