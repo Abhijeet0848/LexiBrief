@@ -59,9 +59,16 @@ class MongoDBManager:
 
     def _init_connection(self):
         """Attempts to initialize connection to MongoDB."""
+        is_serverless = bool(os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME") or os.getenv("NOW_REGION"))
+        if is_serverless and ("localhost" in self.mongo_url or "127.0.0.1" in self.mongo_url):
+            logger.info("Serverless environment detected without external MongoDB URL. Using resilient /tmp storage.")
+            self.use_mongo = False
+            self._ensure_local_dirs()
+            return
+
         try:
             import pymongo
-            self.client = pymongo.MongoClient(self.mongo_url, serverSelectionTimeoutMS=2000)
+            self.client = pymongo.MongoClient(self.mongo_url, serverSelectionTimeoutMS=1500, connectTimeoutMS=1500)
             # Test connection with ping
             self.client.admin.command('ping')
             self.db = self.client[self.db_name]
@@ -74,17 +81,30 @@ class MongoDBManager:
             self._ensure_local_dirs()
 
     def _ensure_local_dirs(self):
-        """Creates directory structure for local persistence (using /tmp on serverless if needed)."""
-        try:
-            os.makedirs(os.path.join("artifacts", "database"), exist_ok=True)
-            self.summaries_file = os.path.join("artifacts", "database", "summaries.json")
-            self.documents_file = os.path.join("artifacts", "database", "documents.json")
-        except (OSError, PermissionError):
-            import tempfile
+        """Creates directory structure for local persistence (using /tmp on serverless or read-only filesystem)."""
+        is_serverless = bool(os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME") or os.getenv("NOW_REGION"))
+        import tempfile
+        
+        if is_serverless:
             tmp_dir = os.path.join(tempfile.gettempdir(), "lexibrief_db")
             os.makedirs(tmp_dir, exist_ok=True)
             self.summaries_file = os.path.join(tmp_dir, "summaries.json")
             self.documents_file = os.path.join(tmp_dir, "documents.json")
+        else:
+            try:
+                local_dir = os.path.join("artifacts", "database")
+                os.makedirs(local_dir, exist_ok=True)
+                test_file = os.path.join(local_dir, ".test_write")
+                with open(test_file, "w") as tf:
+                    tf.write("ok")
+                os.remove(test_file)
+                self.summaries_file = os.path.join(local_dir, "summaries.json")
+                self.documents_file = os.path.join(local_dir, "documents.json")
+            except (OSError, PermissionError):
+                tmp_dir = os.path.join(tempfile.gettempdir(), "lexibrief_db")
+                os.makedirs(tmp_dir, exist_ok=True)
+                self.summaries_file = os.path.join(tmp_dir, "summaries.json")
+                self.documents_file = os.path.join(tmp_dir, "documents.json")
 
         for f in [self.summaries_file, self.documents_file]:
             try:

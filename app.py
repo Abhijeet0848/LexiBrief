@@ -3,17 +3,30 @@ import os
 import re
 
 # Serverless & local environment directory resolution
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+current_file_dir = os.path.dirname(os.path.abspath(__file__))
+candidate_bases = [
+    current_file_dir,
+    os.getcwd(),
+    os.path.dirname(current_file_dir),
+    "/var/task"
+]
+
+BASE_DIR = current_file_dir
+for candidate in candidate_bases:
+    if os.path.exists(os.path.join(candidate, "templates")) or os.path.exists(os.path.join(candidate, "src")):
+        BASE_DIR = candidate
+        break
+
 SRC_DIR = os.path.join(BASE_DIR, "src")
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 
-for path in [BASE_DIR, SRC_DIR]:
-    if path not in sys.path:
+for path in [BASE_DIR, SRC_DIR, current_file_dir, os.getcwd(), "/var/task", "/var/task/src"]:
+    if path and os.path.exists(path) and path not in sys.path:
         sys.path.insert(0, path)
 
 from fastapi import FastAPI, Request, Form, HTTPException, UploadFile, File, Response, BackgroundTasks, Body
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -173,20 +186,54 @@ Agent: Excellent to hear. I have filed an internal incident report to ensure thi
 ]
 
 
-@app.get("/", response_class=FileResponse, tags=["UI"])
+def _find_index_html() -> Optional[str]:
+    """Finds and reads index.html from multiple candidate directories in serverless and local runtimes."""
+    candidate_paths = [
+        os.path.join(TEMPLATES_DIR, "index.html"),
+        os.path.join(BASE_DIR, "templates", "index.html"),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates", "index.html"),
+        os.path.join(os.getcwd(), "templates", "index.html"),
+        os.path.join(os.getcwd(), "api", "..", "templates", "index.html"),
+        "/var/task/templates/index.html",
+        "templates/index.html"
+    ]
+    for p in candidate_paths:
+        if os.path.exists(p) and os.path.isfile(p):
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    return f.read()
+            except Exception:
+                pass
+    return None
+
+
+@app.get("/", response_class=HTMLResponse, tags=["UI"])
 async def index():
-    index_path = os.path.join(TEMPLATES_DIR, "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
-    return FileResponse("templates/index.html")
+    html_content = _find_index_html()
+    if html_content:
+        return HTMLResponse(content=html_content, status_code=200)
+    return HTMLResponse(
+        content="""<!DOCTYPE html><html><head><title>LexiBrief NLP Engine</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body{font-family:system-ui,sans-serif;background:#090d16;color:#e2e8f0;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px;box-sizing:border-box}.card{background:#131b2e;padding:32px;border-radius:16px;border:1px solid #1e293b;max-width:540px;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,0.5)}h1{font-size:24px;color:#38bdf8;margin:0 0 12px}p{color:#94a3b8;line-height:1.6;margin:0 0 20px}a{display:inline-block;padding:10px 20px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;transition:background 0.2s}a:hover{background:#1d4ed8}</style></head><body><div class="card"><h1>⚡ LexiBrief NLP Engine Active</h1><p>The backend API services and serverless functions are operational. You can explore interactive OpenAPI documentation below.</p><a href="/docs">View Interactive Swagger Docs</a></div></body></html>""",
+        status_code=200
+    )
 
 
 @app.get("/favicon.ico", include_in_schema=False)
 @app.get("/favicon.png", include_in_schema=False)
 async def favicon():
-    logo_path = os.path.join(STATIC_DIR, "logo.jpg")
-    if os.path.exists(logo_path):
-        return FileResponse(logo_path, media_type="image/jpeg")
+    candidate_favicons = [
+        os.path.join(STATIC_DIR, "logo.jpg"),
+        os.path.join(BASE_DIR, "static", "logo.jpg"),
+        "/var/task/static/logo.jpg",
+        "static/logo.jpg"
+    ]
+    for p in candidate_favicons:
+        if os.path.exists(p) and os.path.isfile(p):
+            try:
+                with open(p, "rb") as f:
+                    return Response(content=f.read(), media_type="image/jpeg")
+            except Exception:
+                pass
     return Response(status_code=204)
 
 
@@ -337,53 +384,6 @@ async def evaluate_rouge(req: RougeEvalRequest):
     return {"rouge": rouge_res}
 
 
-@app.post("/api/tts", tags=["Speech Synthesis"])
-async def text_to_speech(req: TTSRequest):
-    """Synthesizes text into realistic, studio-quality speech stream in any detected language."""
-    if not req.text or not req.text.strip():
-        raise HTTPException(status_code=400, detail="Text cannot be empty.")
-    
-    clean_text = re.sub(r'[#*_`~>-]', ' ', req.text)
-    clean_text = re.sub(r'\s+', ' ', clean_text).strip()
-    
-    # Cap to reasonable size for rapid generation
-    clean_text = clean_text[:5000]
-    
-    try:
-        from gtts import gTTS
-        import io
-        from textSummarizer.components.nlp_processor import NLPProcessor
-        
-        lang_code, lang_name = NLPProcessor.detect_language(clean_text)
-        
-        # Supported gTTS language codes
-        supported_gtts = {
-            'hi': 'hi', 'mr': 'mr', 'ta': 'ta', 'te': 'te', 'bn': 'bn',
-            'gu': 'gu', 'kn': 'kn', 'ml': 'ml', 'ur': 'ur', 'pa': 'pa',
-            'es': 'es', 'fr': 'fr', 'de': 'de', 'it': 'it', 'pt': 'pt',
-            'ru': 'ru', 'ja': 'ja', 'ko': 'ko', 'zh': 'zh-CN', 'ar': 'ar',
-            'id': 'id', 'vi': 'vi', 'th': 'th', 'tr': 'tr', 'nl': 'nl'
-        }
-        
-        target_lang = supported_gtts.get(lang_code, 'en')
-        tld_param = 'co.in' if target_lang == 'en' else 'com'
-        
-        tts = gTTS(text=clean_text, lang=target_lang, tld=tld_param, slow=False)
-        fp = io.BytesIO()
-        tts.write_to_fp(fp)
-        fp.seek(0)
-        
-        return Response(
-            content=fp.read(), 
-            media_type="audio/mpeg",
-            headers={
-                "X-Voice-Language": lang_name,
-                "X-Voice-Code": target_lang
-            }
-        )
-    except Exception as e:
-        logger.error(f"TTS synthesis error: {e}")
-        raise HTTPException(status_code=500, detail=f"Audio synthesis failed: {str(e)}")
 
 
 @app.get("/api/metrics", tags=["Telemetry"])
