@@ -42,7 +42,6 @@ app = FastAPI(
 MAX_UPLOAD_SIZE = 15 * 1024 * 1024   # 15 MB max file upload
 MAX_INPUT_CHARS = 150_000            # 150,000 max input character limit
 ADMIN_SECRET_KEY = os.getenv("ADMIN_SECRET_KEY")
-ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
 SARVAM_API_KEY = os.getenv("SARVAM_API_KEY")
 
 # Sarvam AI Authentic Indian Voice Catalog (bulbul:v1)
@@ -56,23 +55,11 @@ SARVAM_VOICE_MAP = {
     "amartya": {"speaker": "amartya", "name": "Amartya (Deep Indian Male)", "gender": "male"}
 }
 
-# ElevenLabs High-Definition Voice Catalog
-ELEVENLABS_VOICE_MAP = {
-    "aria": {"id": "9BWtsMINqrJLrRacOk9x", "name": "Aria (Hyper-realistic Female)"},
-    "rishi": {"id": "pqHfZKP75CvOlQylNhV4", "name": "Rishi (Indian Male)"},
-    "indian_female": {"id": "EXAVITQu4vr4xnSDxMaL", "name": "Indian Female"},
-    "sarah": {"id": "EXAVITQu4vr4xnSDxMaL", "name": "Sarah (News Anchor)"},
-    "george": {"id": "JBFqnCBsd6RMkjVDRZzb", "name": "George (Storyteller)"},
-    "charlie": {"id": "IKne3meq5aSn9XLyUdCD", "name": "Charlie (Conversational)"}
-}
-
 
 class TTSRequest(BaseModel):
     text: str = Field(..., description="Text to synthesize to speech")
-    engine: Optional[str] = Field("auto", description="Engine: 'sarvam', 'elevenlabs', 'google', or 'auto'")
-    voice: Optional[str] = Field("meera", description="Voice identifier ('meera', 'arvind', 'shubh', 'ananya', 'aria', 'rishi', 'google')")
+    voice: Optional[str] = Field("meera", description="Voice identifier ('meera', 'arvind', 'shubh', 'ananya', 'priya', 'dhruv', 'amartya', 'google')")
     sarvam_key: Optional[str] = Field(None, description="Optional Sarvam AI API subscription key")
-    elevenlabs_key: Optional[str] = Field(None, description="Optional ElevenLabs API key")
     api_key: Optional[str] = Field(None, description="Generic API key override")
     model: Optional[str] = Field("bulbul:v1", description="Sarvam model: 'bulbul:v1' or 'bulbul:v2'")
     speed: Optional[float] = Field(1.0, description="Speech rate multiplier")
@@ -512,7 +499,7 @@ def synthesize_sarvam_ai(text: str, speaker: str, api_key: str, model: str = "bu
 @app.post("/api/tts", tags=["Text-to-Speech"])
 async def text_to_speech(req: TTSRequest, request: Request):
     """
-    Synthesizes authentic Indian voice audio with Sarvam AI (bulbul:v1), ElevenLabs, or Google Neural (Free).
+    Synthesizes authentic Indian voice audio with Sarvam AI (bulbul:v1) or Google Neural (Free).
     """
     try:
         text_content = req.text.strip()
@@ -527,11 +514,9 @@ async def text_to_speech(req: TTSRequest, request: Request):
 
         selected_voice = (req.voice or "meera").lower().strip()
         sarvam_sub_key = req.sarvam_key or req.api_key or request.headers.get("api-subscription-key") or SARVAM_API_KEY
-        elevenlabs_sub_key = req.elevenlabs_key or req.api_key or request.headers.get("xi-api-key") or ELEVENLABS_API_KEY
 
-        # 1. Sarvam AI Bulbul Authentic Indian Voices (meera, arvind, shubh, ananya, priya, dhruv)
-        is_sarvam_voice = selected_voice in SARVAM_VOICE_MAP or req.engine == "sarvam"
-        if is_sarvam_voice and sarvam_sub_key:
+        # 1. Sarvam AI Bulbul Authentic Indian Voices (meera, arvind, shubh, ananya, priya, dhruv, amartya)
+        if selected_voice in SARVAM_VOICE_MAP and sarvam_sub_key:
             speaker_name = selected_voice if selected_voice in SARVAM_VOICE_MAP else "meera"
             wav_bytes = synthesize_sarvam_ai(clean_text, speaker_name, sarvam_sub_key, req.model or "bulbul:v1")
             if wav_bytes:
@@ -544,36 +529,7 @@ async def text_to_speech(req: TTSRequest, request: Request):
                     }
                 )
 
-        # 2. ElevenLabs Hyper-realistic Voices (Aria, Rishi, Sarah, etc.)
-        is_eleven_voice = selected_voice in ELEVENLABS_VOICE_MAP or req.engine == "elevenlabs"
-        if (is_eleven_voice or selected_voice in ["aria", "rishi", "sarah"]) and elevenlabs_sub_key:
-            voice_id = ELEVENLABS_VOICE_MAP.get(selected_voice, {}).get("id", "9BWtsMINqrJLrRacOk9x")
-            elevenlabs_url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-            headers = {
-                "Accept": "audio/mpeg",
-                "Content-Type": "application/json",
-                "xi-api-key": elevenlabs_sub_key.strip()
-            }
-            payload = {
-                "text": clean_text,
-                "model_id": "eleven_multilingual_v2",
-                "voice_settings": {"stability": 0.50, "similarity_boost": 0.80, "style": 0.05, "use_speaker_boost": True}
-            }
-            try:
-                resp = requests.post(elevenlabs_url, json=payload, headers=headers, timeout=25)
-                if resp.status_code == 200:
-                    return StreamingResponse(
-                        io.BytesIO(resp.content),
-                        media_type="audio/mpeg",
-                        headers={
-                            "Content-Disposition": f"inline; filename=elevenlabs_{selected_voice}.mp3",
-                            "X-Voice-Engine": f"ElevenLabs-{selected_voice}"
-                        }
-                    )
-            except Exception as el_err:
-                logger.warning(f"ElevenLabs TTS error: {el_err}")
-
-        # 3. Built-in 100% Free Zero-Key Fallback: Google Neural Indian English
+        # 2. Built-in 100% Free Zero-Key Fallback: Google Neural Indian English
         fp = io.BytesIO()
         tts = gTTS(text=clean_text, lang='en', tld='co.in', slow=False)
         tts.write_to_fp(fp)

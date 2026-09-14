@@ -287,7 +287,7 @@
       const [rougeScores, setRougeScores] = useState(null);
       const [rougeLoading, setRougeLoading] = useState(false);
 
-      // Speech Synthesis, Sarvam AI & ElevenLabs Voice State
+      // Speech Synthesis & Sarvam AI Voice State
       const [isSpeaking, setIsSpeaking] = useState(false);
       const [audioLoading, setAudioLoading] = useState(false);
       const [selectedVoice, setSelectedVoice] = useState(() => {
@@ -295,9 +295,6 @@
       });
       const [sarvamKey, setSarvamKey] = useState(() => {
         try { return localStorage.getItem('lexibrief_sarvam_key') || ''; } catch(e) { return ''; }
-      });
-      const [elevenLabsKey, setElevenLabsKey] = useState(() => {
-        try { return localStorage.getItem('lexibrief_elevenlabs_key') || ''; } catch(e) { return ''; }
       });
       const [showVoiceSettings, setShowVoiceSettings] = useState(false);
       const [voices, setVoices] = useState([]);
@@ -312,12 +309,6 @@
         setSarvamKey(key);
         try { localStorage.setItem('lexibrief_sarvam_key', key); } catch(e) {}
         showToast(key ? "✓ Sarvam AI (Bulbul) Subscription Key saved!" : "Sarvam Key cleared", "success");
-      };
-
-      const handleSaveElevenLabsKey = (key) => {
-        setElevenLabsKey(key);
-        try { localStorage.setItem('lexibrief_elevenlabs_key', key); } catch(e) {}
-        showToast(key ? "✓ ElevenLabs API Key saved!" : "ElevenLabs Key cleared", "success");
       };
 
       const showToast = (msg, type = 'info') => setToast({ message: msg, type });
@@ -663,10 +654,9 @@
         setAudioLoading(true);
 
         try {
-          // Call multi-provider backend TTS (Sarvam AI Bulbul / ElevenLabs / Google Neural)
+          // Call Sarvam AI Bulbul / Google Neural backend TTS
           const headers = { 'Content-Type': 'application/json' };
           if (sarvamKey) headers['api-subscription-key'] = sarvamKey;
-          if (elevenLabsKey) headers['xi-api-key'] = elevenLabsKey;
 
           const res = await fetch('/api/tts', {
             method: 'POST',
@@ -675,7 +665,6 @@
               text: cleanText,
               voice: selectedVoice,
               sarvam_key: sarvamKey || undefined,
-              elevenlabs_key: elevenLabsKey || undefined,
               model: "bulbul:v1"
             })
           });
@@ -715,9 +704,7 @@
           const voiceLabel = selectedVoice === 'meera' ? 'Meera (Sarvam Bulbul)' :
                              selectedVoice === 'arvind' ? 'Arvind (Sarvam Bulbul)' :
                              selectedVoice === 'shubh' ? 'Shubh (Sarvam Bulbul)' :
-                             selectedVoice === 'ananya' ? 'Ananya (Sarvam Bulbul)' :
-                             selectedVoice === 'aria' ? 'Aria (ElevenLabs)' :
-                             selectedVoice === 'rishi' ? 'Rishi (ElevenLabs)' : 'Google Neural';
+                             selectedVoice === 'ananya' ? 'Ananya (Sarvam Bulbul)' : 'Google Neural (Free)';
           showToast(`🎙️ Speaking with ${voiceLabel}`, "info");
         } catch (err) {
           console.warn("Backend TTS stream fallback to browser speech synthesis:", err);
@@ -1300,16 +1287,14 @@
                             <button
                               onClick={() => setShowVoiceSettings(true)}
                               className="btn-3d-secondary py-2 px-2 rounded-xl text-slate-700 font-semibold flex items-center gap-1 cursor-pointer text-xs"
-                              title="Voice Model & Accent Settings (Sarvam Bulbul, ElevenLabs, Google)"
+                              title="Voice Model & Accent Settings (Sarvam Bulbul & Google Neural)"
                             >
                               <span>🎙️</span>
                               <span className="hidden md:inline text-[11px] font-bold text-indigo-600">
                                 {selectedVoice === 'meera' ? 'Meera (Sarvam)' :
                                  selectedVoice === 'arvind' ? 'Arvind (Sarvam)' :
                                  selectedVoice === 'shubh' ? 'Shubh (Sarvam)' :
-                                 selectedVoice === 'ananya' ? 'Ananya (Sarvam)' :
-                                 selectedVoice === 'aria' ? 'Aria' :
-                                 selectedVoice === 'rishi' ? 'Rishi' : 'Google'}
+                                 selectedVoice === 'ananya' ? 'Ananya (Sarvam)' : 'Google Neural'}
                               </span>
                               <span className="text-[8px] text-slate-400">⚙️</span>
                             </button>
@@ -2215,7 +2200,7 @@
                         Voice & Accent Engine
                       </h3>
                       <p className="text-xs text-slate-500">
-                        Sarvam AI (Bulbul:v1), ElevenLabs & Free Google Neural
+                        Sarvam AI (Bulbul:v1) & Free Google Neural Voices
                       </p>
                     </div>
                   </div>
@@ -2276,22 +2261,6 @@
                           desc: 'Built-in high-definition Indian English. 100% Free, no keys required.',
                           tag: '⚡ 100% Free',
                           icon: '🌐'
-                        },
-                        {
-                          id: 'aria',
-                          name: 'Aria (ElevenLabs)',
-                          badge: 'Hyper-Realistic Female',
-                          desc: 'Studio-grade expressive female voice with natural breathing.',
-                          tag: 'ElevenLabs',
-                          icon: '👩'
-                        },
-                        {
-                          id: 'rishi',
-                          name: 'Rishi (ElevenLabs)',
-                          badge: 'Indian Male Accent',
-                          desc: 'Hyper-realistic neural Indian Male accent.',
-                          tag: 'ElevenLabs',
-                          icon: '👨'
                         }
                       ].map(v => (
                         <div
@@ -2364,40 +2333,6 @@
                       <button
                         onClick={() => handleSaveSarvamKey(sarvamKey)}
                         className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition shadow-xs"
-                      >
-                        Save
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* ElevenLabs Key Config */}
-                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5 font-heading">
-                        <span>🔑</span> ElevenLabs API Key (Optional)
-                      </span>
-                      {elevenLabsKey ? (
-                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                          ✓ Key Configured
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-medium text-slate-400">
-                          Optional premium
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex gap-2 pt-1">
-                      <input
-                        type="password"
-                        value={elevenLabsKey}
-                        onChange={(e) => setElevenLabsKey(e.target.value)}
-                        placeholder="sk_..."
-                        className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-mono focus:outline-none focus:border-indigo-500"
-                      />
-                      <button
-                        onClick={() => handleSaveElevenLabsKey(elevenLabsKey)}
-                        className="px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl transition shadow-xs"
                       >
                         Save
                       </button>
