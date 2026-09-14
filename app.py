@@ -43,6 +43,8 @@ app = FastAPI(
 # Security Constants & Limits
 MAX_UPLOAD_SIZE = 15 * 1024 * 1024   # 15 MB max file upload
 MAX_INPUT_CHARS = 150_000            # 150,000 max input character limit
+ADMIN_SECRET_KEY = os.getenv("ADMIN_SECRET_KEY")
+
 # Ultra-Realistic Studio Neural Indian English Voices (100% Free, Zero Key Required)
 EDGE_NEURAL_VOICE_MAP = {
     "neerja": {"id": "en-IN-NeerjaNeural", "name": "Neerja (Studio Indian Female)", "gender": "female"},
