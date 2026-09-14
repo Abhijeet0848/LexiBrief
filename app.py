@@ -172,12 +172,13 @@ async def upload_document(file: UploadFile = File(...)):
                 detail="File too large. Maximum supported document size is 15 MB."
             )
         
-        extracted_text, detected_format = TextExtractor.extract(file.filename or "document.txt", content_bytes)
+        extracted_text, detected_format, pages_count = TextExtractor.extract(file.filename or "document.txt", content_bytes)
         
         if not extracted_text or not extracted_text.strip():
             raise HTTPException(status_code=400, detail="Could not extract readable text from uploaded file.")
             
         stats = NLPProcessor.compute_stats(extracted_text)
+        stats["pages"] = pages_count
         keywords = NLPProcessor.extract_keywords(extracted_text, top_k=8)
         key_points = NLPProcessor.extract_key_points(extracted_text, top_k=4)
         
@@ -185,6 +186,8 @@ async def upload_document(file: UploadFile = File(...)):
             "filename": file.filename or "document.txt",
             "format": detected_format,
             "text": extracted_text,
+            "pages": pages_count,
+            "words": stats.get("words", 0),
             "stats": stats,
             "keywords": keywords,
             "key_points": key_points
@@ -197,6 +200,8 @@ async def upload_document(file: UploadFile = File(...)):
             "id": saved_record.get("_id"),
             "filename": file.filename or "document.txt",
             "format": detected_format,
+            "pages": pages_count,
+            "words": stats.get("words", 0),
             "text": extracted_text,
             "stats": stats,
             "keywords": keywords,

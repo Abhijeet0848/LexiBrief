@@ -60,19 +60,21 @@ class TextExtractor:
                 return file_bytes.decode('utf-8', errors='ignore')
 
     @staticmethod
-    def extract_from_pdf(file_bytes: bytes) -> str:
-        """Extracts text from PDF files using pypdf if available or regex text stream parsing."""
+    def extract_from_pdf(file_bytes: bytes) -> Tuple[str, int]:
+        """Extracts text from PDF files using pypdf if available or regex text stream parsing. Returns (text, page_count)."""
         # Try pypdf if installed
         try:
             import pypdf
             reader = pypdf.PdfReader(io.BytesIO(file_bytes))
             pages = []
+            page_count = len(reader.pages)
             for page in reader.pages:
                 text = page.extract_text()
                 if text:
                     pages.append(text)
             if pages:
-                return "\n\n".join(pages)
+                return "\n\n".join(pages), max(1, page_count)
+            return "", max(1, page_count)
         except ImportError:
             pass
         except Exception as e:
@@ -83,28 +85,29 @@ class TextExtractor:
             content = file_bytes.decode('latin-1', errors='ignore')
             text_blocks = _RE_PDF_TEXT_BLOCKS.findall(content)
             if text_blocks:
-                return " ".join(text_blocks)
+                return " ".join(text_blocks), 1
             cleaned = _RE_NON_PRINTABLE_PDF.sub('', content)
             readable = _RE_READABLE_CHUNKS.findall(cleaned)
-            return " ".join(readable)
+            return " ".join(readable), 1
         except Exception as e:
             logger.error(f"PDF extraction error: {e}")
-            return file_bytes.decode('utf-8', errors='ignore')
+            return file_bytes.decode('utf-8', errors='ignore'), 1
 
     @classmethod
-    def extract(cls, filename: str, file_bytes: bytes) -> Tuple[str, str]:
-        """Extracts text based on file extension and returns (clean_text, detected_format)."""
+    def extract(cls, filename: str, file_bytes: bytes) -> Tuple[str, str, int]:
+        """Extracts text based on file extension and returns (clean_text, detected_format, page_count)."""
         fn = filename.lower()
+        pages = 1
         if fn.endswith('.docx') or fn.endswith('.doc'):
             fmt = "DOCX"
             raw = cls.extract_from_docx(file_bytes)
         elif fn.endswith('.pdf'):
             fmt = "PDF"
-            raw = cls.extract_from_pdf(file_bytes)
+            raw, pages = cls.extract_from_pdf(file_bytes)
         else:
             fmt = "TXT"
             raw = file_bytes.decode('utf-8', errors='ignore')
 
         cleaned = cls.clean_text(raw)
-        return cleaned, fmt
+        return cleaned, fmt, pages
 
