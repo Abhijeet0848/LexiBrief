@@ -515,27 +515,6 @@
                 ))}
               </nav>
 
-              {/* Right Profile & MongoDB Status */}
-              <div className="flex items-center gap-3">
-                {/* DB status pill */}
-                <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-xs">
-                  <span className={`w-2 h-2 rounded-full ${dbStatus?.status === 'connected' || dbStatus?.status === 'active' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
-                  <span className="text-slate-300 font-mono text-[11px]">{dbStatus?.database || 'lexibrief_db'}</span>
-                </div>
-
-                {/* User Auth Profile Button */}
-                <button
-                  onClick={() => setIsAuthModalOpen(true)}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-200 transition shadow"
-                  title="Database User Profile"
-                >
-                  <div className="w-5 h-5 rounded-full bg-brand-600 flex items-center justify-center text-[10px] text-white font-bold">
-                    {currentUser[0]?.toUpperCase() || 'U'}
-                  </div>
-                  <span className="hidden sm:inline max-w-[120px] truncate">{currentUser}</span>
-                </button>
-              </div>
-
             </div>
           </header>
 
@@ -1302,39 +1281,7 @@ MONGODB_DB=lexibrief_db
 
           </main>
 
-          {/* User Auth / Profile Modal */}
-          <Modal
-            isOpen={isAuthModalOpen}
-            onClose={() => setIsAuthModalOpen(false)}
-            title="👤 User & Database Credentials"
-          >
-            <div className="space-y-4 text-xs">
-              <p className="text-slate-300">
-                Configure your active MongoDB session identifier or switch accounts:
-              </p>
-              <div>
-                <label className="text-slate-400 font-semibold mb-1 block">Username / Account Name:</label>
-                <input
-                  type="text"
-                  value={authUsernameInput}
-                  onChange={(e) => setAuthUsernameInput(e.target.value)}
-                  className="w-full p-2.5 rounded-xl glass-input text-white focus:outline-none font-mono"
-                />
-              </div>
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  onClick={() => {
-                    setCurrentUser(authUsernameInput.trim() || 'gautamabhijeet050_db_user');
-                    setIsAuthModalOpen(false);
-                    showToast(`Active account set to ${authUsernameInput}!`, "success");
-                  }}
-                  className="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 font-bold text-white transition"
-                >
-                  Save Profile
-                </button>
-              </div>
-            </div>
-          </Modal>
+
 
           {/* Toast Notification */}
           {toast && (
