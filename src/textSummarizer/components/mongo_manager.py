@@ -192,6 +192,7 @@ class MongoDBManager:
             "_id": str(uuid.uuid4()),
             "filename": doc_data.get("filename", "untitled.txt"),
             "format": doc_data.get("format", "TXT"),
+            "text_snippet": (doc_data.get("text", "")[:220] + ("..." if len(doc_data.get("text", "")) > 220 else "")),
             "text_content": doc_data.get("text", ""),
             "words": doc_data.get("stats", {}).get("words", 0),
             "characters": doc_data.get("stats", {}).get("characters", 0),
@@ -226,7 +227,18 @@ class MongoDBManager:
         if self.use_mongo and self.db is not None:
             try:
                 cursor = self.db.documents.find({}, {"text_content": 0}).sort("uploaded_at", -1).limit(limit)
-                return list(cursor)
+                docs = list(cursor)
+                for d in docs:
+                    if not d.get("text_snippet") and d.get("_id"):
+                        try:
+                            full = self.db.documents.find_one({"_id": d["_id"]}, {"text_content": 1})
+                            if full and full.get("text_content"):
+                                snippet = full["text_content"][:220] + ("..." if len(full["text_content"]) > 220 else "")
+                                d["text_snippet"] = snippet
+                                self.db.documents.update_one({"_id": d["_id"]}, {"$set": {"text_snippet": snippet}})
+                        except Exception:
+                            pass
+                return docs
             except Exception as e:
                 logger.warning(f"MongoDB document read failed: {e}")
 
@@ -235,6 +247,9 @@ class MongoDBManager:
             self._ensure_local_dirs()
             with open(self.documents_file, "r", encoding="utf-8") as fp:
                 items = json.load(fp)
+            for it in items:
+                if not it.get("text_snippet") and it.get("text_content"):
+                    it["text_snippet"] = it["text_content"][:220] + ("..." if len(it["text_content"]) > 220 else "")
             return items[:limit]
         except Exception:
             return []
