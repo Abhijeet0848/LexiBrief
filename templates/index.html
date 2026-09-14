@@ -150,6 +150,31 @@
       );
     }
 
+    // Modern SVG Icons for Tabs & Action Buttons
+    const SparklesIcon = ({ className = "w-4 h-4" }) => (
+      <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+        <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z"/>
+      </svg>
+    );
+
+    const DocumentIcon = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+      </svg>
+    );
+
+    const HistoryIcon = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+    );
+
+    const ChartIcon = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+      </svg>
+    );
+
     function App() {
       // Navigation
       const [activeTab, setActiveTab] = useState('summarize');
@@ -576,10 +601,10 @@
               {/* Desktop Navigation Tabs - Modern Segmented Capsule */}
               <nav className="hidden md:flex items-center p-1 bg-slate-100/90 rounded-2xl border border-slate-200/80 shadow-2xs gap-1">
                 {[
-                  { id: 'summarize', label: 'Summarize', icon: '✨' },
-                  { id: 'documents', label: 'Documents', icon: '📄', count: documentsList.length },
-                  { id: 'history', label: 'History', icon: '🕘', count: summariesList.length },
-                  { id: 'benchmarks', label: 'ROUGE Metrics', icon: '📊' }
+                  { id: 'summarize', label: 'Summarize', icon: <SparklesIcon className="w-4 h-4 text-amber-500" /> },
+                  { id: 'documents', label: 'Documents', icon: <DocumentIcon className="w-4 h-4 text-indigo-600" />, count: documentsList.length },
+                  { id: 'history', label: 'History', icon: <HistoryIcon className="w-4 h-4 text-indigo-600" />, count: summariesList.length },
+                  { id: 'benchmarks', label: 'ROUGE Metrics', icon: <ChartIcon className="w-4 h-4 text-indigo-600" /> }
                 ].map(tab => {
                   const isActive = activeTab === tab.id;
                   return (
@@ -588,11 +613,11 @@
                       onClick={() => setActiveTab(tab.id)}
                       className={`relative px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all duration-200 select-none whitespace-nowrap ${
                         isActive
-                          ? 'bg-white text-indigo-600 font-bold shadow-xs border border-slate-200/60'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                          ? 'bg-white text-indigo-700 font-bold shadow-xs border border-indigo-100 ring-1 ring-indigo-500/10'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
                       }`}
                     >
-                      <span className={`transition-transform duration-200 ${isActive ? 'scale-110' : ''}`}>
+                      <span className={`transition-transform duration-200 flex items-center ${isActive ? 'scale-110' : 'opacity-70'}`}>
                         {tab.icon}
                       </span>
                       <span>{tab.label}</span>
@@ -635,10 +660,10 @@
             {mobileMenuOpen && (
               <div className="md:hidden border-t border-slate-200/80 bg-white/95 backdrop-blur-md px-3 py-3 space-y-1.5 shadow-lg animate-fadeIn">
                 {[
-                  { id: 'summarize', label: 'Summarize', icon: '✨', desc: 'Neural & Extractive Text Summarizer' },
-                  { id: 'documents', label: 'Documents', icon: '📄', count: documentsList.length, desc: 'Ingest & Manage PDF, DOCX, TXT' },
-                  { id: 'history', label: 'History', icon: '🕘', count: summariesList.length, desc: 'Previous Summaries & Records' },
-                  { id: 'benchmarks', label: 'ROUGE Metrics', icon: '📊', desc: 'NLP Benchmarks & Evaluator' }
+                  { id: 'summarize', label: 'Summarize', icon: <SparklesIcon className="w-4 h-4 text-amber-500" />, desc: 'Neural & Extractive Text Summarizer' },
+                  { id: 'documents', label: 'Documents', icon: <DocumentIcon className="w-4 h-4 text-indigo-600" />, count: documentsList.length, desc: 'Ingest & Manage PDF, DOCX, TXT' },
+                  { id: 'history', label: 'History', icon: <HistoryIcon className="w-4 h-4 text-indigo-600" />, count: summariesList.length, desc: 'Previous Summaries & Records' },
+                  { id: 'benchmarks', label: 'ROUGE Metrics', icon: <ChartIcon className="w-4 h-4 text-indigo-600" />, desc: 'NLP Benchmarks & Evaluator' }
                 ].map(tab => {
                   const isActive = activeTab === tab.id;
                   return (
@@ -655,7 +680,7 @@
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <span className="text-base p-1.5 rounded-lg bg-white border border-slate-200/80 shadow-2xs flex-shrink-0">{tab.icon}</span>
+                        <span className="p-2 rounded-lg bg-white border border-slate-200/80 shadow-2xs flex-shrink-0 flex items-center justify-center">{tab.icon}</span>
                         <div>
                           <div className="text-xs font-bold text-slate-900">{tab.label}</div>
                           <div className="text-[10px] text-slate-400 font-normal">{tab.desc}</div>
@@ -761,9 +786,10 @@
                           <button
                             onClick={handleSummarize}
                             disabled={isLoading}
-                            className="mt-2.5 w-full py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-2xs"
+                            className="mt-2.5 w-full py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-sm shadow-indigo-500/20 active:scale-[0.99]"
                           >
-                            <span>⚡ [ Analyze Document ]</span>
+                            <SparklesIcon className="w-3.5 h-3.5 text-amber-300" />
+                            <span>Summarize This Document</span>
                           </button>
                         </div>
                       )}
@@ -789,19 +815,31 @@
                       <button
                         onClick={handleSummarize}
                         disabled={isLoading || !inputText.trim() || !/[a-zA-Z0-9]/.test(inputText)}
-                        className={`px-5 sm:px-6 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm ${
+                        className={`group relative overflow-hidden px-6 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 flex items-center justify-center gap-2 ${
                           isLoading || !inputText.trim() || !/[a-zA-Z0-9]/.test(inputText)
-                            ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                            : 'bg-indigo-600 hover:bg-indigo-700 text-white active:scale-98'
+                            ? 'bg-slate-100 text-slate-400 border border-slate-200/80 cursor-not-allowed shadow-none'
+                            : 'bg-gradient-to-r from-indigo-600 via-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-md shadow-indigo-500/25 hover:shadow-lg hover:shadow-indigo-500/35 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]'
                         }`}
                       >
                         {isLoading ? (
                           <>
-                            <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
-                            <span>Summarizing...</span>
+                            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                            <span>Generating Summary...</span>
                           </>
                         ) : (
-                          <span>✨ Summarize</span>
+                          <>
+                            <SparklesIcon className={`w-4 h-4 transition-transform duration-200 ${
+                              !inputText.trim() || !/[a-zA-Z0-9]/.test(inputText)
+                                ? 'text-slate-400 opacity-60'
+                                : 'text-amber-300 drop-shadow-xs group-hover:scale-110 group-hover:rotate-12'
+                            }`} />
+                            <span className="tracking-wide">Summarize</span>
+                            {inputText.trim() && /[a-zA-Z0-9]/.test(inputText) && (
+                              <svg className="w-3.5 h-3.5 ml-0.5 text-white/70 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                              </svg>
+                            )}
+                          </>
                         )}
                       </button>
                     </div>
@@ -1655,10 +1693,10 @@
                     <button
                       onClick={handleComputeRouge}
                       disabled={rougeLoading || !rougeRef.trim() || !rougeCand.trim()}
-                      className={`w-full sm:w-auto px-6 py-3 rounded-xl font-bold text-xs sm:text-sm transition shadow-sm flex items-center justify-center gap-2 whitespace-nowrap active:scale-98 ${
+                      className={`group w-full sm:w-auto px-6 py-3 rounded-xl font-bold text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-2 whitespace-nowrap active:scale-[0.98] ${
                         rougeLoading || !rougeRef.trim() || !rougeCand.trim()
-                          ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                          : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-100'
+                          ? 'bg-slate-100 text-slate-400 border border-slate-200/80 cursor-not-allowed shadow-none'
+                          : 'bg-gradient-to-r from-indigo-600 via-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-md shadow-indigo-500/25 hover:shadow-lg hover:shadow-indigo-500/35 hover:-translate-y-0.5'
                       }`}
                     >
                       {rougeLoading ? (
@@ -1671,7 +1709,12 @@
                         </>
                       ) : (
                         <>
-                          <span>✨ Test Summary Accuracy</span>
+                          <SparklesIcon className={`w-4 h-4 transition-transform duration-200 ${
+                            !rougeRef.trim() || !rougeCand.trim()
+                              ? 'text-slate-400 opacity-60'
+                              : 'text-amber-300 drop-shadow-xs group-hover:scale-110 group-hover:rotate-12'
+                          }`} />
+                          <span>Calculate ROUGE Accuracy</span>
                         </>
                       )}
                     </button>
@@ -1935,12 +1978,12 @@
           )}
 
           {/* Mobile Bottom Navigation Bar for quick single-tap switching on small screens */}
-          <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 flex items-center justify-around py-1 px-1 shadow-lg">
+          <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 flex items-center justify-around py-1.5 px-2 shadow-lg">
             {[
-              { id: 'summarize', label: 'Summarize', icon: '✨' },
-              { id: 'documents', label: 'Docs', icon: '📄', count: documentsList.length },
-              { id: 'history', label: 'History', icon: '🕘', count: summariesList.length },
-              { id: 'benchmarks', label: 'ROUGE', icon: '📊' }
+              { id: 'summarize', label: 'Summarize', icon: <SparklesIcon className="w-5 h-5 text-amber-500" /> },
+              { id: 'documents', label: 'Docs', icon: <DocumentIcon className="w-5 h-5 text-indigo-600" />, count: documentsList.length },
+              { id: 'history', label: 'History', icon: <HistoryIcon className="w-5 h-5 text-indigo-600" />, count: summariesList.length },
+              { id: 'benchmarks', label: 'ROUGE', icon: <ChartIcon className="w-5 h-5 text-indigo-600" /> }
             ].map(tab => {
               const isActive = activeTab === tab.id;
               return (
@@ -1950,14 +1993,14 @@
                     setActiveTab(tab.id);
                     setMobileMenuOpen(false);
                   }}
-                  className={`relative flex flex-col items-center justify-center flex-1 py-1.5 px-1 rounded-xl transition-all ${
+                  className={`relative flex flex-col items-center justify-center flex-1 py-1 px-1 rounded-xl transition-all ${
                     isActive ? 'text-indigo-600 font-bold' : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
-                  <span className={`text-lg transition-transform duration-150 ${isActive ? 'scale-110' : ''}`}>
+                  <span className={`transition-transform duration-150 flex items-center justify-center ${isActive ? 'scale-110' : 'opacity-70'}`}>
                     {tab.icon}
                   </span>
-                  <span className="text-[10px] mt-0.5 font-medium leading-tight">{tab.label}</span>
+                  <span className="text-[10px] mt-1 font-medium leading-tight">{tab.label}</span>
                   {tab.count !== undefined && tab.count > 0 && (
                     <span className="absolute top-0.5 right-1/4 -translate-y-0.5 translate-x-2 bg-indigo-600 text-white text-[9px] font-bold px-1 rounded-full min-w-[14px] text-center shadow-2xs">
                       {tab.count}
