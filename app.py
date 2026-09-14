@@ -30,7 +30,8 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse, HTM
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any, List
+import uuid
+from typing import Optional, Dict, Any, List, Tuple
 import uvicorn
 import subprocess
 import time
