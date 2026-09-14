@@ -290,17 +290,9 @@
       // Speech Synthesis & Studio Neural Voice State
       const [isSpeaking, setIsSpeaking] = useState(false);
       const [audioLoading, setAudioLoading] = useState(false);
-      const [selectedVoice, setSelectedVoice] = useState(() => {
-        try { return localStorage.getItem('lexibrief_voice') || 'neerja'; } catch(e) { return 'neerja'; }
-      });
-      const [showVoiceSettings, setShowVoiceSettings] = useState(false);
+      const [selectedVoice, setSelectedVoice] = useState('neerja');
       const [voices, setVoices] = useState([]);
       const audioRef = useRef(null);
-
-      const handleSaveVoicePreference = (voiceId) => {
-        setSelectedVoice(voiceId);
-        try { localStorage.setItem('lexibrief_voice', voiceId); } catch(e) {}
-      };
 
       const showToast = (msg, type = 'info') => setToast({ message: msg, type });
 
@@ -1267,18 +1259,6 @@
                             </button>
 
                             <button
-                              onClick={() => setShowVoiceSettings(true)}
-                              className="btn-3d-secondary py-2 px-2 rounded-xl text-slate-700 font-semibold flex items-center gap-1 cursor-pointer text-xs"
-                              title="Voice Model & Accent Settings (Studio Neural Indian English)"
-                            >
-                              <span>🎙️</span>
-                              <span className="hidden md:inline text-[11px] font-bold text-indigo-600">
-                                {selectedVoice === 'prabhat' ? 'Prabhat (Studio)' : 'Neerja (Studio)'}
-                              </span>
-                              <span className="text-[8px] text-slate-400">⚙️</span>
-                            </button>
-
-                            <button
                               onClick={() => copyToClipboard(summaryResult.summary)}
                               className="btn-3d-secondary py-2 px-2.5 rounded-xl text-slate-700 font-semibold flex items-center gap-1 cursor-pointer text-xs"
                               title="Copy Summary"
@@ -2164,120 +2144,7 @@
 
           </main>
 
-          {/* Studio Neural Voice Settings Modal */}
-          {showVoiceSettings && (
-            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-              <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
-                {/* Header */}
-                <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-indigo-50/70 via-purple-50/50 to-white">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-bold text-lg shadow-md shadow-indigo-200">
-                      🎙️
-                    </div>
-                    <div>
-                      <h3 className="text-base font-bold text-slate-900 font-heading">
-                        Voice & Accent Engine
-                      </h3>
-                      <p className="text-xs text-slate-500">
-                        Studio Neural Indian English Voices • 100% Free & Zero Key
-                      </p>
-                    </div>
-                  </div>
 
-                  <button
-                    onClick={() => setShowVoiceSettings(false)}
-                    className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center text-sm font-bold transition"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                {/* Body */}
-                <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
-                  {/* Voice Options */}
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-2 font-heading">
-                      Select Authentic Indian Voice
-                    </label>
-                    <div className="space-y-2.5">
-                      {[
-                        {
-                          id: 'neerja',
-                          name: 'Neerja (Studio Indian Female)',
-                          badge: 'Ultra-Realistic Female',
-                          desc: 'Studio-grade neural Indian English voice with natural human breath and cadence. 100% Free, zero config.',
-                          tag: '⭐ Default / Top Pick',
-                          icon: '🇮🇳'
-                        },
-                        {
-                          id: 'prabhat',
-                          name: 'Prabhat (Studio Indian Male)',
-                          badge: 'Ultra-Realistic Male',
-                          desc: 'Studio-grade neural Indian male voice with warm, natural authoritative human tone. 100% Free, zero config.',
-                          tag: '⭐ Studio Quality',
-                          icon: '🇮🇳'
-                        }
-                      ].map(v => (
-                        <div
-                          key={v.id}
-                          onClick={() => handleSaveVoicePreference(v.id)}
-                          className={`p-4 rounded-2xl border-2 transition cursor-pointer flex items-center justify-between gap-3 ${
-                            selectedVoice === v.id
-                              ? 'border-indigo-600 bg-indigo-50/50 shadow-xs ring-1 ring-indigo-200'
-                              : 'border-slate-200 hover:border-indigo-200 bg-white'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="radio"
-                              name="voiceChoice"
-                              checked={selectedVoice === v.id}
-                              onChange={() => handleSaveVoicePreference(v.id)}
-                              className="w-4 h-4 text-indigo-600 focus:ring-indigo-500"
-                            />
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-slate-900">{v.name}</span>
-                                <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded-md border border-indigo-100">
-                                  {v.tag}
-                                </span>
-                              </div>
-                              <p className="text-[11px] text-slate-500 mt-0.5">{v.desc}</p>
-                            </div>
-                          </div>
-                          <span className="text-xl flex-shrink-0">{v.icon}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Free & Zero Key Highlight Banner */}
-                  <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 flex items-center gap-3">
-                    <span className="text-xl">⚡</span>
-                    <div className="text-xs text-emerald-900">
-                      <p className="font-bold">100% Free & No Setup Required</p>
-                      <p className="text-[11px] text-emerald-700 mt-0.5">
-                        High-definition neural speech synthesis is pre-configured and ready to play immediately.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                  <span className="text-[11px] text-slate-500">
-                    Active Voice: <b className="text-indigo-600">{selectedVoice === 'prabhat' ? 'Prabhat (Male)' : 'Neerja (Female)'}</b>
-                  </span>
-                  <button
-                    onClick={() => setShowVoiceSettings(false)}
-                    className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-xs"
-                  >
-                    Done
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Document Full-Text Preview Modal */}
           {previewDoc && (
