@@ -85,16 +85,10 @@
     }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-900 antialiased selection:bg-indigo-600 selection:text-white relative min-h-screen">
+<body class="text-slate-900 antialiased selection:bg-indigo-600 selection:text-white min-h-screen relative overflow-x-hidden bg-slate-100" style="background-image: url('/static/background.jpg'); background-size: cover; background-position: center; background-attachment: fixed; background-repeat: no-repeat;">
   
-  <!-- Fixed NLP Linguistic Waves Background Backdrop -->
-  <div 
-    class="fixed inset-0 pointer-events-none z-0 opacity-25 sm:opacity-30 bg-cover bg-center bg-no-repeat transition-opacity duration-700" 
-    style="background-image: url('/static/background.jpg'); background-attachment: fixed;"
-  ></div>
-  <div 
-    class="fixed inset-0 pointer-events-none z-0 bg-gradient-to-b from-white/70 via-slate-50/80 to-slate-50/95"
-  ></div>
+  <!-- Ambient Soft Overlay for contrast & readability -->
+  <div class="fixed inset-0 pointer-events-none z-0 bg-slate-50/60 backdrop-blur-[0.5px]"></div>
 
   <div id="root" class="relative z-10"></div>
 
@@ -464,10 +458,10 @@
       }, [summariesList, historySearch]);
 
       return (
-        <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
+        <div className="min-h-screen flex flex-col bg-transparent text-slate-900">
           
           {/* Top Clean Header with Mobile Responsiveness */}
-          <header className="bg-white border-b border-slate-200 sticky top-0 z-30 card-shadow">
+          <header className="bg-white/90 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 shadow-xs">
             <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-2">
               
               {/* Brand Logo */}
