@@ -944,6 +944,50 @@
             </div>
 
             <div>
+                <h4 style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.6rem; font-weight: 700;">System & NLP Architecture</h4>
+                <div style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.9rem; overflow-x: auto;">
+                    <pre style="font-family: 'JetBrains Mono', monospace; font-size: 0.76rem; color: #1e293b; line-height: 1.35; margin: 0;">             ┌─────────────────────┐
+             │     User Input      │
+             │ Text / PDF / DOCX   │
+             └──────────┬──────────┘
+                        │
+                        ▼
+             ┌─────────────────────┐
+             │ Text Extraction     │
+             │ & Preprocessing     │
+             └──────────┬──────────┘
+                        │
+                        ▼
+             ┌─────────────────────┐
+             │   NLP Processing    │
+             │ Tokenization        │
+             │ Sentence Splitting  │
+             │ Keywords            │
+             └──────────┬──────────┘
+                        │
+             ┌──────────┴──────────┐
+             ▼                     ▼
+ ┌────────────────────┐   ┌────────────────────┐
+ │ Extractive         │   │ Abstractive        │
+ │ Summarization      │   │ Summarization      │
+ │ TF-IDF / TextRank  │   │ Transformer Model  │
+ └─────────┬──────────┘   └─────────┬──────────┘
+           │                        │
+           └──────────┬─────────────┘
+                      ▼
+             ┌─────────────────────┐
+             │ Generated Summary   │
+             └──────────┬──────────┘
+                        │
+                        ▼
+             ┌─────────────────────┐
+             │ Evaluation          │
+             │ ROUGE / Similarity  │
+             └─────────────────────┘</pre>
+                </div>
+            </div>
+
+            <div>
                 <h4 style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.6rem; font-weight: 700;">Modular Pipeline Stages</h4>
                 <div class="pipeline-steps">
                     <div class="step-item active">

@@ -31,21 +31,63 @@
 
 ---
 
-## 🏗️ Modular MLOps Architecture
+## 🏗️ System & NLP Architecture
 
-```mermaid
-flowchart LR
-    A[Data Ingestion] --> B[Data Validation]
-    B --> C[Data Transformation]
-    C --> D[Pegasus Model Trainer]
-    D --> E[Model Evaluation]
-    E --> F[(ROUGE Metrics & Model Artifacts)]
-    F --> G[FastAPI Inference Engine]
-    G --> H[Glassmorphic Web UI]
-    G --> I[REST API / Swagger Docs]
+```text
+             ┌─────────────────────┐
+             │     User Input      │
+             │                     │
+             │ Text / PDF / DOCX   │
+             └──────────┬──────────┘
+                        │
+                        ▼
+             ┌─────────────────────┐
+             │ Text Extraction     │
+             │ & Preprocessing     │
+             └──────────┬──────────┘
+                        │
+                        ▼
+             ┌─────────────────────┐
+             │   NLP Processing    │
+             │ Tokenization        │
+             │ Sentence Splitting  │
+             │ Keywords            │
+             └──────────┬──────────┘
+                        │
+             ┌──────────┴──────────┐
+             ▼                     ▼
+ ┌────────────────────┐   ┌────────────────────┐
+ │ Extractive         │   │ Abstractive        │
+ │ Summarization      │   │ Summarization      │
+ │                    │   │                    │
+ │ TF-IDF / TextRank  │   │ Transformer Model  │
+ └─────────┬──────────┘   └─────────┬──────────┘
+           │                        │
+           └──────────┬─────────────┘
+                      ▼
+             ┌─────────────────────┐
+             │ Generated Summary   │
+             └──────────┬──────────┘
+                        │
+                        ▼
+             ┌─────────────────────┐
+             │ Evaluation          │
+             │ ROUGE / Similarity  │
+             └─────────────────────┘
 ```
 
-### Pipeline Stages
+```mermaid
+flowchart TD
+    UI["📥 User Input (Text / PDF / DOCX)"] --> EXT["⚙️ Text Extraction & Preprocessing"]
+    EXT --> NLP["🔍 NLP Processing (Tokenization, Sentence Splitting, Keywords)"]
+    NLP --> EXTRACTIVE["📊 Extractive Summarization (TF-IDF / TextRank)"]
+    NLP --> ABSTRACTIVE["🧠 Abstractive Summarization (Pegasus Transformer)"]
+    EXTRACTIVE --> GEN["📄 Generated Summary"]
+    ABSTRACTIVE --> GEN
+    GEN --> EVAL["📈 Evaluation (ROUGE-1, ROUGE-2, ROUGE-L)"]
+```
+
+### Modular MLOps Pipeline Stages
 1. **`Stage 01: Data Ingestion`**: Downloads and extracts raw text corpora (e.g., SAMSum dataset).
 2. **`Stage 02: Data Validation`**: Checks data integrity and schema conformity against requirements.
 3. **`Stage 03: Data Transformation`**: Tokenizes input dialogues and summaries into dense tensor representations.
