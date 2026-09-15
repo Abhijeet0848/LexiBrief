@@ -61,6 +61,7 @@ class MongoDBManager:
         """Attempts to initialize connection to MongoDB."""
         is_serverless = bool(os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME") or os.getenv("NOW_REGION"))
         if is_serverless and ("localhost" in self.mongo_url or "127.0.0.1" in self.mongo_url):
+            self.last_connection_error = "Serverless environment detected without external MONGODB_URL configured in Vercel."
             logger.info("Serverless environment detected without external MongoDB URL. Using resilient /tmp storage.")
             self.use_mongo = False
             self._ensure_local_dirs()
@@ -73,9 +74,11 @@ class MongoDBManager:
             self.client.admin.command('ping')
             self.db = self.client[self.db_name]
             self.use_mongo = True
+            self.last_connection_error = None
             safe_url = self.mongo_url.split("@")[-1] if "@" in self.mongo_url else self.mongo_url
             logger.info(f"Connected to MongoDB server at {safe_url} (Database: {self.db_name})")
         except Exception as e:
+            self.last_connection_error = str(e)
             logger.info(f"MongoDB cloud/local connection notice ({e}). Operating in resilient local storage mode.")
             self.use_mongo = False
             self._ensure_local_dirs()
@@ -345,6 +348,7 @@ class MongoDBManager:
             "engine": "MongoDB (Atlas Cloud / Local)" if self.use_mongo else "MongoDB (Resilient Local Engine)",
             "status": "connected" if self.use_mongo else "active",
             "database": self.db_name,
+            "connection_error": getattr(self, "last_connection_error", None),
             "collections": {
                 "summaries": len(summaries),
                 "documents": len(documents)
