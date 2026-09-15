@@ -197,39 +197,53 @@ class TextExtractor:
         # 2. Fetch transcript via youtube_transcript_api (compatible with v1.2.4+ and older versions)
         try:
             from youtube_transcript_api import YouTubeTranscriptApi
-            transcript_list = None
+            languages = ['en', 'en-US', 'en-GB', 'hi', 'mr', 'bn', 'ta', 'te', 'gu', 'kn', 'ml', 'ur', 'pa', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'zh', 'ja', 'ar']
             
-            # Try new v1.2+ API (instance based)
+            # Tier 1: Modern Instance API (v1.2.4+)
             try:
                 ytt = YouTubeTranscriptApi()
                 try:
                     t_list = ytt.list(video_id)
                     try:
-                        t = t_list.find_transcript(['en', 'en-US', 'en-GB', 'hi', 'es', 'fr', 'de'])
+                        t = t_list.find_transcript(languages)
                         transcript_list = t.fetch()
                     except Exception:
-                        for t in t_list:
+                        try:
+                            t = t_list.find_generated_transcript(languages)
                             transcript_list = t.fetch()
-                            break
+                        except Exception:
+                            all_transcripts = list(getattr(t_list, '_manually_created_transcripts', {}).values()) + list(getattr(t_list, '_generated_transcripts', {}).values())
+                            if all_transcripts:
+                                transcript_list = all_transcripts[0].fetch()
                 except Exception:
-                    transcript_list = ytt.fetch(video_id)
-            except Exception:
-                pass
+                    try:
+                        transcript_list = ytt.fetch(video_id, languages=languages)
+                    except Exception:
+                        transcript_list = ytt.fetch(video_id)
+            except Exception as e1:
+                logger.debug(f"Instance transcript API notice: {e1}")
 
-            # Try legacy static API if instance didn't work
+            # Tier 2: Static / Legacy API
             if not transcript_list:
                 try:
                     if hasattr(YouTubeTranscriptApi, 'list_transcripts'):
                         t_obj = YouTubeTranscriptApi.list_transcripts(video_id)
                         try:
-                            t = t_obj.find_transcript(['en', 'en-US', 'en-GB', 'hi', 'es', 'fr', 'de'])
+                            t = t_obj.find_transcript(languages)
                             transcript_list = t.fetch()
                         except Exception:
-                            for t in t_obj:
+                            try:
+                                t = t_obj.find_generated_transcript(languages)
                                 transcript_list = t.fetch()
-                                break
+                            except Exception:
+                                for t in t_obj:
+                                    transcript_list = t.fetch()
+                                    break
                     elif hasattr(YouTubeTranscriptApi, 'get_transcript'):
-                        transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
+                        try:
+                            transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=languages)
+                        except Exception:
+                            transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
                 except Exception as leg_err:
                     logger.debug(f"Legacy transcript method notice: {leg_err}")
 
