@@ -31,8 +31,23 @@ class MongoDBManager:
     """Manages persistence for Summaries and Documents in MongoDB with a local fallback engine."""
 
     def __init__(self, db_name: str = "lexibrief_db"):
-        self.db_name = os.getenv("MONGODB_DB", db_name)
         self.mongo_url = self._resolve_mongo_url()
+        
+        db_env = (os.getenv("MONGODB_DB") or "").strip()
+        if db_env:
+            self.db_name = db_env
+        else:
+            # Extract database name from connection URL if available
+            extracted_db = None
+            if self.mongo_url and "/" in self.mongo_url:
+                try:
+                    path_seg = self.mongo_url.split("/")[-1].split("?")[0].strip()
+                    if path_seg and path_seg not in ("admin", ""):
+                        extracted_db = path_seg
+                except Exception:
+                    pass
+            self.db_name = extracted_db or (db_name.strip() if db_name else "") or "lexibrief_db"
+
         self.client = None
         self.db = None
         self.use_mongo = False
