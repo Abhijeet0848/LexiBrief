@@ -9,7 +9,7 @@ __version__ = "0.0.0"
 REPO_NAME = "LexiBrief"
 AUTHOR_USER_NAME = "Abhijeet0848"
 SRC_REPO = "textSummarizer"
-AUTHOR_EMAIL = ""
+AUTHOR_EMAIL = "gautamabhijeet051@gmail.com"
 
 
 
