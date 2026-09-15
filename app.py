@@ -104,6 +104,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+import urllib.parse
+
 class VercelPathFixMiddleware:
     """Pure ASGI middleware to correct scope['path'] rewritten by Vercel serverless rewrites."""
     def __init__(self, app):
@@ -111,16 +113,16 @@ class VercelPathFixMiddleware:
 
     async def __call__(self, scope, receive, send):
         if scope.get("type") in ("http", "websocket"):
-            headers = dict(scope.get("headers", []))
-            matched_path = (
-                headers.get(b"x-matched-path", b"").decode("latin1")
-                or headers.get(b"x-vercel-matched-path", b"").decode("latin1")
-                or headers.get(b"x-forwarded-uri", b"").decode("latin1")
-            )
-            if matched_path:
-                clean_path = matched_path.split("?")[0]
-                scope["path"] = clean_path
-                scope["raw_path"] = clean_path.encode("latin1")
+            q_bytes = scope.get("query_string", b"")
+            if q_bytes and b"__path__=" in q_bytes:
+                params = urllib.parse.parse_qs(q_bytes.decode("latin1"), keep_blank_values=True)
+                if "__path__" in params:
+                    raw_p = params.pop("__path__")[0]
+                    clean_p = raw_p if raw_p.startswith("/") else ("/" + raw_p)
+                    clean_p = clean_p.rstrip("/") if len(clean_p) > 1 else clean_p
+                    scope["path"] = clean_p or "/"
+                    scope["raw_path"] = (clean_p or "/").encode("latin1")
+                    scope["query_string"] = urllib.parse.urlencode(params, doseq=True).encode("latin1")
             elif scope.get("path") in ("/api/index.py", "/api/index", "/index.py", "/index"):
                 scope["path"] = "/"
                 scope["raw_path"] = b"/"
@@ -689,14 +691,6 @@ async def predict_route(request: Request, background_tasks: BackgroundTasks):
                 selected_model = body.get("model_name", "bart")
                 selected_persona = body.get("persona", "general")
 
-        if input_text == "__debug__":
-            return JSONResponse({
-                "headers": dict(request.headers),
-                "scope_path": request.scope.get("path"),
-                "scope_raw_path": str(request.scope.get("raw_path")),
-                "scope_query": str(request.scope.get("query_string"))
-            })
-        
         if not input_text or not str(input_text).strip():
             raise HTTPException(status_code=400, detail="Input text cannot be empty.")
 
