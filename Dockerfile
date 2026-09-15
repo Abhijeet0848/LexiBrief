@@ -21,9 +21,7 @@ COPY . /app
 # Install local package in editable mode
 RUN pip install --no-cache-dir -e .
 
+EXPOSE 7860
 EXPOSE 8080
-
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-  CMD curl -f http://localhost:8080/api/health || exit 1
 
 CMD ["python", "app.py"]
