@@ -352,19 +352,23 @@ class NLPProcessor:
         "executive": {
             "revenue", "profit", "loss", "growth", "margin", "cost", "q1", "q2", "q3", "q4",
             "million", "billion", "percent", "%", "$", "increased", "decreased", "roi", "kpi",
-            "market", "strategic", "decision", "ebitda", "guidance", "target", "outcome", "earnings", "quarter", "annual"
+            "market", "strategic", "decision", "ebitda", "guidance", "target", "outcome", "earnings", "quarter", "annual",
+            "status", "state", "summary", "overview", "impact", "tracking", "account", "accounting", "governance", "unique", "resource", "usage", "identify", "identification", "pid"
         },
         "technical": {
             "api", "architecture", "framework", "database", "pipeline", "model", "transformer",
             "latency", "throughput", "algorithm", "neural", "gpu", "docker", "server", "code",
-            "function", "memory", "cpu", "scale", "performance", "deployment", "protocol", "parameter", "embedding", "loss", "accuracy"
+            "function", "memory", "cpu", "scale", "performance", "deployment", "protocol", "parameter", "embedding", "loss", "accuracy",
+            "scheduling", "queue", "queues", "descriptor", "descriptors", "devices", "device", "stack", "heap", "structure", "layout", "network", "allocated", "hardware", "i/o", "io", "pointers"
         },
         "eli5": {
-            "is", "are", "means", "example", "like", "simple", "main", "works", "help", "called", "known", "way", "idea", "part"
+            "is", "are", "means", "example", "like", "simple", "main", "works", "help", "called", "known", "way", "idea", "part",
+            "number", "shows", "look", "time", "what", "how", "easy", "unique", "files", "using", "open"
         },
         "action_items": {
             "must", "should", "will", "scheduled", "deploy", "implement", "prepare", "fix",
-            "review", "coordinate", "deadline", "todo", "action", "task", "deliverable", "assigned", "urgent", "step", "plan", "lock"
+            "review", "coordinate", "deadline", "todo", "action", "task", "deliverable", "assigned", "urgent", "step", "plan", "lock",
+            "information", "tracks", "helps", "allocated", "decide", "priority", "scheduling", "descriptors"
         }
     }
 

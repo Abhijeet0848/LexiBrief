@@ -77,28 +77,38 @@ class ExtractiveSummarizer:
             if persona_kw:
                 matching_persona_words = sum(1 for w in sentence_tokens[idx] if w in persona_kw)
                 if matching_persona_words > 0:
-                    persona_boost += (0.25 * matching_persona_words)
+                    persona_boost += (0.70 * matching_persona_words)
             
-            # Numeric & metric boosts for executive persona
+            # Executive persona: Prioritize high-level governance, KPIs, state, and resource metrics
             if persona_key == "executive":
                 if any(c.isdigit() or c in "$%€£" for c in sentence):
+                    persona_boost += 0.40
+                if idx in (0, 1):
                     persona_boost += 0.35
+            # Technical persona: Prioritize architectural components, data structures, and mechanics
+            elif persona_key == "technical":
+                lower_s = sentence.lower()
+                if any(kw in lower_s for kw in ["queue", "schedul", "descriptor", "stack", "heap", "i/o", "device", "memory space", "pointer"]):
+                    persona_boost += 0.50
             # Readability / simplicity boost for ELI5
             elif persona_key == "eli5":
-                if len(tokens) <= 15:
-                    persona_boost += 0.30
+                if len(tokens) <= 16:
+                    persona_boost += 0.45
+                lower_s = sentence.lower()
+                if any(w in lower_s for w in ["assigned to", "shows", "means", "identify", "running", "waiting"]):
+                    persona_boost += 0.40
             # Action item marker boost
             elif persona_key == "action_items":
                 lower_s = sentence.lower()
-                if any(w in lower_s for w in ["will", "should", "must", "todo", "action", "next step", "schedule", "deploy", "plan"]):
-                    persona_boost += 0.45
+                if any(w in lower_s for w in ["will", "should", "must", "todo", "action", "next step", "schedule", "deploy", "plan", "tracks", "helps", "allocated"]):
+                    persona_boost += 0.50
 
             # Length normalization (penalize overly short or overly verbose fragments)
             token_count = len(tokens)
             length_norm = math.sqrt(token_count) if token_count > 0 else 1.0
             
-            # Gentle position bias that respects semantic content saliency
-            position_multiplier = 1.05 if idx == 0 else 1.0
+            # Position multiplier
+            position_multiplier = 1.10 if (idx == 0 and persona_key != "technical") else 1.0
 
             final_score = (raw_score / length_norm) * position_multiplier * persona_boost
             scored_sentences.append((idx, final_score, sentence))
