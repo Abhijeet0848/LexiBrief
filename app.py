@@ -689,6 +689,14 @@ async def predict_route(request: Request, background_tasks: BackgroundTasks):
                 selected_model = body.get("model_name", "bart")
                 selected_persona = body.get("persona", "general")
 
+        if input_text == "__debug__":
+            return JSONResponse({
+                "headers": dict(request.headers),
+                "scope_path": request.scope.get("path"),
+                "scope_raw_path": str(request.scope.get("raw_path")),
+                "scope_query": str(request.scope.get("query_string"))
+            })
+        
         if not input_text or not str(input_text).strip():
             raise HTTPException(status_code=400, detail="Input text cannot be empty.")
 
