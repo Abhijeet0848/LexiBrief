@@ -41,9 +41,9 @@ class MongoDBManager:
 
     def _resolve_mongo_url(self) -> str:
         """Resolves MongoDB connection URL from individual credentials or full connection string."""
-        explicit_url = os.getenv("MONGODB_URL")
+        explicit_url = os.getenv("MONGODB_URL") or os.getenv("MONGO_URI") or os.getenv("MONGODB_URI") or os.getenv("DATABASE_URL")
         if explicit_url:
-            return explicit_url
+            return explicit_url.strip().strip("'\"")
 
         user = os.getenv("MONGODB_USER")
         pwd = os.getenv("MONGODB_PASSWORD")
@@ -68,7 +68,7 @@ class MongoDBManager:
 
         try:
             import pymongo
-            self.client = pymongo.MongoClient(self.mongo_url, serverSelectionTimeoutMS=1500, connectTimeoutMS=1500)
+            self.client = pymongo.MongoClient(self.mongo_url, serverSelectionTimeoutMS=5000, connectTimeoutMS=5000)
             # Test connection with ping
             self.client.admin.command('ping')
             self.db = self.client[self.db_name]
