@@ -104,19 +104,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.middleware("http")
-async def normalize_vercel_path(request: Request, call_next):
-    """Normalizes request paths when invoked through Vercel serverless rewrites."""
-    raw_path = request.scope.get("path", "")
-    matched_path = request.headers.get("x-matched-path")
-    
-    target_path = matched_path if (matched_path and matched_path != raw_path) else raw_path
-    for prefix in ["/api/index.py", "/api/index", "/index.py", "/index"]:
-        if target_path == prefix or target_path.startswith(prefix + "/"):
-            target_path = target_path[len(prefix):] or "/"
-            break
-    request.scope["path"] = target_path
-    return await call_next(request)
+class VercelPathFixMiddleware:
+    """Pure ASGI middleware to correct scope['path'] rewritten by Vercel serverless rewrites."""
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") in ("http", "websocket"):
+            headers = dict(scope.get("headers", []))
+            matched_path = (
+                headers.get(b"x-matched-path", b"").decode("latin1")
+                or headers.get(b"x-vercel-matched-path", b"").decode("latin1")
+                or headers.get(b"x-forwarded-uri", b"").decode("latin1")
+            )
+            if matched_path:
+                clean_path = matched_path.split("?")[0]
+                scope["path"] = clean_path
+                scope["raw_path"] = clean_path.encode("latin1")
+            elif scope.get("path") in ("/api/index.py", "/api/index", "/index.py", "/index"):
+                scope["path"] = "/"
+                scope["raw_path"] = b"/"
+        await self.app(scope, receive, send)
+
+app.add_middleware(VercelPathFixMiddleware)
 
 if os.path.exists(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
