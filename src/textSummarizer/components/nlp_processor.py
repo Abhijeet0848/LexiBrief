@@ -227,9 +227,12 @@ class NLPProcessor:
         for idx, sentence in enumerate(sentences):
             words = sent_tokens[idx]
             token_count = len(words)
+            if token_count == 0:
+                continue
             kw_score = sum(top_kw.get(w, 0) for w in words)
             pos_weight = 1.05 if idx == 0 else 1.0
-            score = (kw_score / math.sqrt(token_count)) * pos_weight
+            norm = math.sqrt(token_count) if token_count > 0 else 1.0
+            score = (kw_score / norm) * pos_weight
             scored.append((idx, score, sentence))
 
         if not scored:
