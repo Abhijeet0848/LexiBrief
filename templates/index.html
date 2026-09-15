@@ -519,10 +519,15 @@
       };
 
       // URL / YouTube Content Ingestion Handler
-      const handleFetchUrl = async () => {
-        if (!urlInput.trim()) {
+      const handleFetchUrl = async (overrideUrl = null) => {
+        const targetUrl = (typeof overrideUrl === 'string' && overrideUrl.trim()) ? overrideUrl.trim() : urlInput.trim();
+        if (!targetUrl) {
           showToast("Please enter a valid web article URL or YouTube video link.", "error");
-          return;
+          return null;
+        }
+
+        if (typeof overrideUrl === 'string' && overrideUrl.trim()) {
+          setUrlInput(overrideUrl.trim());
         }
 
         setUrlLoading(true);
@@ -530,7 +535,7 @@
           const res = await fetch('/api/fetch-url', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url: urlInput })
+            body: JSON.stringify({ url: targetUrl })
           });
 
           if (!res.ok) {
@@ -547,10 +552,12 @@
             pages: 1,
             words: data.words || data.stats?.words || 0
           });
-          showToast(`✓ Ingested ${(data.format === 'YOUTUBE' ? 'YouTube video' : 'article')} "${(data.title || 'Web Resource').slice(0, 35)}..."`, "success");
+          showToast(`✓ Ingested ${(data.format === 'YOUTUBE' ? 'YouTube video' : 'article')} "${(data.title || 'Web Resource').slice(0, 35)}..." (${(data.words || 0).toLocaleString()} words)`, "success");
           fetchDocuments();
+          return data.text;
         } catch (err) {
           showToast(err.message, "error");
+          return null;
         } finally {
           setUrlLoading(false);
         }
@@ -558,7 +565,16 @@
 
       // Summarize with Persona and Attribution support
       const handleSummarize = async () => {
-        if (!inputText.trim() || !/[a-zA-Z0-9]/.test(inputText)) {
+        let textToSummarize = inputText;
+        
+        // Auto-fetch if in URL tab and text is empty or unchanged but URL is present
+        if ((!textToSummarize.trim() || !/[a-zA-Z0-9]/.test(textToSummarize)) && urlInput.trim()) {
+          showToast("Fetching URL content before generating brief...", "info");
+          textToSummarize = await handleFetchUrl(urlInput);
+          if (!textToSummarize) return;
+        }
+
+        if (!textToSummarize || !textToSummarize.trim() || !/[a-zA-Z0-9]/.test(textToSummarize)) {
           showToast("Please enter text, upload a document, or fetch a URL.", "error");
           return;
         }
@@ -569,7 +585,7 @@
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              text: inputText,
+              text: textToSummarize,
               mode: summaryMode,
               method: engineMethod,
               model_name: modelChoice,
@@ -1121,20 +1137,22 @@
                             <span className="font-semibold text-slate-500">Try demo links:</span>
                             <button
                               onClick={() => {
-                                setUrlInput('https://en.wikipedia.org/wiki/Artificial_intelligence');
+                                handleFetchUrl('https://en.wikipedia.org/wiki/Artificial_intelligence');
                               }}
-                              className="underline hover:text-indigo-900 cursor-pointer"
+                              className="underline hover:text-indigo-900 cursor-pointer font-medium"
+                              title="Click to auto-fetch Wikipedia article"
                             >
                               Wikipedia AI
                             </button>
                             <span>•</span>
                             <button
                               onClick={() => {
-                                setUrlInput('https://www.youtube.com/watch?v=kCc8FmEb1nY');
+                                handleFetchUrl('https://www.youtube.com/watch?v=kCc8FmEb1nY');
                               }}
-                              className="underline hover:text-indigo-900 cursor-pointer text-red-600"
+                              className="underline hover:text-red-700 cursor-pointer text-red-600 font-medium"
+                              title="Click to auto-fetch Andrej Karpathy YouTube transcript"
                             >
-                              YouTube Andrej Karpathy NLP
+                              ▶️ YouTube Andrej Karpathy NLP
                             </button>
                           </div>
 

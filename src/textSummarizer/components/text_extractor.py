@@ -194,24 +194,44 @@ class TextExtractor:
         except Exception as oe_err:
             logger.debug(f"YouTube oEmbed notice: {oe_err}")
 
-        # 2. Fetch transcript via youtube_transcript_api
+        # 2. Fetch transcript via youtube_transcript_api (compatible with v1.2.4+ and older versions)
         try:
             from youtube_transcript_api import YouTubeTranscriptApi
-            # Try fetching available transcripts (manual or auto-generated)
             transcript_list = None
+            
+            # Try new v1.2+ API (instance based)
             try:
-                transcript_obj = YouTubeTranscriptApi.list_transcripts(video_id)
-                # Prefer English, then Hindi, then any available transcript
+                ytt = YouTubeTranscriptApi()
                 try:
-                    t = transcript_obj.find_transcript(['en', 'en-US', 'en-GB', 'hi', 'es', 'fr', 'de'])
-                    transcript_list = t.fetch()
-                except Exception:
-                    # Fallback to any first available transcript
-                    for t in transcript_obj:
+                    t_list = ytt.list(video_id)
+                    try:
+                        t = t_list.find_transcript(['en', 'en-US', 'en-GB', 'hi', 'es', 'fr', 'de'])
                         transcript_list = t.fetch()
-                        break
+                    except Exception:
+                        for t in t_list:
+                            transcript_list = t.fetch()
+                            break
+                except Exception:
+                    transcript_list = ytt.fetch(video_id)
             except Exception:
-                transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
+                pass
+
+            # Try legacy static API if instance didn't work
+            if not transcript_list:
+                try:
+                    if hasattr(YouTubeTranscriptApi, 'list_transcripts'):
+                        t_obj = YouTubeTranscriptApi.list_transcripts(video_id)
+                        try:
+                            t = t_obj.find_transcript(['en', 'en-US', 'en-GB', 'hi', 'es', 'fr', 'de'])
+                            transcript_list = t.fetch()
+                        except Exception:
+                            for t in t_obj:
+                                transcript_list = t.fetch()
+                                break
+                    elif hasattr(YouTubeTranscriptApi, 'get_transcript'):
+                        transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
+                except Exception as leg_err:
+                    logger.debug(f"Legacy transcript method notice: {leg_err}")
 
             if not transcript_list:
                 raise ValueError("No subtitles or transcripts available for this YouTube video.")
@@ -219,11 +239,13 @@ class TextExtractor:
             full_text_pieces = []
             formatted_chunks = []
             for item in transcript_list:
-                snippet = item.get("text", "").replace("\n", " ").strip()
+                snippet = getattr(item, 'text', item.get('text', '') if isinstance(item, dict) else '')
+                snippet = str(snippet).replace("\n", " ").strip()
                 if not snippet:
                     continue
                 full_text_pieces.append(snippet)
-                start_sec = int(item.get("start", 0))
+                start_raw = getattr(item, 'start', item.get('start', 0) if isinstance(item, dict) else 0)
+                start_sec = int(float(start_raw))
                 minutes = start_sec // 60
                 seconds = start_sec % 60
                 timestamp_str = f"{minutes:02d}:{seconds:02d}"
