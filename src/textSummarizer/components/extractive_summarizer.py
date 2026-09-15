@@ -127,6 +127,15 @@ class ExtractiveSummarizer:
 
         if persona_key == "action_items":
             return "\n".join(f"• {item[2].strip()}" for item in chronological)
+        elif persona_key == "executive":
+            body = " ".join(item[2].strip() for item in chronological)
+            return f"📌 Executive Summary:\n{body}"
+        elif persona_key == "technical":
+            body = " ".join(item[2].strip() for item in chronological)
+            return f"⚙️ Technical Architecture & Specs:\n{body}"
+        elif persona_key == "eli5":
+            body = " ".join(item[2].strip() for item in chronological)
+            return f"💡 Plain-English Concept:\n{body}"
         
         return " ".join(item[2] for item in chronological)
 

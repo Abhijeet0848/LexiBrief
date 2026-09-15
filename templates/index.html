@@ -555,7 +555,9 @@
       };
 
       // Summarize with Persona and Attribution support
-      const handleSummarize = async () => {
+      const handleSummarize = async (overrides = {}) => {
+        const activePersona = (typeof overrides === 'object' && overrides?.personaOverride) ? overrides.personaOverride : persona;
+        const activeMode = (typeof overrides === 'object' && overrides?.modeOverride) ? overrides.modeOverride : summaryMode;
         let textToSummarize = inputText;
         
         // Auto-fetch if in URL tab and text is empty or unchanged but URL is present
@@ -577,10 +579,10 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               text: textToSummarize,
-              mode: summaryMode,
+              mode: activeMode,
               method: engineMethod,
               model_name: modelChoice,
-              persona: persona
+              persona: activePersona
             })
           });
 
@@ -593,12 +595,26 @@
           setSummaryResult(data);
           setHoveredSummarySentenceIdx(null);
           setSelectedSummarySentenceIdx(null);
-          showToast("Summary generated successfully!", "success");
+          showToast(`Brief generated with ${activePersona.replace('_', ' ').toUpperCase()} persona!`, "success");
           fetchSummaries();
         } catch (e) {
           showToast(e.message, "error");
         } finally {
           setIsLoading(false);
+        }
+      };
+
+      const handlePersonaClick = (pId) => {
+        setPersona(pId);
+        if (inputText && inputText.trim() && /[a-zA-Z0-9]/.test(inputText) && summaryResult) {
+          handleSummarize({ personaOverride: pId });
+        }
+      };
+
+      const handleModeClick = (mId) => {
+        setSummaryMode(mId);
+        if (inputText && inputText.trim() && /[a-zA-Z0-9]/.test(inputText) && summaryResult) {
+          handleSummarize({ modeOverride: mId });
         }
       };
 
@@ -981,7 +997,7 @@
                       ].map(p => (
                         <button
                           key={p.id}
-                          onClick={() => setPersona(p.id)}
+                          onClick={() => handlePersonaClick(p.id)}
                           className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all tab-3d cursor-pointer select-none whitespace-nowrap flex items-center gap-1.5 ${
                             persona === p.id
                               ? 'tab-3d-active text-indigo-700 font-bold'
@@ -1001,7 +1017,7 @@
                       {['concise', 'balanced', 'detailed'].map(m => (
                         <button
                           key={m}
-                          onClick={() => setSummaryMode(m)}
+                          onClick={() => handleModeClick(m)}
                           className={`px-3 py-1.5 text-xs font-semibold capitalize rounded-lg transition-all tab-3d cursor-pointer select-none whitespace-nowrap ${
                             summaryMode === m
                               ? 'tab-3d-active text-indigo-700 font-bold'
@@ -1376,7 +1392,7 @@
                           {/* Summary Output Box with Interactive Sentence Spans */}
                           <div className="p-4 sm:p-5 rounded-2xl bg-slate-50/70 border border-slate-200 text-slate-800 text-sm sm:text-base leading-relaxed min-h-[160px] shadow-inner font-sans">
                             {summaryResult.attribution?.attribution_map?.length > 0 ? (
-                              <div>
+                              <div className="whitespace-pre-line space-y-1">
                                 {summaryResult.attribution.attribution_map.map((item, idx) => {
                                   const isHovered = hoveredSummarySentenceIdx === idx;
                                   const isSelected = selectedSummarySentenceIdx === idx;
