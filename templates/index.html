@@ -507,16 +507,7 @@
         });
       }, [documentsList, docSearch, docFormatFilter]);
 
-      // Sample Text Ingestion Helpers
-      const handleLoadSample = () => {
-        setInputText("Artificial intelligence (AI) and Natural Language Processing (NLP) are revolutionizing modern text comprehension. Deep neural transformer models like Google Pegasus and BART Seq2Seq excel at capturing contextual nuances and long-range semantic dependencies. Unlike legacy extractive systems that merely splice sentences, abstractive summarizers generate coherent, human-like summaries that condense dense documents by up to 80% while preserving crucial information.");
-        showToast("✓ Loaded sample NLP article into editor", "info");
-      };
 
-      const handleLoadResearchSample = () => {
-        setInputText("Recent advancements in Large Language Models (LLMs) have demonstrated emergent reasoning capabilities across diverse NLP benchmarks. However, high computational costs and memory latency during autoregressive decoding remain key bottlenecks for edge deployments. In this work, we evaluate hybrid quantization algorithms and model distillation techniques, achieving a 3.4x speedup with minimal degradation in ROUGE-1 and ROUGE-L evaluation scores.");
-        showToast("✓ Loaded AI research paper snippet", "info");
-      };
 
       // URL / YouTube Content Ingestion Handler
       const handleFetchUrl = async (overrideUrl = null) => {
@@ -1073,23 +1064,7 @@
                           </button>
                         </div>
 
-                        {/* Presets dropdown/shortcuts for quick demo */}
-                        <div className="hidden sm:flex items-center gap-1.5">
-                          <button
-                            onClick={handleLoadSample}
-                            className="text-[11px] font-semibold text-slate-500 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 px-2 py-1 rounded-lg border border-slate-200 transition"
-                            title="Load Sample Text"
-                          >
-                            Sample 1
-                          </button>
-                          <button
-                            onClick={handleLoadResearchSample}
-                            className="text-[11px] font-semibold text-slate-500 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 px-2 py-1 rounded-lg border border-slate-200 transition"
-                            title="Load Research Sample"
-                          >
-                            Sample 2
-                          </button>
-                        </div>
+
                       </div>
 
                       {/* URL / YouTube Ingestion Panel */}
@@ -1132,29 +1107,7 @@
                             </button>
                           </div>
 
-                          {/* Quick URL Suggestions */}
-                          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-indigo-700">
-                            <span className="font-semibold text-slate-500">Try demo links:</span>
-                            <button
-                              onClick={() => {
-                                handleFetchUrl('https://en.wikipedia.org/wiki/Artificial_intelligence');
-                              }}
-                              className="underline hover:text-indigo-900 cursor-pointer font-medium"
-                              title="Click to auto-fetch Wikipedia article"
-                            >
-                              Wikipedia AI
-                            </button>
-                            <span>•</span>
-                            <button
-                              onClick={() => {
-                                handleFetchUrl('https://www.youtube.com/watch?v=kCc8FmEb1nY');
-                              }}
-                              className="underline hover:text-red-700 cursor-pointer text-red-600 font-medium"
-                              title="Click to auto-fetch Andrej Karpathy YouTube transcript"
-                            >
-                              ▶️ YouTube Andrej Karpathy NLP
-                            </button>
-                          </div>
+
 
                           {/* YouTube Metadata Preview Card */}
                           {urlDocData && urlDocData.format === 'YOUTUBE' && (
