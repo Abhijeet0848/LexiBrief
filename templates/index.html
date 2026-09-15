@@ -542,6 +542,7 @@
 
           setInputText(extractedText);
           setUrlDocData(data);
+          setSourceViewMode('editor');
           setUploadedDocInfo({
             filename: data.title || (data.format === 'YOUTUBE' ? 'YouTube Transcript' : 'Web Resource'),
             format: data.format || 'WEB_URL',
@@ -565,14 +566,18 @@
         const activeMode = (typeof overrides === 'object' && overrides?.modeOverride) ? overrides.modeOverride : summaryMode;
         let textToSummarize = (typeof overrides === 'object' && overrides?.textOverride) ? overrides.textOverride : (inputText || urlDocData?.text || '');
         
-        // Auto-fetch if in URL tab and text is empty or unchanged but URL is present
-        if ((!textToSummarize || !textToSummarize.trim() || !/[a-zA-Z0-9]/.test(textToSummarize)) && urlInput.trim()) {
-          showToast("Fetching URL content before generating brief...", "info");
-          textToSummarize = await handleFetchUrl(urlInput);
+        // Auto-detect if user entered a URL in URL tab or directly in input
+        const isUrlInput = (inputSourceTab === 'url' && urlInput.trim()) || 
+          (textToSummarize && /^(https?:\/\/|youtu\.be\/)/i.test(textToSummarize.trim()));
+
+        if (isUrlInput && (!textToSummarize || /^(https?:\/\/|youtu\.be\/)/i.test(textToSummarize.trim()) || !/[a-zA-Z0-9\u0900-\u097F]/.test(textToSummarize))) {
+          const targetUrl = (inputSourceTab === 'url' && urlInput.trim()) ? urlInput.trim() : textToSummarize.trim();
+          showToast("Fetching video transcript/article content...", "info");
+          textToSummarize = await handleFetchUrl(targetUrl);
           if (!textToSummarize) return;
         }
 
-        if (!textToSummarize || !textToSummarize.trim() || !/[a-zA-Z0-9]/.test(textToSummarize)) {
+        if (!textToSummarize || !textToSummarize.trim() || !/[a-zA-Z0-9\u0900-\u097F]/.test(textToSummarize)) {
           showToast("Please enter text, upload a document, or fetch a URL.", "error");
           return;
         }
