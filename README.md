@@ -1,12 +1,3 @@
----
-title: LexiBrief NLP Engine
-emoji: ⚡
-colorFrom: indigo
-colorTo: purple
-sdk: docker
-app_port: 8080
----
-
 <div align="center">
 
 <img src="static/logo.jpg" alt="LexiBrief Logo" width="180" style="border-radius: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); margin-bottom: 12px;" />
