@@ -553,6 +553,39 @@
           fetchDocuments();
           return extractedText;
         } catch (err) {
+          // Client-Side YouTube Fallback: If cloud backend is blocked by YouTube rate-limits, fetch oEmbed and guide user
+          const ytMatch = targetUrl.match(/(?:v=|\/|youtu\.be\/|shorts\/)([0-9A-Za-z_-]{11})/);
+          const videoId = ytMatch ? ytMatch[1] : null;
+          if (videoId) {
+            try {
+              const oeRes = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
+              if (oeRes.ok) {
+                const oeData = await oeRes.json();
+                const title = oeData.title || `YouTube Video (${videoId})`;
+                const author = oeData.author_name || 'YouTube Creator';
+                const thumb = oeData.thumbnail_url || `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+                
+                setUrlDocData({
+                  format: 'YOUTUBE',
+                  title: title,
+                  author: author,
+                  thumbnail: thumb,
+                  video_id: videoId,
+                  source_url: targetUrl,
+                  is_fallback: true
+                });
+                setUploadedDocInfo({
+                  filename: title,
+                  format: 'YOUTUBE',
+                  pages: 1,
+                  words: 0
+                });
+                setSourceViewMode('editor');
+                showToast(`ℹ️ Video "${title.slice(0, 30)}..." recognized! Paste transcript below to summarize.`, "info", 6000);
+                return null;
+              }
+            } catch (oeErr) {}
+          }
           showToast(err.message, "error");
           return null;
         } finally {
@@ -1137,25 +1170,52 @@
 
                           {/* YouTube Metadata Preview Card */}
                           {urlDocData && urlDocData.format === 'YOUTUBE' && (
-                            <div className="p-3 rounded-xl bg-slate-900 text-white border border-slate-800 flex items-start gap-3 shadow-md animate-fadeIn">
-                              {urlDocData.thumbnail && (
-                                <img
-                                  src={urlDocData.thumbnail}
-                                  alt="Thumbnail"
-                                  className="w-24 h-16 object-cover rounded-lg flex-shrink-0 border border-slate-700"
-                                />
-                              )}
-                              <div className="min-w-0 flex-1 space-y-1">
-                                <div className="flex items-center gap-1.5 text-[10px] font-bold text-red-400">
-                                  <span>▶️</span> YouTube Video Transcript Ingested
-                                </div>
-                                <h4 className="text-xs font-bold text-white truncate">{urlDocData.title}</h4>
-                                <div className="flex items-center gap-3 text-[10px] text-slate-400">
-                                  <span>By: {urlDocData.author || 'Creator'}</span>
-                                  <span>•</span>
-                                  <span>{urlDocData.words?.toLocaleString()} words</span>
+                            <div className="space-y-2 animate-fadeIn">
+                              <div className="p-3 rounded-xl bg-slate-900 text-white border border-slate-800 flex items-start gap-3 shadow-md">
+                                {urlDocData.thumbnail && (
+                                  <img
+                                    src={urlDocData.thumbnail}
+                                    alt="Thumbnail"
+                                    className="w-24 h-16 object-cover rounded-lg flex-shrink-0 border border-slate-700"
+                                  />
+                                )}
+                                <div className="min-w-0 flex-1 space-y-1">
+                                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-red-400">
+                                    <span>▶️</span> {urlDocData.is_fallback ? 'YouTube Video Linked' : 'YouTube Video Transcript Ingested'}
+                                  </div>
+                                  <h4 className="text-xs font-bold text-white truncate">{urlDocData.title}</h4>
+                                  <div className="flex items-center gap-3 text-[10px] text-slate-400">
+                                    <span>By: {urlDocData.author || 'Creator'}</span>
+                                    {urlDocData.words > 0 && (
+                                      <>
+                                        <span>•</span>
+                                        <span>{urlDocData.words?.toLocaleString()} words</span>
+                                      </>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
+
+                              {urlDocData.is_fallback && (
+                                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-900 space-y-2 text-xs">
+                                  <div className="font-bold flex items-center gap-1.5 text-amber-900">
+                                    <span>⚡</span> YouTube Cloud Anti-Bot Notice
+                                  </div>
+                                  <p className="text-amber-800 text-[11px] leading-relaxed">
+                                    Cloud servers (Vercel) are rate-limited by YouTube. You can copy the transcript in 1 click from YouTube and paste it into the editor below for instant AI summarization:
+                                  </p>
+                                  <div className="flex items-center gap-2 pt-1">
+                                    <a
+                                      href={`https://www.youtube.com/watch?v=${urlDocData.video_id || ''}`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs shadow-2xs transition"
+                                    >
+                                      <span>📺</span> Open YouTube Video & Transcript ↗
+                                    </a>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
