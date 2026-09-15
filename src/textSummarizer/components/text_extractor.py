@@ -205,18 +205,20 @@ class TextExtractor:
                 ytt = YouTubeTranscriptApi()
                 try:
                     t_list = ytt.list(video_id)
+                    target_transcript = None
                     try:
-                        t = t_list.find_transcript(languages)
-                        transcript_list = t.fetch()
+                        target_transcript = t_list.find_transcript(languages)
                     except Exception:
                         try:
-                            t = t_list.find_generated_transcript(languages)
-                            transcript_list = t.fetch()
+                            target_transcript = t_list.find_generated_transcript(languages)
                         except Exception:
-                            all_transcripts = list(getattr(t_list, '_manually_created_transcripts', {}).values()) + list(getattr(t_list, '_generated_transcripts', {}).values())
-                            if all_transcripts:
-                                transcript_list = all_transcripts[0].fetch()
-                except Exception:
+                            for t in t_list:
+                                target_transcript = t
+                                break
+                    if target_transcript:
+                        transcript_list = target_transcript.fetch()
+                except Exception as list_err:
+                    logger.debug(f"Instance list notice: {list_err}")
                     try:
                         transcript_list = ytt.fetch(video_id, languages=languages)
                     except Exception:
@@ -229,17 +231,18 @@ class TextExtractor:
                 try:
                     if hasattr(YouTubeTranscriptApi, 'list_transcripts'):
                         t_obj = YouTubeTranscriptApi.list_transcripts(video_id)
+                        target_t = None
                         try:
-                            t = t_obj.find_transcript(languages)
-                            transcript_list = t.fetch()
+                            target_t = t_obj.find_transcript(languages)
                         except Exception:
                             try:
-                                t = t_obj.find_generated_transcript(languages)
-                                transcript_list = t.fetch()
+                                target_t = t_obj.find_generated_transcript(languages)
                             except Exception:
                                 for t in t_obj:
-                                    transcript_list = t.fetch()
+                                    target_t = t
                                     break
+                        if target_t:
+                            transcript_list = target_t.fetch()
                     elif hasattr(YouTubeTranscriptApi, 'get_transcript'):
                         try:
                             transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=languages)
