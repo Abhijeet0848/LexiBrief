@@ -195,6 +195,7 @@ class TextExtractor:
             logger.debug(f"YouTube oEmbed notice: {oe_err}")
 
         # 2. Fetch transcript via youtube_transcript_api (compatible with v1.2.4+ and older versions)
+        transcript_list = None
         try:
             from youtube_transcript_api import YouTubeTranscriptApi
             languages = ['en', 'en-US', 'en-GB', 'hi', 'mr', 'bn', 'ta', 'te', 'gu', 'kn', 'ml', 'ur', 'pa', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'zh', 'ja', 'ar']
