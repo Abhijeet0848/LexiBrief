@@ -24,14 +24,17 @@
 
 </div>
 
-## 🚀 Key Features
+## 🚀 Key Features & Differentiators
 
+- 🔍 **Explainable Source Attribution & Traceability Mapping**: Hover or click over any summary sentence to highlight its exact matching origin sentence in the source text with real-time confidence scores.
+- 🎭 **5 Persona & Role-Tailored Output Profiles**: Instant mode switching between **General**, **Executive (C-Suite KPIs & Finances)**, **Technical (Deep-Dive & Architecture)**, **ELI5 (Simplified Core Concepts)**, and **Action Items (Milestones & Deliverables)**.
+- 🌐 **Live Web Article & YouTube Video Ingestion**: Enter any public URL or YouTube video link to automatically parse article text or fetch timestamped video transcripts.
 - 🧠 **Dual Extractive & Deep Transformer Engine**: Seq2Seq neural summarization paired with TF-IDF semantic saliency ranking.
 - 🎛️ **Adaptive Compression Modes**: Switch between **Concise** *(high condensation)*, **Balanced** *(recommended)*, and **Detailed** *(comprehensive)* summary lengths.
 - ⚡ **Real-Time Telemetry & ROUGE Evaluation**: Live calculation of word/character compression ratios, reading time savings, and ROUGE-1/ROUGE-2/ROUGE-L F1 accuracy scores.
 - 📄 **Multi-Format Document Ingestion**: Drag-and-drop parsing for PDF, DOCX, and TXT documents.
 - 🍃 **MongoDB Atlas Cloud Persistence**: Dual collections for `summaries` and `documents` with resilient local storage fallback.
-- 🎨 **Modern Minimalist UI**: Clean, light-mode interface with audio text-to-speech reader, key takeaways extraction, and JSON/TXT export tools.
+- 🎨 **Modern Minimalist UI**: Clean interface with studio-grade text-to-speech reader, key takeaways extraction, and JSON/TXT export tools.
 
 ---
 

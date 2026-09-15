@@ -261,10 +261,23 @@
       const [uploadLoading, setUploadLoading] = useState(false);
       const [toast, setToast] = useState(null);
 
-      // Model Settings
+      // Model & Persona Settings
       const [engineMethod, setEngineMethod] = useState('auto');
       const [modelChoice, setModelChoice] = useState('bart');
       const [summaryMode, setSummaryMode] = useState('balanced');
+      const [persona, setPersona] = useState('general'); // 'general', 'executive', 'technical', 'eli5', 'action_items'
+
+      // Multi-Source Ingestion & URL / YouTube State
+      const [inputSourceTab, setInputSourceTab] = useState('text'); // 'text', 'upload', 'url'
+      const [urlInput, setUrlInput] = useState('');
+      const [urlLoading, setUrlLoading] = useState(false);
+      const [urlDocData, setUrlDocData] = useState(null);
+
+      // Explainable Source Attribution Highlighting State
+      const [hoveredSummarySentenceIdx, setHoveredSummarySentenceIdx] = useState(null);
+      const [selectedSummarySentenceIdx, setSelectedSummarySentenceIdx] = useState(null);
+      const [showAttributionInspector, setShowAttributionInspector] = useState(false);
+      const [sourceViewMode, setSourceViewMode] = useState('editor'); // 'editor', 'traceability'
 
       // Lists & Search
       const [summariesList, setSummariesList] = useState([]);
@@ -505,10 +518,48 @@
         showToast("✓ Loaded AI research paper snippet", "info");
       };
 
-      // Summarize
+      // URL / YouTube Content Ingestion Handler
+      const handleFetchUrl = async () => {
+        if (!urlInput.trim()) {
+          showToast("Please enter a valid web article URL or YouTube video link.", "error");
+          return;
+        }
+
+        setUrlLoading(true);
+        try {
+          const res = await fetch('/api/fetch-url', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: urlInput })
+          });
+
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || "Failed to fetch content from URL.");
+          }
+
+          const data = await res.json();
+          setInputText(data.text || '');
+          setUrlDocData(data);
+          setUploadedDocInfo({
+            filename: data.title || (data.format === 'YOUTUBE' ? 'YouTube Transcript' : 'Web Resource'),
+            format: data.format || 'WEB_URL',
+            pages: 1,
+            words: data.words || data.stats?.words || 0
+          });
+          showToast(`✓ Ingested ${(data.format === 'YOUTUBE' ? 'YouTube video' : 'article')} "${(data.title || 'Web Resource').slice(0, 35)}..."`, "success");
+          fetchDocuments();
+        } catch (err) {
+          showToast(err.message, "error");
+        } finally {
+          setUrlLoading(false);
+        }
+      };
+
+      // Summarize with Persona and Attribution support
       const handleSummarize = async () => {
         if (!inputText.trim() || !/[a-zA-Z0-9]/.test(inputText)) {
-          showToast("Please enter text or upload a document.", "error");
+          showToast("Please enter text, upload a document, or fetch a URL.", "error");
           return;
         }
 
@@ -521,7 +572,8 @@
               text: inputText,
               mode: summaryMode,
               method: engineMethod,
-              model_name: modelChoice
+              model_name: modelChoice,
+              persona: persona
             })
           });
 
@@ -532,6 +584,8 @@
 
           const data = await res.json();
           setSummaryResult(data);
+          setHoveredSummarySentenceIdx(null);
+          setSelectedSummarySentenceIdx(null);
           showToast("Summary generated successfully!", "success");
           fetchSummaries();
         } catch (e) {
@@ -902,18 +956,46 @@
             {activeTab === 'summarize' && (
               <div className="space-y-5">
                 
-                {/* Control Toolbar - Clean Responsive Single-Line Layout */}
-                <div className="bg-white/95 backdrop-blur-xl border border-slate-200/90 rounded-2xl p-2 sm:p-3 flex items-center justify-between gap-2 shadow-xs">
+                {/* Control Toolbar - Length, Persona & Settings */}
+                <div className="bg-white/95 backdrop-blur-xl border border-slate-200/90 rounded-2xl p-3 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-xs">
                   
-                  {/* Left: Length Mode Switcher */}
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="text-slate-600 font-semibold hidden md:inline text-xs">Summary Length:</span>
+                  {/* Left: Persona Switcher */}
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 no-scrollbar">
+                    <span className="text-slate-600 font-bold text-xs whitespace-nowrap flex items-center gap-1.5">
+                      <span>🎭</span> Persona:
+                    </span>
+                    <div className="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200/80 gap-1 flex-shrink-0">
+                      {[
+                        { id: 'general', label: 'General', icon: '🌐' },
+                        { id: 'executive', label: 'Executive', icon: '👔' },
+                        { id: 'technical', label: 'Technical', icon: '💻' },
+                        { id: 'eli5', label: 'ELI5', icon: '🧒' },
+                        { id: 'action_items', label: 'Action Items', icon: '✅' }
+                      ].map(p => (
+                        <button
+                          key={p.id}
+                          onClick={() => setPersona(p.id)}
+                          className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all tab-3d cursor-pointer select-none whitespace-nowrap flex items-center gap-1.5 ${
+                            persona === p.id
+                              ? 'tab-3d-active text-indigo-700 font-bold'
+                              : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                          }`}
+                        >
+                          <span>{p.icon}</span>
+                          <span>{p.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Right: Length Mode Switcher & Clear */}
+                  <div className="flex items-center justify-between md:justify-end gap-2 text-xs">
                     <div className="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200/80 gap-1">
                       {['concise', 'balanced', 'detailed'].map(m => (
                         <button
                           key={m}
                           onClick={() => setSummaryMode(m)}
-                          className={`px-2.5 sm:px-3.5 py-1.5 text-xs font-semibold capitalize rounded-lg transition-all tab-3d cursor-pointer select-none whitespace-nowrap ${
+                          className={`px-3 py-1.5 text-xs font-semibold capitalize rounded-lg transition-all tab-3d cursor-pointer select-none whitespace-nowrap ${
                             summaryMode === m
                               ? 'tab-3d-active text-indigo-700 font-bold'
                               : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
@@ -923,90 +1005,270 @@
                         </button>
                       ))}
                     </div>
-                  </div>
 
-                  {/* Right: Clear Button */}
-                  <button
-                    onClick={() => { setInputText(''); setSummaryResult(null); }}
-                    className="btn-3d-secondary text-xs font-semibold text-slate-600 px-3 py-1.5 rounded-xl cursor-pointer flex items-center gap-1.5 hover:text-rose-600 select-none whitespace-nowrap"
-                    title="Clear Editor"
-                  >
-                    <span>✕</span>
-                    <span className="hidden sm:inline">Clear Text</span>
-                  </button>
+                    <button
+                      onClick={() => { setInputText(''); setSummaryResult(null); setUrlDocData(null); setUploadedDocInfo(null); setUrlInput(''); }}
+                      className="btn-3d-secondary text-xs font-semibold text-slate-600 px-3 py-1.5 rounded-xl cursor-pointer flex items-center gap-1.5 hover:text-rose-600 select-none whitespace-nowrap"
+                      title="Clear All Inputs"
+                    >
+                      <span>✕</span>
+                      <span className="hidden sm:inline">Reset</span>
+                    </button>
+                  </div>
 
                 </div>
 
-                {/* 2-Column Clean Workspace with 3D Glassmorphism & Hover Effects */}
+                {/* 2-Column Clean Workspace */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   
-                  {/* Left Column: Source Document Card */}
+                  {/* Left Column: Source Document & Ingestion Hub */}
                   <div className="bg-white/95 backdrop-blur-xl border border-slate-200/90 rounded-3xl p-5 sm:p-6 flex flex-col justify-between space-y-4 shadow-sm hover:shadow-xl hover:shadow-indigo-500/10 hover:border-indigo-300/80 transition-all duration-300 relative group">
-                    {/* Hover Ambient Top Accent Line */}
                     <div className="absolute top-0 left-8 right-8 h-[2px] bg-gradient-to-r from-transparent via-indigo-500 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
 
                     <div>
-                      {/* Header Bar */}
-                      <div className="flex flex-wrap items-center justify-between gap-2.5 mb-3.5">
-                        <div className="flex items-center gap-2.5">
-                          <span className="relative flex h-2.5 w-2.5">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-indigo-600"></span>
-                          </span>
-                          <span className="text-sm sm:text-base font-bold text-slate-900 font-heading tracking-tight">Source Document</span>
-                          <span className="text-[10px] font-semibold text-slate-500 bg-slate-100/90 px-2 py-0.5 rounded-full border border-slate-200/60 hidden sm:inline-block">
-                            Input Editor
-                          </span>
+                      {/* Ingestion Source Tabs */}
+                      <div className="flex items-center justify-between gap-2 mb-3">
+                        <div className="inline-flex bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 gap-1 w-full sm:w-auto">
+                          <button
+                            onClick={() => setInputSourceTab('text')}
+                            className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold transition tab-3d cursor-pointer select-none ${
+                              inputSourceTab === 'text' ? 'tab-3d-active text-indigo-700 font-extrabold' : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                          >
+                            ✍️ Direct Text
+                          </button>
+                          <button
+                            onClick={() => setInputSourceTab('upload')}
+                            className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold transition tab-3d cursor-pointer select-none ${
+                              inputSourceTab === 'upload' ? 'tab-3d-active text-indigo-700 font-extrabold' : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                          >
+                            📄 Upload File
+                          </button>
+                          <button
+                            onClick={() => setInputSourceTab('url')}
+                            className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold transition tab-3d cursor-pointer select-none flex items-center justify-center gap-1 ${
+                              inputSourceTab === 'url' ? 'tab-3d-active text-indigo-700 font-extrabold' : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                          >
+                            <span>🌐</span>
+                            <span>URL / YouTube</span>
+                            <span className="text-[9px] bg-indigo-100 text-indigo-800 px-1 py-0.2 rounded font-mono">NEW</span>
+                          </button>
                         </div>
-                        
-                        {/* Upload Button with 3D Tactile Hover */}
-                        <label className="btn-3d-secondary cursor-pointer inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-700 select-none">
-                          <DocumentIcon className="w-3.5 h-3.5 text-indigo-600" />
-                          <span>{uploadLoading ? '⏳ Reading...' : 'Upload PDF / DOCX / TXT'}</span>
-                          <input type="file" accept=".pdf,.docx,.txt" onChange={handleFileUpload} disabled={uploadLoading} className="hidden" />
-                        </label>
+
+                        {/* Presets dropdown/shortcuts for quick demo */}
+                        <div className="hidden sm:flex items-center gap-1.5">
+                          <button
+                            onClick={handleLoadSample}
+                            className="text-[11px] font-semibold text-slate-500 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 px-2 py-1 rounded-lg border border-slate-200 transition"
+                            title="Load Sample Text"
+                          >
+                            Sample 1
+                          </button>
+                          <button
+                            onClick={handleLoadResearchSample}
+                            className="text-[11px] font-semibold text-slate-500 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 px-2 py-1 rounded-lg border border-slate-200 transition"
+                            title="Load Research Sample"
+                          >
+                            Sample 2
+                          </button>
+                        </div>
                       </div>
 
+                      {/* URL / YouTube Ingestion Panel */}
+                      {inputSourceTab === 'url' && (
+                        <div className="mb-3.5 p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-100 space-y-3 animate-fadeIn">
+                          <div className="flex items-center justify-between text-xs text-indigo-900 font-bold">
+                            <span className="flex items-center gap-1.5">
+                              <span>🔗</span> Ingest Web Article or YouTube Video
+                            </span>
+                            <span className="text-[10px] text-indigo-600 font-normal">Extracts article text & video subtitles</span>
+                          </div>
 
-                      {/* Uploaded Document Info Card */}
-                      {uploadedDocInfo && (
-                        <div className="mb-3.5 p-3.5 rounded-2xl bg-slate-900 text-white border border-slate-800 shadow-md animate-fadeIn">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-xs">
-                              <span>✓</span> <span>Document Ingested Successfully</span>
-                            </div>
-                            <button 
-                              onClick={() => setUploadedDocInfo(null)}
-                              className="text-slate-400 hover:text-white text-xs px-2 py-0.5 rounded hover:bg-slate-800 transition"
-                              title="Dismiss card"
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                            <input
+                              type="url"
+                              value={urlInput}
+                              onChange={(e) => setUrlInput(e.target.value)}
+                              placeholder="Paste https://techcrunch.com/... or https://youtube.com/watch?v=..."
+                              className="flex-1 px-3.5 py-2 rounded-xl bg-white border border-indigo-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 placeholder-slate-400 font-sans shadow-2xs"
+                              onKeyDown={(e) => { if (e.key === 'Enter') handleFetchUrl(); }}
+                            />
+                            <button
+                              onClick={handleFetchUrl}
+                              disabled={urlLoading || !urlInput.trim()}
+                              className={`btn-3d-primary px-4 py-2 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer select-none ${
+                                urlLoading || !urlInput.trim() ? 'opacity-60 cursor-not-allowed' : ''
+                              }`}
                             >
-                              ✕
+                              {urlLoading ? (
+                                <>
+                                  <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                                  <span>Fetching...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span>⚡</span>
+                                  <span>Fetch Content</span>
+                                </>
+                              )}
                             </button>
                           </div>
-                          <div className="grid grid-cols-2 gap-y-1.5 text-xs text-slate-300 font-mono">
-                            <div><span className="text-slate-400 font-sans">File:</span> <span className="text-white font-bold">{uploadedDocInfo.filename}</span></div>
-                            <div><span className="text-slate-400 font-sans">Type:</span> <span className="text-indigo-300 font-bold">{uploadedDocInfo.format}</span></div>
-                            <div><span className="text-slate-400 font-sans">Pages:</span> <span className="text-white font-bold">{uploadedDocInfo.pages}</span></div>
-                            <div><span className="text-slate-400 font-sans">Words:</span> <span className="text-white font-bold">{uploadedDocInfo.words?.toLocaleString()}</span></div>
+
+                          {/* Quick URL Suggestions */}
+                          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-indigo-700">
+                            <span className="font-semibold text-slate-500">Try demo links:</span>
+                            <button
+                              onClick={() => {
+                                setUrlInput('https://en.wikipedia.org/wiki/Artificial_intelligence');
+                              }}
+                              className="underline hover:text-indigo-900 cursor-pointer"
+                            >
+                              Wikipedia AI
+                            </button>
+                            <span>•</span>
+                            <button
+                              onClick={() => {
+                                setUrlInput('https://www.youtube.com/watch?v=kCc8FmEb1nY');
+                              }}
+                              className="underline hover:text-indigo-900 cursor-pointer text-red-600"
+                            >
+                              YouTube Andrej Karpathy NLP
+                            </button>
                           </div>
-                          <button
-                            onClick={handleSummarize}
-                            disabled={isLoading}
-                            className="btn-3d-primary mt-3 w-full py-2.5 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
+
+                          {/* YouTube Metadata Preview Card */}
+                          {urlDocData && urlDocData.format === 'YOUTUBE' && (
+                            <div className="p-3 rounded-xl bg-slate-900 text-white border border-slate-800 flex items-start gap-3 shadow-md animate-fadeIn">
+                              {urlDocData.thumbnail && (
+                                <img
+                                  src={urlDocData.thumbnail}
+                                  alt="Thumbnail"
+                                  className="w-24 h-16 object-cover rounded-lg flex-shrink-0 border border-slate-700"
+                                />
+                              )}
+                              <div className="min-w-0 flex-1 space-y-1">
+                                <div className="flex items-center gap-1.5 text-[10px] font-bold text-red-400">
+                                  <span>▶️</span> YouTube Video Transcript Ingested
+                                </div>
+                                <h4 className="text-xs font-bold text-white truncate">{urlDocData.title}</h4>
+                                <div className="flex items-center gap-3 text-[10px] text-slate-400">
+                                  <span>By: {urlDocData.author || 'Creator'}</span>
+                                  <span>•</span>
+                                  <span>{urlDocData.words?.toLocaleString()} words</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* File Upload Drop Area */}
+                      {inputSourceTab === 'upload' && (
+                        <div
+                          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                          onDragLeave={() => setIsDragging(false)}
+                          onDrop={handleDrop}
+                          className={`mb-3.5 p-6 rounded-2xl border-2 border-dashed text-center transition-all animate-fadeIn ${
+                            isDragging
+                              ? 'border-indigo-500 bg-indigo-50/80 scale-[0.99]'
+                              : 'border-slate-200 bg-slate-50/60 hover:border-indigo-300'
+                          }`}
+                        >
+                          <div className="w-12 h-12 mx-auto mb-2 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                            <DocumentIcon className="w-6 h-6" />
+                          </div>
+                          <p className="text-xs font-bold text-slate-800">
+                            Drag & drop your PDF, DOCX, or TXT file here
+                          </p>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            Supports multi-page documents up to 15 MB
+                          </p>
+                          <label className="btn-3d-secondary mt-3 cursor-pointer inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-indigo-700 select-none">
+                            <span>Browse File</span>
+                            <input type="file" accept=".pdf,.docx,.txt" onChange={handleFileUpload} disabled={uploadLoading} className="hidden" />
+                          </label>
+                        </div>
+                      )}
+
+                      {/* Ingested Document Info Card */}
+                      {uploadedDocInfo && inputSourceTab !== 'url' && (
+                        <div className="mb-3.5 p-3 rounded-2xl bg-slate-900 text-white border border-slate-800 shadow-md animate-fadeIn flex items-center justify-between">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span className="text-emerald-400 text-sm font-bold">✓</span>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-white truncate">{uploadedDocInfo.filename}</p>
+                              <p className="text-[10px] text-slate-400">
+                                {uploadedDocInfo.format} • {uploadedDocInfo.words?.toLocaleString()} words
+                              </p>
+                            </div>
+                          </div>
+                          <button 
+                            onClick={() => setUploadedDocInfo(null)}
+                            className="text-slate-400 hover:text-white text-xs px-2 py-1 rounded hover:bg-slate-800 transition"
                           >
-                            <SparklesIcon className="w-4 h-4 text-amber-300" />
-                            <span>Summarize This Document</span>
+                            ✕
                           </button>
                         </div>
                       )}
 
-                      {/* Textarea Editor with Smooth Focus & Hover Glow */}
-                      <textarea
-                        value={inputText}
-                        onChange={(e) => setInputText(e.target.value)}
-                        placeholder="Paste or type text to summarize here..."
-                        className="w-full h-[380px] sm:h-[430px] min-h-[320px] p-4 sm:p-5 rounded-2xl bg-slate-50/60 hover:bg-slate-50/90 border border-slate-200/90 text-slate-800 text-sm leading-relaxed placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-y transition-all duration-200 shadow-inner font-sans"
-                      />
+                      {/* Source Text View Switcher Header (when summary has attribution) */}
+                      {summaryResult?.attribution?.source_sentences?.length > 0 && (
+                        <div className="flex items-center justify-between mb-2 px-1 text-xs">
+                          <span className="text-slate-500 font-semibold text-[11px]">
+                            {sourceViewMode === 'traceability' ? '🔍 Interactive Source Sentences' : 'Source Text Content'}
+                          </span>
+                          <button
+                            onClick={() => setSourceViewMode(sourceViewMode === 'editor' ? 'traceability' : 'editor')}
+                            className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100 transition flex items-center gap-1"
+                          >
+                            <span>{sourceViewMode === 'editor' ? '🔍 View Highlighted Sentences' : '✏️ View Raw Editor'}</span>
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Text Content: Editor vs Interactive Traceability Sentences */}
+                      {sourceViewMode === 'traceability' && summaryResult?.attribution?.source_sentences?.length > 0 ? (
+                        <div className="w-full h-[380px] sm:h-[430px] min-h-[320px] p-4 sm:p-5 rounded-2xl bg-slate-50/80 border border-slate-200 overflow-y-auto space-y-2 text-xs leading-relaxed font-sans shadow-inner">
+                          {summaryResult.attribution.source_sentences.map((sent, sIdx) => {
+                            // Find if this source sentence matches hovered or selected summary sentence
+                            const activeSummaryIdx = hoveredSummarySentenceIdx !== null ? hoveredSummarySentenceIdx : selectedSummarySentenceIdx;
+                            const isMatched = activeSummaryIdx !== null && summaryResult.attribution.attribution_map?.some(
+                              m => m.summary_idx === activeSummaryIdx && m.source_idx === sIdx
+                            );
+                            const matchedMap = isMatched ? summaryResult.attribution.attribution_map.find(m => m.summary_idx === activeSummaryIdx && m.source_idx === sIdx) : null;
+
+                            return (
+                              <div
+                                key={sIdx}
+                                className={`p-2 rounded-xl transition-all duration-200 border ${
+                                  isMatched
+                                    ? 'bg-amber-100/90 text-amber-950 border-amber-300 font-medium ring-2 ring-amber-400/40 shadow-sm'
+                                    : 'bg-white/70 text-slate-700 border-slate-100 hover:bg-white'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between gap-2 mb-1">
+                                  <span className="text-[10px] font-mono font-bold text-slate-400">Sentence #{sIdx + 1}</span>
+                                  {isMatched && (
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 border border-amber-300 animate-pulse">
+                                      🎯 Matched Point (Confidence: {matchedMap?.confidence}%)
+                                    </span>
+                                  )}
+                                </div>
+                                <p>{sent}</p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <textarea
+                          value={inputText}
+                          onChange={(e) => setInputText(e.target.value)}
+                          placeholder="Paste or type text to summarize here, or use the URL / File upload tabs above..."
+                          className="w-full h-[380px] sm:h-[430px] min-h-[320px] p-4 sm:p-5 rounded-2xl bg-slate-50/60 hover:bg-slate-50/90 border border-slate-200/90 text-slate-800 text-sm leading-relaxed placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-y transition-all duration-200 shadow-inner font-sans"
+                        />
+                      )}
                     </div>
 
                     {/* Footer Stats & Primary Summarize Button */}
@@ -1035,7 +1297,7 @@
                         {isLoading ? (
                           <>
                             <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                            <span>Generating Summary...</span>
+                            <span>Generating {persona !== 'general' ? persona.replace('_', ' ').toUpperCase() : ''} Brief...</span>
                           </>
                         ) : (
                           <>
@@ -1044,7 +1306,7 @@
                                 ? 'text-slate-400 opacity-60'
                                 : 'text-amber-300 drop-shadow-xs group-hover:scale-125 group-hover:rotate-12'
                             }`} />
-                            <span className="tracking-wide font-extrabold">Summarize</span>
+                            <span className="tracking-wide font-extrabold">Generate Brief</span>
                             {inputText.trim() && /[a-zA-Z0-9]/.test(inputText) && (
                               <svg className="w-4 h-4 ml-0.5 text-white/80 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
@@ -1056,28 +1318,31 @@
                     </div>
                   </div>
 
-                  {/* Right Column: Generated Summary Card with AI Studio Empty State */}
+                  {/* Right Column: Generated Summary Card with Explainable Attribution */}
                   <div className="bg-white/95 backdrop-blur-xl border border-slate-200/90 rounded-3xl p-5 sm:p-6 flex flex-col justify-between space-y-4 shadow-sm hover:shadow-xl hover:shadow-emerald-500/10 hover:border-emerald-300/80 transition-all duration-300 relative group">
-                    {/* Hover Ambient Top Accent Line */}
                     <div className="absolute top-0 left-8 right-8 h-[2px] bg-gradient-to-r from-transparent via-emerald-500 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
 
                     <div>
                       {/* Header Bar */}
-                      <div className="flex items-center justify-between mb-3.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-3.5">
                         <div className="flex items-center gap-2.5">
                           <span className="relative flex h-2.5 w-2.5">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                             <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                           </span>
-                          <span className="text-sm sm:text-base font-bold text-slate-900 font-heading tracking-tight">Generated Summary</span>
-                          <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 hidden sm:inline-block">
-                            AI Output
-                          </span>
+                          <span className="text-sm sm:text-base font-bold text-slate-900 font-heading tracking-tight">Executive Brief</span>
+                          {persona !== 'general' && (
+                            <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-100 uppercase">
+                              {persona.replace('_', ' ')}
+                            </span>
+                          )}
                         </div>
                         {summaryResult && (
-                          <span className="text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-md">
-                            {summaryResult.method_used}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-md">
+                              {summaryResult.method_used}
+                            </span>
+                          </div>
                         )}
                       </div>
 
@@ -1086,9 +1351,14 @@
                           
                           {/* Summary Metadata & Compression Banner */}
                           <div className="p-3.5 rounded-2xl bg-slate-900 text-white border border-slate-800 shadow-md space-y-2">
-                            <div className="flex items-center gap-1.5 text-xs text-indigo-300 font-bold">
-                              <span>🏷️</span>
-                              <span>{summaryResult.method_used || 'Abstractive Transformer'}</span>
+                            <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-1.5 text-indigo-300 font-bold">
+                                <span>🏷️</span>
+                                <span>{summaryResult.method_used || 'Abstractive Transformer'}</span>
+                              </div>
+                              <div className="text-[10px] text-emerald-400 font-mono">
+                                ⚡ {summaryResult.analytics?.latency_ms || 0}ms latency
+                              </div>
                             </div>
                             <div className="grid grid-cols-3 gap-2 pt-1.5 border-t border-slate-800 text-xs">
                               <div>
@@ -1116,10 +1386,91 @@
                             </div>
                           </div>
 
-                          {/* Summary Output Box */}
-                          <div className="p-4 sm:p-5 rounded-2xl bg-slate-50/70 border border-slate-200 text-slate-800 text-sm sm:text-base leading-relaxed min-h-[180px] shadow-inner font-sans">
-                            {summaryResult.summary}
+                          {/* Explainable Attribution Helper Hint */}
+                          {summaryResult.attribution?.attribution_map?.length > 0 && (
+                            <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200/80 flex items-center justify-between text-xs text-amber-900">
+                              <span className="flex items-center gap-1.5">
+                                <span>💡</span>
+                                <span><b>Interactive Source Attribution:</b> Hover over any sentence below to trace its source origin!</span>
+                              </span>
+                              <button
+                                onClick={() => setShowAttributionInspector(!showAttributionInspector)}
+                                className="text-[10px] font-bold text-amber-800 underline hover:text-amber-950 cursor-pointer"
+                              >
+                                {showAttributionInspector ? 'Hide Inspector' : 'Show Inspector'}
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Summary Output Box with Interactive Sentence Spans */}
+                          <div className="p-4 sm:p-5 rounded-2xl bg-slate-50/70 border border-slate-200 text-slate-800 text-sm sm:text-base leading-relaxed min-h-[160px] shadow-inner font-sans">
+                            {summaryResult.attribution?.attribution_map?.length > 0 ? (
+                              <div>
+                                {summaryResult.attribution.attribution_map.map((item, idx) => {
+                                  const isHovered = hoveredSummarySentenceIdx === idx;
+                                  const isSelected = selectedSummarySentenceIdx === idx;
+                                  const isActive = isHovered || isSelected;
+
+                                  return (
+                                    <span
+                                      key={idx}
+                                      onMouseEnter={() => {
+                                        setHoveredSummarySentenceIdx(idx);
+                                        setSourceViewMode('traceability');
+                                      }}
+                                      onMouseLeave={() => setHoveredSummarySentenceIdx(null)}
+                                      onClick={() => {
+                                        setSelectedSummarySentenceIdx(isSelected ? null : idx);
+                                        setSourceViewMode('traceability');
+                                      }}
+                                      className={`inline cursor-pointer rounded px-1 py-0.5 transition-all duration-150 mr-1 ${
+                                        isActive
+                                          ? 'bg-amber-200 text-amber-950 font-medium underline decoration-amber-500 decoration-2'
+                                          : 'hover:bg-indigo-100 hover:text-indigo-900'
+                                      }`}
+                                      title={`Click or hover to highlight source sentence in editor (Confidence: ${item.confidence}%)`}
+                                    >
+                                      {item.summary_sentence}{' '}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <div className="whitespace-pre-line">{summaryResult.summary}</div>
+                            )}
                           </div>
+
+                          {/* Live Sentence Attribution Inspector Drawer */}
+                          {(showAttributionInspector || hoveredSummarySentenceIdx !== null || selectedSummarySentenceIdx !== null) && summaryResult.attribution?.attribution_map?.length > 0 && (
+                            (() => {
+                              const targetIdx = hoveredSummarySentenceIdx !== null ? hoveredSummarySentenceIdx : (selectedSummarySentenceIdx !== null ? selectedSummarySentenceIdx : 0);
+                              const targetItem = summaryResult.attribution.attribution_map[targetIdx];
+                              if (!targetItem) return null;
+
+                              return (
+                                <div className="p-3.5 rounded-2xl bg-slate-900 text-white border border-slate-800 shadow-md space-y-2 animate-fadeIn text-xs">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-bold text-amber-400 flex items-center gap-1.5">
+                                      <span>🔍</span> Traceability Mapping for Sentence #{targetIdx + 1}
+                                    </span>
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500 text-slate-900">
+                                      {targetItem.confidence}% Confidence
+                                    </span>
+                                  </div>
+                                  <div className="space-y-1.5 text-[11px] pt-1 border-t border-slate-800">
+                                    <div>
+                                      <span className="text-slate-400 font-semibold block">Summary Statement:</span>
+                                      <span className="text-amber-200 italic font-medium">"{targetItem.summary_sentence}"</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-slate-400 font-semibold block">Matched Source Statement (Sentence #{targetItem.source_idx + 1}):</span>
+                                      <span className="text-slate-200 italic font-medium">"{targetItem.source_sentence}"</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })()
+                          )}
 
                           {/* Key Points Takeaways */}
                           {summaryResult.key_points && summaryResult.key_points.length > 0 && (
@@ -1174,38 +1525,35 @@
                       ) : (
                         /* AI Studio Empty State Hub */
                         <div className="h-[380px] sm:h-[430px] min-h-[320px] flex flex-col items-center justify-center text-center p-6 sm:p-8 rounded-2xl border-2 border-dashed border-indigo-200/80 bg-gradient-to-b from-indigo-50/40 via-purple-50/20 to-transparent relative overflow-hidden group/empty hover:border-indigo-400/90 transition-all duration-300">
-                          {/* 3D Animated AI Sparkle Orb */}
                           <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/30 flex items-center justify-center mb-3.5 transform group-hover/empty:scale-110 group-hover/empty:rotate-6 transition-all duration-300">
                             <SparklesIcon className="w-8 h-8 text-amber-300 drop-shadow-sm" />
                           </div>
                           
                           <span className="text-sm sm:text-base font-bold text-slate-800 font-heading">
-                            Summary will appear here
+                            Executive brief will appear here
                           </span>
                           <p className="text-xs text-slate-500 max-w-xs mt-1.5 leading-relaxed">
-                            Type or paste your text on the left, or upload a document to generate an abstractive or extractive summary.
+                            Select a persona above, paste text, upload a document, or enter a YouTube/Web URL.
                           </p>
 
-                          {/* High-tech feature badges */}
                           <div className="flex flex-wrap items-center justify-center gap-2 mt-4">
                             <span className="px-2.5 py-1 rounded-lg bg-white/90 border border-slate-200/80 text-[11px] font-semibold text-slate-600 shadow-2xs">
-                              🤖 Seq2Seq & TF-IDF
+                              🎭 5 Personas
                             </span>
                             <span className="px-2.5 py-1 rounded-lg bg-white/90 border border-slate-200/80 text-[11px] font-semibold text-slate-600 shadow-2xs">
-                              📊 ROUGE Scoring
+                              🔍 Source Attribution
                             </span>
                             <span className="px-2.5 py-1 rounded-lg bg-white/90 border border-slate-200/80 text-[11px] font-semibold text-slate-600 shadow-2xs">
-                              💾 Cloud History
+                              🌐 Web & YouTube
                             </span>
                           </div>
                         </div>
                       )}
                     </div>
 
-                    {/* Toolbar Actions - Responsive Mobile-Optimized Layout */}
+                    {/* Toolbar Actions */}
                     {summaryResult && (
                       <div className="flex flex-col gap-2.5 pt-3.5 border-t border-slate-100 text-xs">
-                        {/* Compression & Latency Stats Row */}
                         <div className="flex items-center justify-between text-xs text-slate-600 font-medium">
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200/80 font-bold text-[11px]">
                             <span>📉</span> {summaryResult.analytics?.compression_ratio || '0%'} compressed
@@ -1215,7 +1563,6 @@
                           </span>
                         </div>
 
-                        {/* Action Buttons Row */}
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <button
                             onClick={handleSaveSummary}

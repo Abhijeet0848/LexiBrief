@@ -144,8 +144,13 @@ class SummaryRequest(BaseModel):
     mode: Optional[str] = Field("balanced", description="Summary mode: 'concise', 'balanced', or 'detailed'")
     method: Optional[str] = Field("auto", description="Summarization engine: 'abstractive', 'extractive', or 'auto'")
     model_name: Optional[str] = Field("bart", description="Transformer architecture: 'bart', 't5', 'pegasus'")
+    persona: Optional[str] = Field("general", description="Persona profile: 'general', 'executive', 'technical', 'eli5', 'action_items'")
     max_length: Optional[int] = Field(None, description="Optional override for maximum tokens")
     min_length: Optional[int] = Field(None, description="Optional override for minimum tokens")
+
+
+class URLIngestRequest(BaseModel):
+    url: str = Field(..., description="Web article URL or YouTube video link")
 
 
 class RougeEvalRequest(BaseModel):
@@ -155,6 +160,7 @@ class RougeEvalRequest(BaseModel):
 
 class TTSRequest(BaseModel):
     text: str = Field(..., description="Text to synthesize to speech")
+    voice: Optional[str] = Field("neerja", description="Voice identifier ('neerja', 'prabhat' or language-specific)")
     speed: Optional[float] = Field(1.0, description="Speech rate multiplier")
 
 
@@ -332,6 +338,70 @@ async def upload_document(file: UploadFile = File(...)):
     except Exception as e:
         logger.error(f"File extraction error: {e}")
         raise HTTPException(status_code=500, detail=f"An error occurred while processing the uploaded file: {str(e)}")
+
+
+@app.post("/api/fetch-url", tags=["Text Extraction & MongoDB"])
+@app.post("/fetch-url", tags=["Text Extraction & MongoDB"], include_in_schema=False)
+async def fetch_url_content(req: URLIngestRequest):
+    """Fetches and cleans article text from web URLs or subtitle transcripts from YouTube videos."""
+    url_str = req.url.strip()
+    if not url_str:
+        raise HTTPException(status_code=400, detail="URL cannot be empty.")
+
+    try:
+        is_youtube = bool(TextExtractor.extract_youtube_video_id(url_str))
+        if is_youtube:
+            extracted_data = TextExtractor.extract_from_youtube(url_str)
+        else:
+            extracted_data = TextExtractor.extract_from_url(url_str)
+
+        extracted_text = extracted_data.get("text", "")
+        if not extracted_text or not extracted_text.strip():
+            raise HTTPException(status_code=400, detail="Could not extract readable text from the provided URL.")
+
+        stats = NLPProcessor.compute_stats(extracted_text)
+        keywords = NLPProcessor.extract_keywords(extracted_text, top_k=8)
+        key_points = NLPProcessor.extract_key_points(extracted_text, top_k=4)
+
+        doc_payload = {
+            "filename": extracted_data.get("title", "Web Resource"),
+            "format": extracted_data.get("format", "WEB_URL"),
+            "text": extracted_text,
+            "pages": 1,
+            "words": stats.get("words", 0),
+            "source_url": extracted_data.get("source_url", url_str),
+            "stats": stats,
+            "keywords": keywords,
+            "key_points": key_points
+        }
+
+        try:
+            saved_record = db_manager.save_document(doc_payload)
+            doc_id = saved_record.get("_id") if isinstance(saved_record, dict) else str(uuid.uuid4())
+        except Exception as db_err:
+            logger.warning(f"Database save error during URL ingest: {db_err}")
+            doc_id = str(uuid.uuid4())
+
+        return {
+            "id": doc_id,
+            "title": extracted_data.get("title", "Web Resource"),
+            "format": extracted_data.get("format", "WEB_URL"),
+            "author": extracted_data.get("author", ""),
+            "thumbnail": extracted_data.get("thumbnail", ""),
+            "chunks": extracted_data.get("chunks", []),
+            "text": extracted_text,
+            "words": stats.get("words", 0),
+            "source_url": extracted_data.get("source_url", url_str),
+            "stats": stats,
+            "keywords": keywords,
+            "key_points": key_points,
+            "saved_to_db": True
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"URL extraction error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.get("/api/documents", tags=["MongoDB Documents"])
@@ -580,6 +650,7 @@ async def predict_route(request: Request, background_tasks: BackgroundTasks):
         selected_mode = "balanced"
         selected_method = "auto"
         selected_model = "bart"
+        selected_persona = "general"
         max_len = None
         min_len = None
 
@@ -589,6 +660,7 @@ async def predict_route(request: Request, background_tasks: BackgroundTasks):
             selected_mode = body.get("mode", "balanced")
             selected_method = body.get("method", "auto")
             selected_model = body.get("model_name", "bart")
+            selected_persona = body.get("persona", "general")
             max_len = body.get("max_length")
             min_len = body.get("min_length")
         else:
@@ -598,12 +670,14 @@ async def predict_route(request: Request, background_tasks: BackgroundTasks):
                 selected_mode = form.get("mode", "balanced")
                 selected_method = form.get("method", "auto")
                 selected_model = form.get("model_name", "bart")
+                selected_persona = form.get("persona", "general")
             except Exception:
                 body = await request.json()
                 input_text = body.get("text", "")
                 selected_mode = body.get("mode", "balanced")
                 selected_method = body.get("method", "auto")
                 selected_model = body.get("model_name", "bart")
+                selected_persona = body.get("persona", "general")
 
         if not input_text or not str(input_text).strip():
             raise HTTPException(status_code=400, detail="Input text cannot be empty.")
@@ -621,6 +695,7 @@ async def predict_route(request: Request, background_tasks: BackgroundTasks):
             mode=selected_mode,
             method=selected_method,
             model_name=selected_model,
+            persona=selected_persona,
             max_length=max_len,
             min_length=min_len
         )
@@ -637,11 +712,13 @@ async def predict_route(request: Request, background_tasks: BackgroundTasks):
             "summary": summary_text,
             "key_points": prediction_result.get("key_points", []),
             "mode": selected_mode,
+            "persona": selected_persona,
             "method_used": prediction_result.get("method_used", selected_method),
             "model_source": prediction_result.get("model_source", "unknown"),
             "detected_language": prediction_result.get("detected_language", "en"),
             "language_name": prediction_result.get("language_name", "English"),
             "keywords": prediction_result.get("keywords", []),
+            "attribution": prediction_result.get("attribution", {}),
             "nlp_stats": prediction_result.get("nlp_stats", {}),
             "summary_stats": prediction_result.get("summary_stats", {}),
             "rouge": prediction_result.get("rouge", {}),
@@ -665,6 +742,8 @@ async def predict_route(request: Request, background_tasks: BackgroundTasks):
                 "key_points": result_payload["key_points"],
                 "keywords": result_payload["keywords"],
                 "mode": selected_mode,
+                "persona": selected_persona,
+                "attribution": result_payload["attribution"],
                 "method_used": prediction_result.get("method_used", selected_method),
                 "model_source": prediction_result.get("model_source", "unknown"),
                 "rouge": result_payload["rouge"],

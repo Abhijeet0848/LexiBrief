@@ -7,7 +7,7 @@ from textSummarizer.components.abstractive_summarizer import AbstractiveSummariz
 from textSummarizer.logging import logger
 
 class PredictionPipeline:
-    """Unified NLP Summarization Pipeline coordinating Extractive and Abstractive Transformer engines with LRU caching."""
+    """Unified NLP Summarization Pipeline coordinating Extractive and Abstractive Transformer engines with LRU caching, Persona routing, and Explainable Attribution."""
 
     def __init__(self):
         self.abstractive_engine = AbstractiveSummarizer()
@@ -15,8 +15,8 @@ class PredictionPipeline:
         self._cache: Dict[str, Dict[str, Any]] = {}
         self._max_cache_entries = 128
 
-    def _make_cache_key(self, text: str, mode: str, method: str, model_name: str, max_len: Optional[int], min_len: Optional[int]) -> str:
-        key_raw = f"{text}|{mode}|{method}|{model_name}|{max_len}|{min_len}"
+    def _make_cache_key(self, text: str, mode: str, method: str, model_name: str, persona: str, max_len: Optional[int], min_len: Optional[int]) -> str:
+        key_raw = f"{text}|{mode}|{method}|{model_name}|{persona}|{max_len}|{min_len}"
         return hashlib.sha256(key_raw.encode("utf-8")).hexdigest()
 
     def predict(
@@ -25,12 +25,13 @@ class PredictionPipeline:
         mode: str = "balanced",
         method: str = "auto",
         model_name: str = "bart",
+        persona: str = "general",
         max_length: Optional[int] = None,
         min_length: Optional[int] = None
     ) -> Dict[str, Any]:
         """
-        Executes high-speed end-to-end NLP summarization, keyword extraction, key-points extraction,
-        and ROUGE scoring in an optimized single-pass workflow.
+        Executes high-speed end-to-end NLP summarization, persona conditioning, keyword extraction,
+        explainable sentence attribution mapping, and ROUGE scoring in an optimized single-pass workflow.
         """
         cleaned_text = TextExtractor.clean_text(text)
         if not cleaned_text or not any(c.isalnum() for c in cleaned_text):
@@ -40,7 +41,9 @@ class PredictionPipeline:
                 "method_used": "none",
                 "model_source": "none",
                 "mode": mode,
+                "persona": persona,
                 "keywords": [],
+                "attribution": {"source_sentences": [], "summary_sentences": [], "attribution_map": []},
                 "nlp_stats": {},
                 "summary_stats": {},
                 "rouge": {
@@ -50,8 +53,10 @@ class PredictionPipeline:
                 }
             }
 
+        persona_clean = (persona or "general").lower().strip()
+
         # Check in-memory prediction cache
-        cache_key = self._make_cache_key(cleaned_text, mode, method, model_name, max_length, min_length)
+        cache_key = self._make_cache_key(cleaned_text, mode, method, model_name, persona_clean, max_length, min_length)
         if cache_key in self._cache:
             return self._cache[cache_key]
 
@@ -81,11 +86,16 @@ class PredictionPipeline:
         engine_used = ""
         model_source = ""
 
-        # 5. Engine selection (For non-English text, use high-speed multilingual extractive saliency)
-        if method == "extractive" or (method == "auto" and lang_code != "en"):
-            summary = self.extractive_engine.summarize(cleaned_text, ratio=cfg["ratio"], precomputed_sentences=pre_sentences)
-            engine_used = f"Multilingual Extractive ({lang_name})" if lang_code != "en" else "Extractive (TF-IDF Saliency)"
-            model_source = f"multilingual_{lang_code}_engine" if lang_code != "en" else "extractive_tfidf_engine"
+        # 5. Engine selection (For non-English text or extractive/persona requests)
+        if method == "extractive" or (method == "auto" and lang_code != "en") or persona_clean in ["executive", "technical", "eli5", "action_items"]:
+            summary = self.extractive_engine.summarize(
+                cleaned_text,
+                ratio=cfg["ratio"],
+                precomputed_sentences=pre_sentences,
+                persona=persona_clean
+            )
+            engine_used = f"Extractive Persona ({persona_clean.capitalize()})" if persona_clean != "general" else (f"Multilingual Extractive ({lang_name})" if lang_code != "en" else "Extractive (TF-IDF Saliency)")
+            model_source = f"extractive_persona_{persona_clean}" if persona_clean != "general" else (f"multilingual_{lang_code}_engine" if lang_code != "en" else "extractive_tfidf_engine")
         elif method == "abstractive":
             try:
                 summary = self.abstractive_engine.summarize(
@@ -98,10 +108,10 @@ class PredictionPipeline:
                 model_source = self.abstractive_engine.model_identifier
             except Exception as e:
                 logger.warning(f"Abstractive engine error: {e}. Falling back to Extractive TF-IDF.")
-                summary = self.extractive_engine.summarize(cleaned_text, ratio=cfg["ratio"], precomputed_sentences=pre_sentences)
+                summary = self.extractive_engine.summarize(cleaned_text, ratio=cfg["ratio"], precomputed_sentences=pre_sentences, persona=persona_clean)
                 engine_used = "Extractive Fallback (TF-IDF)"
                 model_source = "extractive_fallback_tfidf"
-        else:  # "auto" for English
+        else:  # "auto" for English general
             try:
                 summary = self.abstractive_engine.summarize(
                     cleaned_text,
@@ -113,14 +123,17 @@ class PredictionPipeline:
                 model_source = self.abstractive_engine.model_identifier
             except Exception as e:
                 logger.info(f"Auto-selected Extractive NLP engine (Transformer note: {e})")
-                summary = self.extractive_engine.summarize(cleaned_text, ratio=cfg["ratio"], precomputed_sentences=pre_sentences)
+                summary = self.extractive_engine.summarize(cleaned_text, ratio=cfg["ratio"], precomputed_sentences=pre_sentences, persona=persona_clean)
                 engine_used = "Extractive (TF-IDF / Saliency)"
                 model_source = "extractive_nlp_engine"
 
         # 6. Compute real-time ROUGE evaluation scores against original source text
         rouge_scores = NLPProcessor.compute_rouge(cleaned_text, summary)
 
-        # 7. Compute summary-specific NLP statistics
+        # 7. Compute Explainable Sentence Attribution Mapping
+        attribution_data = NLPProcessor.compute_attribution(cleaned_text, summary)
+
+        # 8. Compute summary-specific NLP statistics
         summary_stats = NLPProcessor.compute_stats(summary)
         summary_stats["language"] = lang_code
         summary_stats["language_name"] = lang_name
@@ -131,9 +144,11 @@ class PredictionPipeline:
             "method_used": engine_used,
             "model_source": model_source,
             "mode": mode,
+            "persona": persona_clean,
             "detected_language": lang_code,
             "language_name": lang_name,
             "keywords": keywords,
+            "attribution": attribution_data,
             "nlp_stats": nlp_stats,
             "summary_stats": summary_stats,
             "rouge": rouge_scores
@@ -141,7 +156,6 @@ class PredictionPipeline:
 
         # Store in LRU cache
         if len(self._cache) >= self._max_cache_entries:
-            # Pop the oldest entry
             self._cache.pop(next(iter(self._cache)))
         self._cache[cache_key] = result
 

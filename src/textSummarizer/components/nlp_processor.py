@@ -347,3 +347,113 @@ class NLPProcessor:
             "rouge2": {"precision": r2_p, "recall": r2_r, "f1": r2_f1},
             "rougeL": {"precision": rl_p, "recall": rl_r, "f1": rl_f1}
         }
+
+    PERSONA_KEYWORDS = {
+        "executive": {
+            "revenue", "profit", "loss", "growth", "margin", "cost", "q1", "q2", "q3", "q4",
+            "million", "billion", "percent", "%", "$", "increased", "decreased", "roi", "kpi",
+            "market", "strategic", "decision", "ebitda", "guidance", "target", "outcome", "earnings", "quarter", "annual"
+        },
+        "technical": {
+            "api", "architecture", "framework", "database", "pipeline", "model", "transformer",
+            "latency", "throughput", "algorithm", "neural", "gpu", "docker", "server", "code",
+            "function", "memory", "cpu", "scale", "performance", "deployment", "protocol", "parameter", "embedding", "loss", "accuracy"
+        },
+        "eli5": {
+            "is", "are", "means", "example", "like", "simple", "main", "works", "help", "called", "known", "way", "idea", "part"
+        },
+        "action_items": {
+            "must", "should", "will", "scheduled", "deploy", "implement", "prepare", "fix",
+            "review", "coordinate", "deadline", "todo", "action", "task", "deliverable", "assigned", "urgent", "step", "plan", "lock"
+        }
+    }
+
+    @classmethod
+    def compute_attribution(cls, source_text: str, summary_text: str) -> Dict[str, Any]:
+        """
+        Computes sentence-level semantic attribution mapping from summary sentences to original source sentences.
+        Uses TF-IDF, lexical overlap, and n-gram matching to calculate traceability confidence scores.
+        """
+        source_sentences = cls.split_sentences(source_text)
+        summary_sentences = cls.split_sentences(summary_text)
+
+        if not source_sentences or not summary_sentences:
+            return {
+                "source_sentences": source_sentences,
+                "summary_sentences": summary_sentences,
+                "attribution_map": []
+            }
+
+        # Tokenize source sentences
+        src_tokens_list = [cls.tokenize_words(s) for s in source_sentences]
+        num_src = len(source_sentences)
+
+        # Compute document frequencies across source sentences for TF-IDF
+        df_counts = Counter()
+        for toks in src_tokens_list:
+            unique_toks = set(toks)
+            for t in unique_toks:
+                if t not in cls.STOPWORDS:
+                    df_counts[t] += 1
+
+        attribution_map = []
+        for s_idx, sum_sent in enumerate(summary_sentences):
+            sum_toks = cls.tokenize_words(sum_sent)
+            if not sum_toks:
+                continue
+
+            sum_toks_filtered = [t for t in sum_toks if t not in cls.STOPWORDS]
+            sum_set = set(sum_toks_filtered) if sum_toks_filtered else set(sum_toks)
+            sum_bigrams = set(zip(sum_toks, sum_toks[1:])) if len(sum_toks) > 1 else set()
+
+            best_src_idx = 0
+            best_score = 0.0
+
+            for src_idx, src_sent in enumerate(source_sentences):
+                src_toks = src_tokens_list[src_idx]
+                if not src_toks:
+                    continue
+
+                src_toks_filtered = [t for t in src_toks if t not in cls.STOPWORDS]
+                src_set = set(src_toks_filtered) if src_toks_filtered else set(src_toks)
+
+                # 1. Jaccard token overlap
+                intersection = sum_set.intersection(src_set)
+                union = sum_set.union(src_set)
+                jaccard = len(intersection) / len(union) if union else 0.0
+
+                # 2. Bigram overlap
+                src_bigrams = set(zip(src_toks, src_toks[1:])) if len(src_toks) > 1 else set()
+                bg_intersection = sum_bigrams.intersection(src_bigrams)
+                bg_union = sum_bigrams.union(src_bigrams)
+                bg_score = len(bg_intersection) / len(bg_union) if bg_union else 0.0
+
+                # 3. Weighted TF-IDF cosine approximation
+                tfidf_score = 0.0
+                if intersection:
+                    tfidf_sum = sum(math.log((num_src + 1) / (df_counts.get(w, 1) + 1)) for w in intersection)
+                    tfidf_score = min(1.0, tfidf_sum / (math.sqrt(len(sum_set)) * math.sqrt(len(src_set)) + 1e-5))
+
+                combined = (0.50 * jaccard) + (0.30 * tfidf_score) + (0.20 * bg_score)
+
+                if combined > best_score:
+                    best_score = combined
+                    best_src_idx = src_idx
+
+            # Calculate normalized percentage confidence (minimum 45% floor for closest match, max 99%)
+            conf_pct = round(min(99.0, max(45.0, (best_score * 100) + 20.0)), 1) if best_score > 0.05 else round(min(99.0, best_score * 100), 1)
+
+            attribution_map.append({
+                "summary_idx": s_idx,
+                "summary_sentence": sum_sent,
+                "source_idx": best_src_idx,
+                "source_sentence": source_sentences[best_src_idx],
+                "confidence": conf_pct,
+                "score": round(best_score, 3)
+            })
+
+        return {
+            "source_sentences": source_sentences,
+            "summary_sentences": summary_sentences,
+            "attribution_map": attribution_map
+        }

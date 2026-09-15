@@ -44,9 +44,10 @@ class ExtractiveSummarizer:
         ratio: float = 0.35,
         min_sentences: int = 1,
         max_sentences: int = 10,
-        precomputed_sentences: Optional[List[str]] = None
+        precomputed_sentences: Optional[List[str]] = None,
+        persona: str = "general"
     ) -> str:
-        """Extracts top representative sentences using semantic saliency, position bias, and length penalties."""
+        """Extracts top representative sentences using semantic saliency, persona bias, position bias, and length penalties."""
         sentences = precomputed_sentences if precomputed_sentences is not None else NLPProcessor.split_sentences(text)
         if not sentences or len(sentences) <= 2:
             return text.strip()
@@ -59,6 +60,9 @@ class ExtractiveSummarizer:
 
         num_sentences = len(sentences)
         scored_sentences: List[Tuple[int, float, str]] = []
+        
+        persona_key = (persona or "general").lower().strip()
+        persona_kw = NLPProcessor.PERSONA_KEYWORDS.get(persona_key, set())
 
         for idx, sentence in enumerate(sentences):
             tokens = [w for w in sentence_tokens[idx] if w in word_weights]
@@ -68,6 +72,27 @@ class ExtractiveSummarizer:
             # Base score from keyword weights
             raw_score = sum(word_weights[w] for w in tokens)
             
+            # Persona-specific weighting boosts
+            persona_boost = 1.0
+            if persona_kw:
+                matching_persona_words = sum(1 for w in sentence_tokens[idx] if w in persona_kw)
+                if matching_persona_words > 0:
+                    persona_boost += (0.25 * matching_persona_words)
+            
+            # Numeric & metric boosts for executive persona
+            if persona_key == "executive":
+                if any(c.isdigit() or c in "$%€£" for c in sentence):
+                    persona_boost += 0.35
+            # Readability / simplicity boost for ELI5
+            elif persona_key == "eli5":
+                if len(tokens) <= 15:
+                    persona_boost += 0.30
+            # Action item marker boost
+            elif persona_key == "action_items":
+                lower_s = sentence.lower()
+                if any(w in lower_s for w in ["will", "should", "must", "todo", "action", "next step", "schedule", "deploy", "plan"]):
+                    persona_boost += 0.45
+
             # Length normalization (penalize overly short or overly verbose fragments)
             token_count = len(tokens)
             length_norm = math.sqrt(token_count) if token_count > 0 else 1.0
@@ -75,7 +100,7 @@ class ExtractiveSummarizer:
             # Gentle position bias that respects semantic content saliency
             position_multiplier = 1.05 if idx == 0 else 1.0
 
-            final_score = (raw_score / length_norm) * position_multiplier
+            final_score = (raw_score / length_norm) * position_multiplier * persona_boost
             scored_sentences.append((idx, final_score, sentence))
 
         if not scored_sentences:
@@ -89,5 +114,9 @@ class ExtractiveSummarizer:
         
         # Restore chronological order for narrative flow
         chronological = sorted(top_ranked, key=lambda item: item[0])
+
+        if persona_key == "action_items":
+            return "\n".join(f"• {item[2].strip()}" for item in chronological)
+        
         return " ".join(item[2] for item in chronological)
 

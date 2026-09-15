@@ -153,3 +153,156 @@ class TextExtractor:
         cleaned = cls.clean_text(raw)
         return cleaned, fmt, pages
 
+    @staticmethod
+    def extract_youtube_video_id(url: str) -> str:
+        """Extracts standard 11-character YouTube video ID from various URL structures."""
+        patterns = [
+            r'(?:v=|\/)([0-9A-Za-z_-]{11}).*',
+            r'(?:youtu\.be\/|embed\/|shorts\/)([0-9A-Za-z_-]{11})',
+            r'^([0-9A-Za-z_-]{11})$'
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, url.strip())
+            if match:
+                return match.group(1)
+        return ""
+
+    @classmethod
+    def extract_from_youtube(cls, url: str) -> dict:
+        """
+        Extracts subtitle transcript and metadata from a YouTube video URL.
+        Returns dict with video_id, title, thumbnail_url, text, and timestamped chunks.
+        """
+        video_id = cls.extract_youtube_video_id(url)
+        if not video_id:
+            raise ValueError("Invalid YouTube URL. Please provide a valid YouTube watch, short, or share link.")
+
+        title = f"YouTube Video ({video_id})"
+        author_name = "YouTube Creator"
+        thumbnail_url = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
+
+        # 1. Fetch metadata via zero-key oEmbed endpoint
+        try:
+            import requests
+            oembed_url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
+            resp = requests.get(oembed_url, timeout=5)
+            if resp.status_code == 200:
+                data = resp.json()
+                title = data.get("title", title)
+                author_name = data.get("author_name", author_name)
+                thumbnail_url = data.get("thumbnail_url", thumbnail_url)
+        except Exception as oe_err:
+            logger.debug(f"YouTube oEmbed notice: {oe_err}")
+
+        # 2. Fetch transcript via youtube_transcript_api
+        try:
+            from youtube_transcript_api import YouTubeTranscriptApi
+            # Try fetching available transcripts (manual or auto-generated)
+            transcript_list = None
+            try:
+                transcript_obj = YouTubeTranscriptApi.list_transcripts(video_id)
+                # Prefer English, then Hindi, then any available transcript
+                try:
+                    t = transcript_obj.find_transcript(['en', 'en-US', 'en-GB', 'hi', 'es', 'fr', 'de'])
+                    transcript_list = t.fetch()
+                except Exception:
+                    # Fallback to any first available transcript
+                    for t in transcript_obj:
+                        transcript_list = t.fetch()
+                        break
+            except Exception:
+                transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
+
+            if not transcript_list:
+                raise ValueError("No subtitles or transcripts available for this YouTube video.")
+
+            full_text_pieces = []
+            formatted_chunks = []
+            for item in transcript_list:
+                snippet = item.get("text", "").replace("\n", " ").strip()
+                if not snippet:
+                    continue
+                full_text_pieces.append(snippet)
+                start_sec = int(item.get("start", 0))
+                minutes = start_sec // 60
+                seconds = start_sec % 60
+                timestamp_str = f"{minutes:02d}:{seconds:02d}"
+                formatted_chunks.append({
+                    "time": timestamp_str,
+                    "seconds": start_sec,
+                    "text": snippet
+                })
+
+            full_text = cls.clean_text(" ".join(full_text_pieces))
+            return {
+                "video_id": video_id,
+                "title": title,
+                "author": author_name,
+                "thumbnail": thumbnail_url,
+                "text": full_text,
+                "chunks": formatted_chunks,
+                "format": "YOUTUBE",
+                "source_url": f"https://www.youtube.com/watch?v={video_id}"
+            }
+        except Exception as yt_err:
+            logger.error(f"YouTube transcript extraction error: {yt_err}")
+            raise ValueError(f"Could not retrieve transcript from YouTube video: {str(yt_err)}")
+
+    @classmethod
+    def extract_from_url(cls, url: str) -> dict:
+        """
+        Scrapes and extracts clean main article text and title from a web URL.
+        Removes navigation, scripts, ads, and footers.
+        """
+        import requests
+        from bs4 import BeautifulSoup
+
+        clean_url = url.strip()
+        if not clean_url.startswith(('http://', 'https://')):
+            clean_url = 'https://' + clean_url
+
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5'
+        }
+
+        try:
+            resp = requests.get(clean_url, headers=headers, timeout=12)
+            resp.raise_for_status()
+        except Exception as req_err:
+            raise ValueError(f"Failed to fetch content from URL: {str(req_err)}")
+
+        soup = BeautifulSoup(resp.content, 'html.parser')
+
+        # Extract title
+        page_title = "Web Article"
+        if soup.title and soup.title.string:
+            page_title = soup.title.string.strip()
+        elif soup.find('h1'):
+            page_title = soup.find('h1').get_text().strip()
+
+        # Remove irrelevant elements
+        for tag in soup(['script', 'style', 'nav', 'header', 'footer', 'aside', 'form', 'button', 'svg', 'noscript', 'iframe']):
+            tag.decompose()
+
+        # Extract main text content
+        main_content = soup.find('article') or soup.find('main') or soup.find('div', class_=re.compile(r'content|article|post|body|entry', re.I))
+        if main_content:
+            paragraphs = [p.get_text().strip() for p in main_content.find_all(['p', 'h2', 'h3', 'li']) if len(p.get_text().strip()) > 20]
+        else:
+            paragraphs = [p.get_text().strip() for p in soup.find_all('p') if len(p.get_text().strip()) > 20]
+
+        extracted_text = "\n\n".join(paragraphs) if paragraphs else soup.get_text(separator='\n')
+        cleaned_text = cls.clean_text(extracted_text)
+
+        if not cleaned_text or len(cleaned_text) < 50:
+            raise ValueError("Could not extract substantial article text from the provided webpage.")
+
+        return {
+            "title": page_title,
+            "text": cleaned_text,
+            "format": "WEB_URL",
+            "source_url": clean_url
+        }
+
