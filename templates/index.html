@@ -535,17 +535,22 @@
           }
 
           const data = await res.json();
-          setInputText(data.text || '');
+          const extractedText = (data && data.text) ? data.text.trim() : '';
+          if (!extractedText) {
+            throw new Error("No readable subtitles or text found for this link.");
+          }
+
+          setInputText(extractedText);
           setUrlDocData(data);
           setUploadedDocInfo({
             filename: data.title || (data.format === 'YOUTUBE' ? 'YouTube Transcript' : 'Web Resource'),
             format: data.format || 'WEB_URL',
             pages: 1,
-            words: data.words || data.stats?.words || 0
+            words: data.words || data.stats?.words || extractedText.split(/\s+/).length
           });
-          showToast(`✓ Ingested ${(data.format === 'YOUTUBE' ? 'YouTube video' : 'article')} "${(data.title || 'Web Resource').slice(0, 35)}..." (${(data.words || 0).toLocaleString()} words)`, "success");
+          showToast(`✓ Ingested ${(data.format === 'YOUTUBE' ? 'YouTube video' : 'article')} "${(data.title || 'Web Resource').slice(0, 35)}..." (${(data.words || extractedText.split(/\s+/).length).toLocaleString()} words)`, "success");
           fetchDocuments();
-          return data.text;
+          return extractedText;
         } catch (err) {
           showToast(err.message, "error");
           return null;
@@ -558,10 +563,10 @@
       const handleSummarize = async (overrides = {}) => {
         const activePersona = (typeof overrides === 'object' && overrides?.personaOverride) ? overrides.personaOverride : persona;
         const activeMode = (typeof overrides === 'object' && overrides?.modeOverride) ? overrides.modeOverride : summaryMode;
-        let textToSummarize = inputText;
+        let textToSummarize = (typeof overrides === 'object' && overrides?.textOverride) ? overrides.textOverride : (inputText || urlDocData?.text || '');
         
         // Auto-fetch if in URL tab and text is empty or unchanged but URL is present
-        if ((!textToSummarize.trim() || !/[a-zA-Z0-9]/.test(textToSummarize)) && urlInput.trim()) {
+        if ((!textToSummarize || !textToSummarize.trim() || !/[a-zA-Z0-9]/.test(textToSummarize)) && urlInput.trim()) {
           showToast("Fetching URL content before generating brief...", "info");
           textToSummarize = await handleFetchUrl(urlInput);
           if (!textToSummarize) return;
@@ -587,7 +592,7 @@
           });
 
           if (!res.ok) {
-            const err = await res.json();
+            const err = await res.json().catch(() => ({}));
             throw new Error(err.detail || "Summarization request failed");
           }
 

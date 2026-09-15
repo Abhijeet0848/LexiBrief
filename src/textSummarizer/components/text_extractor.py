@@ -256,12 +256,14 @@ class TextExtractor:
                 })
 
             full_text = cls.clean_text(" ".join(full_text_pieces))
+            word_count = len(full_text.split())
             return {
                 "video_id": video_id,
                 "title": title,
                 "author": author_name,
                 "thumbnail": thumbnail_url,
                 "text": full_text,
+                "words": word_count,
                 "chunks": formatted_chunks,
                 "format": "YOUTUBE",
                 "source_url": f"https://www.youtube.com/watch?v={video_id}"
