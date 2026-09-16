@@ -1924,8 +1924,58 @@
                             </div>
                           </div>
 
-                          {/* Explainable Attribution Helper Hint */}
-                          {summaryResult.attribution?.attribution_map?.length > 0 && (
+                          {/* One-Click Quick Translation Banner for Multilingual Summaries */}
+                          {(summaryResult.detected_language !== 'en' || summaryResult.original_language !== 'en' || /[\u0900-\u097F\u0600-\u06FF\u4E00-\u9FFF\u3040-\u30FF\u0400-\u04FF]/.test(summaryResult.original_summary || summaryResult.summary)) && (
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-3 rounded-2xl bg-gradient-to-r from-indigo-50 via-purple-50 to-indigo-50 border border-indigo-200/90 shadow-2xs gap-2 animate-fadeIn">
+                              <div className="flex items-center gap-2 text-xs font-bold text-indigo-950 min-w-0">
+                                <span className="text-base flex-shrink-0">🌐</span>
+                                <div className="truncate">
+                                  <span>
+                                    {summaryResult.translated_to_english 
+                                      ? `English Summary Active (${summaryResult.original_language?.toUpperCase() || 'Source'} → EN)` 
+                                      : `Non-English passage detected (${summaryResult.original_language?.toUpperCase() || 'Multilingual'})`}
+                                  </span>
+                                  <p className="text-[10px] text-slate-500 font-normal">
+                                    {summaryResult.translated_to_english 
+                                      ? 'Neural translation into clean fluent English' 
+                                      : 'Click below to convert this summary into English with 1 click'}
+                                  </p>
+                                </div>
+                              </div>
+                              <button
+                                onClick={handleTranslateSummary}
+                                disabled={isTranslating}
+                                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer select-none flex items-center justify-center gap-1.5 flex-shrink-0 ${
+                                  summaryResult.translated_to_english
+                                    ? 'btn-3d-secondary text-indigo-700 bg-white border border-indigo-200 hover:bg-slate-50'
+                                    : 'btn-3d-primary text-white bg-indigo-600 hover:bg-indigo-700'
+                                } ${isTranslating ? 'opacity-70 cursor-wait' : ''}`}
+                              >
+                                {isTranslating ? (
+                                  <>
+                                    <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                                    </svg>
+                                    <span>Translating...</span>
+                                  </>
+                                ) : summaryResult.translated_to_english ? (
+                                  <>
+                                    <span>↩️</span>
+                                    <span>View Original Language</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span>🔤</span>
+                                    <span>Translate in English</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Explainable Attribution Helper Hint (Shown when not translated to preserve alignment) */}
+                          {!summaryResult.translated_to_english && summaryResult.attribution?.attribution_map?.length > 0 && (
                             <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200/80 flex items-center justify-between text-xs text-amber-900">
                               <span className="flex items-center gap-1.5">
                                 <span>💡</span>
@@ -1942,7 +1992,7 @@
 
                           {/* Summary Output Box with Interactive Sentence Spans */}
                           <div className="p-4 sm:p-5 rounded-2xl bg-slate-50/70 border border-slate-200 text-slate-800 text-sm sm:text-base leading-relaxed min-h-[160px] shadow-inner font-sans">
-                            {summaryResult.attribution?.attribution_map?.length > 0 ? (
+                            {(!summaryResult.translated_to_english && summaryResult.attribution?.attribution_map?.length > 0) ? (
                               <div className="whitespace-pre-line space-y-1">
                                 {summaryResult.attribution.attribution_map.map((item, idx) => {
                                   const isHovered = hoveredSummarySentenceIdx === idx;
@@ -1974,7 +2024,7 @@
                                 })}
                               </div>
                             ) : (
-                              <div className="whitespace-pre-line">{summaryResult.summary}</div>
+                              <div className="whitespace-pre-line leading-relaxed font-sans">{summaryResult.summary}</div>
                             )}
                           </div>
 

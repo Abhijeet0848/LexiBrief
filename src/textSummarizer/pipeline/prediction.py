@@ -150,7 +150,7 @@ class PredictionPipeline:
         rouge_scores = NLPProcessor.compute_rouge(cleaned_text, original_summary)
 
         # 8. Compute Explainable Sentence Attribution Mapping
-        attribution_data = NLPProcessor.compute_attribution(cleaned_text, original_summary)
+        attribution_data = NLPProcessor.compute_attribution(cleaned_text, summary if not translated_flag else original_summary)
 
         # 9. Compute summary-specific NLP statistics
         summary_stats = NLPProcessor.compute_stats(summary)
