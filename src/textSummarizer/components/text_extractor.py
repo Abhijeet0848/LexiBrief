@@ -36,8 +36,8 @@ class TextExtractor:
             with zipfile.ZipFile(io.BytesIO(file_bytes)) as docx_zip:
                 # Security: Check uncompressed XML size to prevent Zip Bomb / memory exhaustion
                 info = docx_zip.getinfo('word/document.xml')
-                if info.file_size > 25 * 1024 * 1024:  # 25 MB max uncompressed XML
-                    raise ValueError("DOCX document XML exceeds maximum safe size (25 MB).")
+                if info.file_size > 75 * 1024 * 1024:  # 75 MB max uncompressed XML
+                    raise ValueError("DOCX document XML exceeds maximum safe size (75 MB).")
                 
                 xml_content = docx_zip.read('word/document.xml')
                 tree = ET.fromstring(xml_content)

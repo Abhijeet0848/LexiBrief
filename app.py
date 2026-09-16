@@ -55,7 +55,7 @@ app = FastAPI(
 )
 
 # Security Constants & Limits
-MAX_UPLOAD_SIZE = 15 * 1024 * 1024   # 15 MB max file upload
+MAX_UPLOAD_SIZE = 50 * 1024 * 1024   # 50 MB max file upload
 MAX_INPUT_CHARS = 150_000            # 150,000 max input character limit
 ADMIN_SECRET_KEY = os.getenv("ADMIN_SECRET_KEY")
 
@@ -296,12 +296,12 @@ async def get_presets():
 async def upload_document(file: UploadFile = File(...)):
     """Extracts and cleans raw text from uploaded files (PDF, DOCX, TXT) and saves to MongoDB."""
     try:
-        # Security: Enforce max upload file size (15 MB) to prevent OOM/DoS
+        # Security: Enforce max upload file size (50 MB) to prevent OOM/DoS
         content_bytes = await file.read(MAX_UPLOAD_SIZE + 1)
         if len(content_bytes) > MAX_UPLOAD_SIZE:
             raise HTTPException(
                 status_code=413, 
-                detail="File too large. Maximum supported document size is 15 MB."
+                detail="File too large. Maximum supported document size is 50 MB."
             )
         
         extracted_text, detected_format, pages_count = TextExtractor.extract(file.filename or "document.txt", content_bytes)

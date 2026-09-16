@@ -167,8 +167,8 @@ def test_security_input_validation_and_id_sanitization():
     res_bad_id = client.get("/api/documents/../../etc/passwd$#@")
     assert res_bad_id.status_code in [400, 404]
 
-    # Test 3: Large file upload rejection (> 15MB)
-    large_payload = b"X" * (15 * 1024 * 1024 + 10)
+    # Test 3: Large file upload rejection (> 50MB)
+    large_payload = b"X" * (50 * 1024 * 1024 + 10)
     res_large_file = client.post(
         "/api/upload",
         files={"file": ("large_bomb.txt", io.BytesIO(large_payload), "text/plain")}
