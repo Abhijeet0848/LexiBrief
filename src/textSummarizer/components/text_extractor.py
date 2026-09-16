@@ -139,12 +139,95 @@ class TextExtractor:
             logger.error(f"PDF stream fallback error: {e}")
             return file_bytes.decode('utf-8', errors='ignore'), 1
 
+    @staticmethod
+    def extract_from_pptx(file_bytes: bytes) -> Tuple[str, int]:
+        """
+        High-fidelity presentation text extraction from PowerPoint PPTX / PPT files.
+        Parses slide XMLs, text frames, shape tables, and speaker notes, returning (clean_text, slide_count).
+        """
+        # 1. State-of-the-art: python-pptx
+        try:
+            from pptx import Presentation
+            prs = Presentation(io.BytesIO(file_bytes))
+            slide_texts = []
+            slide_count = len(prs.slides)
+            for idx, slide in enumerate(prs.slides):
+                slide_content = []
+                for shape in slide.shapes:
+                    if shape.has_text_frame:
+                        for paragraph in shape.text_frame.paragraphs:
+                            txt = "".join(run.text for run in paragraph.runs if run.text).strip()
+                            if txt:
+                                slide_content.append(txt)
+                    elif shape.has_table:
+                        for row in shape.table.rows:
+                            row_txt = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+                            if row_txt:
+                                slide_content.append(" | ".join(row_txt))
+                
+                # Check for speaker notes
+                if slide.has_notes_slide and slide.notes_slide.notes_text_frame:
+                    notes_txt = slide.notes_slide.notes_text_frame.text.strip()
+                    if notes_txt:
+                        slide_content.append(f"[Speaker Notes: {notes_txt}]")
+
+                if slide_content:
+                    slide_texts.append(f"--- Slide {idx + 1} ---\n" + "\n".join(slide_content))
+
+            if slide_texts:
+                return "\n\n".join(slide_texts), max(1, slide_count)
+        except ImportError:
+            pass
+        except Exception as e:
+            logger.warning(f"python-pptx extraction notice: {e}")
+
+        # 2. Resilient OpenXML Zip Archive parser (zero external dependencies)
+        try:
+            with zipfile.ZipFile(io.BytesIO(file_bytes)) as ppt_zip:
+                slide_files = [f for f in ppt_zip.namelist() if f.startswith('ppt/slides/slide') and f.endswith('.xml')]
+                def extract_slide_num(name):
+                    m = re.search(r'slide(\d+)\.xml', name)
+                    return int(m.group(1)) if m else 999999
+                
+                slide_files.sort(key=extract_slide_num)
+                slide_count = len(slide_files)
+                slide_texts = []
+                
+                ns = {'a': 'http://schemas.openxmlformats.org/drawingml/2006/main',
+                      'p': 'http://schemas.openxmlformats.org/presentationml/2006/main'}
+                
+                for idx, sfile in enumerate(slide_files):
+                    xml_content = ppt_zip.read(sfile)
+                    tree = ET.fromstring(xml_content)
+                    texts = [node.text for node in tree.findall('.//a:t', ns) if node.text and node.text.strip()]
+                    if texts:
+                        slide_texts.append(f"--- Slide {idx + 1} ---\n" + "\n".join(texts))
+                
+                if slide_texts:
+                    return "\n\n".join(slide_texts), max(1, slide_count)
+        except Exception as e:
+            logger.warning(f"PPTX zip extraction fallback: {e}")
+
+        # 3. Fallback for raw binary or legacy PPT
+        try:
+            content = file_bytes.decode('latin-1', errors='ignore')
+            readable = _RE_READABLE_CHUNKS.findall(content)
+            if readable:
+                return " ".join(readable), 1
+            return file_bytes.decode('utf-8', errors='ignore'), 1
+        except Exception as e:
+            logger.error(f"PPT binary fallback error: {e}")
+            return file_bytes.decode('utf-8', errors='ignore'), 1
+
     @classmethod
     def extract(cls, filename: str, file_bytes: bytes) -> Tuple[str, str, int]:
         """Extracts text based on file extension and returns (clean_text, detected_format, page_count)."""
         fn = filename.lower()
         pages = 1
-        if fn.endswith('.docx') or fn.endswith('.doc'):
+        if fn.endswith('.pptx') or fn.endswith('.ppt'):
+            fmt = "PPTX"
+            raw, pages = cls.extract_from_pptx(file_bytes)
+        elif fn.endswith('.docx') or fn.endswith('.doc'):
             fmt = "DOCX"
             raw = cls.extract_from_docx(file_bytes)
         elif fn.endswith('.pdf'):

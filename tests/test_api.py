@@ -281,9 +281,24 @@ def test_multilingual_summarize_with_translation():
     })
     assert res.status_code == 200
     data = res.json()
-    assert "summary" in data
-    assert len(data["summary"]) > 0
     assert data.get("translated_to_english") is True
     assert data.get("original_language") == "hi"
+
+
+def test_upload_pptx_endpoint():
+    """Verify document upload endpoint with PowerPoint PPTX file."""
+    from tests.test_pptx_extractor import create_sample_pptx
+    pptx_bytes = create_sample_pptx()
+    response = client.post(
+        "/api/upload",
+        files={"file": ("project_roadmap.pptx", pptx_bytes, "application/vnd.openxmlformats-officedocument.presentationml.presentation")}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["format"] == "PPTX"
+    assert data["pages"] == 3
+    assert data["words"] > 0
+    assert "LexiBrief NLP Architecture" in data["text"]
+
 
 

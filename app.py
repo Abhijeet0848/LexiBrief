@@ -305,7 +305,7 @@ async def get_presets():
 @app.post("/api/upload", tags=["Text Extraction & MongoDB"])
 @app.post("/upload", tags=["Text Extraction & MongoDB"], include_in_schema=False)
 async def upload_document(file: UploadFile = File(...)):
-    """Extracts and cleans raw text from uploaded files (PDF, DOCX, TXT) and saves to MongoDB."""
+    """Extracts and cleans raw text from uploaded files (PDF, DOCX, PPTX, PPT, TXT) and saves to MongoDB."""
     try:
         # Security: Enforce max upload file size (50 MB) to prevent OOM/DoS
         content_bytes = await file.read(MAX_UPLOAD_SIZE + 1)
