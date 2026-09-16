@@ -252,11 +252,17 @@ def _find_index_html() -> Optional[str]:
 @app.get("/index", response_class=HTMLResponse, tags=["UI"], include_in_schema=False)
 async def index():
     html_content = _find_index_html()
+    headers = {
+        "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+        "Pragma": "no-cache",
+        "Expires": "0"
+    }
     if html_content:
-        return HTMLResponse(content=html_content, status_code=200)
+        return HTMLResponse(content=html_content, status_code=200, headers=headers)
     return HTMLResponse(
         content="""<!DOCTYPE html><html><head><title>LexiBrief NLP Engine</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body{font-family:system-ui,sans-serif;background:#090d16;color:#e2e8f0;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px;box-sizing:border-box}.card{background:#131b2e;padding:32px;border-radius:16px;border:1px solid #1e293b;max-width:540px;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,0.5)}h1{font-size:24px;color:#38bdf8;margin:0 0 12px}p{color:#94a3b8;line-height:1.6;margin:0 0 20px}a{display:inline-block;padding:10px 20px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;transition:background 0.2s}a:hover{background:#1d4ed8}</style></head><body><div class="card"><h1>⚡ LexiBrief NLP Engine Active</h1><p>The backend API services and serverless functions are operational. You can explore interactive OpenAPI documentation below.</p><a href="/docs">View Interactive Swagger Docs</a></div></body></html>""",
-        status_code=200
+        status_code=200,
+        headers=headers
     )
 
 
