@@ -20,34 +20,49 @@ class TextExtractor:
     @staticmethod
     def clean_ocr_text(text: str) -> str:
         """
-        Cleans OCR artifacts, repetitive non-alphanumeric symbol runs, 
-        and noisy lines resulting from camera photo scanning or handwritten text recognition.
+        Cleans OCR artifacts, completely removes confusing non-alphanumeric symbols, 
+        and heals digit-in-word confusions resulting from handwritten text recognition.
         """
         if not text:
             return ""
         
-        # 1. Strip repetitive solitary non-alphanumeric noise characters (e.g. | | | ~~~ ^^^ ___)
-        text = re.sub(r'([|~_^\/\\<>{}\[\]*+=#`¬¢§±µ¿¡])\s*\1+', ' ', text)
-        # Remove standalone isolated symbol tokens
-        text = re.sub(r'(?:^|\s)[|~_^\/\\<>{}\[\]*+=#`¬¢§±µ¿¡]{1,3}(?=\s|$)', ' ', text)
+        # 1. Strip all non-word symbols and OCR glitch characters
+        text = re.sub(r'[|~_^\/\\<>{}\[\]*+=#`¬¢§±µ¿¡@$%&;:~]+', ' ', text)
         
-        # 2. Filter line by line
+        # 2. Fix OCR digit-in-word confusions (e.g., 'm0del' -> 'model', 'w1th' -> 'with', 'th3' -> 'the')
+        def _heal_word(w: str) -> str:
+            if not w:
+                return ""
+            # If word is a standard number or date, keep it intact
+            if w.isdigit() or re.match(r'^\d+[a-zA-Z]{1,2}$', w):
+                return w
+            # If word contains multiple letters with embedded OCR digits
+            alpha_count = sum(1 for c in w if c.isalpha())
+            if alpha_count >= 2:
+                w = re.sub(r'(?<=[a-zA-Z])0(?=[a-zA-Z])', 'o', w)
+                w = re.sub(r'(?<=[a-zA-Z])1(?=[a-zA-Z])', 'l', w)
+                w = re.sub(r'(?<=[a-zA-Z])3(?=[a-zA-Z])', 'e', w)
+                w = re.sub(r'(?<=[a-zA-Z])5(?=[a-zA-Z])', 's', w)
+            return w
+
+        # 3. Filter line by line and eliminate isolated single-character noise
         clean_lines = []
         for line in text.split('\n'):
             line_str = line.strip()
             if not line_str:
                 continue
-            # Calculate alphanumeric vs total printable length
-            alpha_chars = sum(1 for c in line_str if c.isalnum())
-            total_printable = sum(1 for c in line_str if not c.isspace())
+            words = line_str.split()
+            healed_words = []
+            for raw_w in words:
+                w = _heal_word(raw_w.strip())
+                # Drop solitary random single letters that aren't valid words
+                if len(w) == 1 and w.lower() not in ['a', 'i', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9']:
+                    continue
+                if w:
+                    healed_words.append(w)
             
-            # If line is mostly symbols/noise (>65% non-alphanumeric) with very few letters, ignore it
-            if total_printable > 0 and (alpha_chars / total_printable) < 0.35 and alpha_chars < 3:
-                continue
-            
-            # Clean internal spacing
-            line_clean = re.sub(r'\s+', ' ', line_str)
-            clean_lines.append(line_clean)
+            if healed_words:
+                clean_lines.append(' '.join(healed_words))
             
         cleaned = "\n".join(clean_lines)
         return TextExtractor.clean_text(cleaned)
