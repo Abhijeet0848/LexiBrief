@@ -1994,28 +1994,28 @@
                             </div>
                           </div>
 
-                          {/* One-Click Quick Translation Banner for Multilingual Summaries */}
+                          {/* Quick Translation Banner for Non-English Text */}
                           {(summaryResult.detected_language !== 'en' || summaryResult.original_language !== 'en' || /[\u0900-\u097F\u0600-\u06FF\u4E00-\u9FFF\u3040-\u30FF\u0400-\u04FF]/.test(summaryResult.original_summary || summaryResult.summary)) && (
-                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-3 rounded-2xl bg-gradient-to-r from-indigo-50 via-purple-50 to-indigo-50 border border-indigo-200/90 shadow-2xs gap-2 animate-fadeIn">
-                              <div className="flex items-center gap-2 text-xs font-bold text-indigo-950 min-w-0">
-                                <span className="text-base flex-shrink-0">🌐</span>
-                                <div className="truncate">
-                                  <span>
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-3.5 rounded-2xl bg-indigo-50/90 border border-indigo-200/90 shadow-2xs gap-3 animate-fadeIn">
+                              <div className="flex items-start sm:items-center gap-2.5 min-w-0">
+                                <span className="text-lg flex-shrink-0 mt-0.5 sm:mt-0">🌐</span>
+                                <div className="space-y-0.5">
+                                  <div className="text-xs font-bold text-indigo-950">
                                     {summaryResult.translated_to_english 
-                                      ? `English Summary Active (${summaryResult.original_language?.toUpperCase() || 'Source'} → EN)` 
-                                      : `Non-English passage detected (${summaryResult.original_language?.toUpperCase() || 'Multilingual'})`}
-                                  </span>
-                                  <p className="text-[10px] text-slate-500 font-normal">
+                                      ? `English Version (${(summaryResult.original_language || 'Source').toUpperCase()} → English)` 
+                                      : `Original text is in ${(summaryResult.original_language || 'another language').toUpperCase()}`}
+                                  </div>
+                                  <p className="text-[11px] text-slate-600 font-normal leading-normal">
                                     {summaryResult.translated_to_english 
-                                      ? 'Neural translation into clean fluent English' 
-                                      : 'Click below to convert this summary into English with 1 click'}
+                                      ? 'Translated into clear, simple English' 
+                                      : 'Convert this summary into simple English with 1 click'}
                                   </p>
                                 </div>
                               </div>
                               <button
                                 onClick={handleTranslateSummary}
                                 disabled={isTranslating}
-                                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer select-none flex items-center justify-center gap-1.5 flex-shrink-0 ${
+                                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer select-none flex items-center justify-center gap-1.5 flex-shrink-0 ${
                                   summaryResult.translated_to_english
                                     ? 'btn-3d-secondary text-indigo-700 bg-white border border-indigo-200 hover:bg-slate-50'
                                     : 'btn-3d-primary text-white bg-indigo-600 hover:bg-indigo-700'
@@ -2032,30 +2032,30 @@
                                 ) : summaryResult.translated_to_english ? (
                                   <>
                                     <span>↩️</span>
-                                    <span>View Original Language</span>
+                                    <span>View Original</span>
                                   </>
                                 ) : (
                                   <>
-                                    <span>🔤</span>
-                                    <span>Translate in English</span>
+                                    <span>🌐</span>
+                                    <span>Translate to English</span>
                                   </>
                                 )}
                               </button>
                             </div>
                           )}
 
-                          {/* Explainable Attribution Helper Hint (Shown when not translated to preserve alignment) */}
+                          {/* Source Attribution Helper Hint */}
                           {!summaryResult.translated_to_english && summaryResult.attribution?.attribution_map?.length > 0 && (
-                            <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200/80 flex items-center justify-between text-xs text-amber-900">
-                              <span className="flex items-center gap-1.5">
-                                <span>💡</span>
-                                <span><b>Interactive Source Attribution:</b> Hover over any sentence below to trace its source origin!</span>
+                            <div className="p-3 rounded-xl bg-amber-50/90 border border-amber-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-amber-950 shadow-2xs">
+                              <span className="flex items-start sm:items-center gap-2 leading-relaxed">
+                                <span className="text-sm flex-shrink-0">💡</span>
+                                <span><b>Tip:</b> Click or hover on any sentence below to see where it came from in the original text.</span>
                               </span>
                               <button
                                 onClick={() => setShowAttributionInspector(!showAttributionInspector)}
-                                className="text-[10px] font-bold text-amber-800 underline hover:text-amber-950 cursor-pointer"
+                                className="text-[11px] font-bold text-amber-800 underline hover:text-amber-950 cursor-pointer self-start sm:self-auto flex-shrink-0"
                               >
-                                {showAttributionInspector ? 'Hide Inspector' : 'Show Inspector'}
+                                {showAttributionInspector ? 'Hide Details ▴' : 'Show Details ▾'}
                               </button>
                             </div>
                           )}
