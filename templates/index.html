@@ -218,7 +218,7 @@
   <script type="text/babel">
     const { useState, useEffect, useMemo, useRef } = React;
 
-    // Modern Glassmorphic Toast Notification
+    // Modern Light Frosted-Glass Toast Notification
     function Toast({ message, type, duration = 4500, onClose }) {
       useEffect(() => {
         const timer = setTimeout(onClose, duration);
@@ -229,15 +229,18 @@
       const isSuccess = type === 'success';
 
       let cleanMsg = message || '';
-      let title = isError ? 'Error Encountered' : isSuccess ? 'Success' : 'Notification';
+      let title = isError ? 'Error Encountered' : isSuccess ? 'Success' : 'Notice';
 
       if (typeof message === 'string') {
         if (message.startsWith('✓ Ingested') || message.startsWith('✓ ')) {
           title = 'Document Ingested';
           cleanMsg = message.replace(/^✓\s*/, '');
-        } else if (message.startsWith('ℹ️') || message.includes('recognized!')) {
+        } else if (message.startsWith('ℹ️') || message.includes('recognized!') || message.includes('detected')) {
           title = 'YouTube Video Detected';
           cleanMsg = message.replace(/^ℹ️\s*/, '');
+        } else if (message.startsWith('⚠️')) {
+          title = 'File Size Limit';
+          cleanMsg = message.replace(/^⚠️\s*/, '');
         } else if (message.startsWith('🎙️')) {
           title = 'Studio Voice Active';
           cleanMsg = message.replace(/^🎙️\s*/, '');
@@ -246,16 +249,20 @@
 
       return (
         <div className="fixed top-5 right-4 sm:right-6 z-[9999] max-w-sm sm:max-w-md w-[calc(100vw-2rem)] sm:w-auto animate-toast pointer-events-auto select-none">
-          <div className={`relative flex items-start gap-3.5 p-3.5 sm:p-4 rounded-2xl shadow-2xl border backdrop-blur-xl transition-all duration-300 ${
-            isError ? 'bg-slate-900/95 border-rose-500/40 text-rose-50 shadow-rose-950/40' :
-            isSuccess ? 'bg-slate-900/95 border-emerald-500/40 text-emerald-50 shadow-emerald-950/40' :
-            'bg-slate-900/95 border-indigo-500/40 text-slate-100 shadow-indigo-950/40'
+          <div className={`relative flex items-start gap-3.5 p-3.5 sm:p-4 rounded-2xl shadow-xl border backdrop-blur-2xl transition-all duration-300 ${
+            isError
+              ? 'bg-white/95 border-rose-200 text-slate-800 shadow-rose-900/10 ring-1 ring-rose-400/20'
+              : isSuccess
+              ? 'bg-white/95 border-emerald-200 text-slate-800 shadow-emerald-900/10 ring-1 ring-emerald-400/20'
+              : 'bg-white/95 border-indigo-200 text-slate-800 shadow-indigo-900/10 ring-1 ring-indigo-400/20'
           }`}>
             {/* Status Icon Badge */}
-            <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm ${
-              isError ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :
-              isSuccess ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
-              'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 shadow-2xs border ${
+              isError
+                ? 'bg-rose-50 text-rose-600 border-rose-200/90'
+                : isSuccess
+                ? 'bg-emerald-50 text-emerald-600 border-emerald-200/90'
+                : 'bg-indigo-50 text-indigo-600 border-indigo-200/90'
             }`}>
               {isError ? (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -274,14 +281,20 @@
 
             {/* Content Details */}
             <div className="flex-1 min-w-0 pr-1">
-              <h5 className="text-xs font-bold text-white tracking-tight">{title}</h5>
-              <p className="text-xs text-slate-300 mt-0.5 leading-relaxed break-words font-normal">{cleanMsg}</p>
+              <h5 className={`text-xs font-bold tracking-tight ${
+                isError ? 'text-rose-700' : isSuccess ? 'text-emerald-800' : 'text-slate-900'
+              }`}>
+                {title}
+              </h5>
+              <p className="text-xs text-slate-600 mt-0.5 leading-relaxed break-words font-medium">
+                {cleanMsg}
+              </p>
             </div>
 
             {/* Close Button */}
             <button
               onClick={onClose}
-              className="w-6 h-6 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors flex-shrink-0 -mr-1 -mt-1 cursor-pointer"
+              className="w-6 h-6 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors flex-shrink-0 -mr-1 -mt-1 cursor-pointer"
               title="Dismiss"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
