@@ -550,18 +550,26 @@
             const len = data.length;
 
             if (mode === 'contrast' || mode === 'clarity' || mode === 'document') {
-              // Gentle S-curve contrast boost that keeps anti-aliasing on fonts & matras intact
+              // Calculate dynamic min/max brightness to normalize lighting across camera shots & shadows
+              let minG = 255, maxG = 0;
+              const step = Math.max(1, Math.floor(len / 4000)) * 4;
+              for (let i = 0; i < len; i += step) {
+                const g = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+                if (g < minG) minG = g;
+                if (g > maxG) maxG = g;
+              }
+              const range = Math.max(30, maxG - minG);
               for (let i = 0; i < len; i += 4) {
                 const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-                let enhanced = gray;
-                if (gray < 165) {
-                  enhanced = Math.max(0, gray * 0.82); // Darken ink text
-                } else if (gray > 195) {
-                  enhanced = Math.min(255, 255 - (255 - gray) * 0.35); // Brighten paper
+                let normalized = Math.max(0, Math.min(255, ((gray - minG) / range) * 255));
+                if (mode === 'document') {
+                  normalized = normalized < 135 ? normalized * 0.55 : Math.min(255, 255 - (255 - normalized) * 0.35);
+                } else if (mode === 'clarity') {
+                  normalized = normalized < 155 ? normalized * 0.8 : Math.min(255, 255 - (255 - normalized) * 0.5);
                 }
-                data[i] = enhanced;
-                data[i + 1] = enhanced;
-                data[i + 2] = enhanced;
+                data[i] = normalized;
+                data[i + 1] = normalized;
+                data[i + 2] = normalized;
               }
             }
 
@@ -750,8 +758,8 @@
 
     // Universal Multi-Language OCR Configuration
     const OCR_LANGUAGES = [
-      { code: 'eng+hin', label: '🌐 Multilingual (English + Hindi)', short: 'Eng + Hin' },
       { code: 'hin', label: '🇮🇳 Hindi (हिन्दी)', short: 'Hindi' },
+      { code: 'eng+hin', label: '🌐 Hindi + English (Multilingual)', short: 'Hin + Eng' },
       { code: 'eng', label: '🇬🇧 English', short: 'English' },
       { code: 'spa', label: '🇪🇸 Spanish (Español)', short: 'Spanish' },
       { code: 'fra', label: '🇫🇷 French (Français)', short: 'French' },
@@ -768,13 +776,13 @@
       { code: 'urd', label: '🇵🇰 Urdu (اردو)', short: 'Urdu' },
       { code: 'ita', label: '🇮🇹 Italian (Italiano)', short: 'Italian' },
       { code: 'por', label: '🇵🇹 Portuguese (Português)', short: 'Portuguese' },
-      { code: 'eng+hin+spa+fra+deu', label: '🌍 Global Multi-Script (Eng+Hin+Spa+Fra+Deu)', short: 'Global Multi' }
+      { code: 'eng+hin+spa+fra+deu', label: '🌍 Global Multi-Script (All)', short: 'Global Multi' }
     ];
 
     // Smart OCR Text Cleanser: Preserves all International Scripts (Hindi, Indic, Arabic, CJK, Cyrillic, Latin)
     const cleanOCRText = (text) => {
       if (!text) return '';
-      // 1. Strip non-printable control codes & glitch symbols while preserving valid letters, numbers, and Indic/Arabic/CJK punctuation
+      // 1. Strip non-printable control codes while preserving valid Unicode letters, numbers, and Indic/Arabic/CJK punctuation
       let clean = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
       clean = clean.replace(/[|~_^\/\\<>{}\[\]*+=#`¬¢§±µ¿¡@$%&~]+/g, ' ');
       
@@ -808,32 +816,36 @@
           validLines.push(validWords.join(' '));
         }
       }
-      return validLines.join('\n').trim();
+      const res = validLines.join('\n').trim();
+      return res || text.trim();
     };
 
     // Helper: Execute High-Precision Client OCR with Universal Multilingual Support
-    const executeHandwritingOCR = async (imageSrc, onProgress, selectedLang = 'eng+hin') => {
+    const executeHandwritingOCR = async (imageSrc, onProgress, selectedLang = 'hin') => {
       if (!window.Tesseract || !imageSrc) return '';
-      const lang = selectedLang || 'eng+hin';
+      const langParam = selectedLang ? (selectedLang.includes('+') ? selectedLang.split('+').map(s => s.trim()).filter(Boolean) : selectedLang) : 'hin';
+      const langStr = Array.isArray(langParam) ? langParam.join('+') : selectedLang;
       
       if (typeof window.Tesseract.createWorker === 'function') {
         try {
-          const worker = await window.Tesseract.createWorker(lang, 1, {
+          const worker = await window.Tesseract.createWorker(langParam, 1, {
+            langPath: 'https://tessdata.projectnaptha.com/4.0.0',
             logger: (m) => {
               if (m.status === 'recognizing text' && typeof m.progress === 'number') {
                 const pct = Math.round(m.progress * 100);
                 if (onProgress) onProgress(pct, `Recognizing text (${pct}%)...`);
               } else if (m.status && onProgress) {
-                const displayStatus = m.status === 'loading tesseract core' ? 'Loading AI core...'
-                  : m.status === 'loading language traineddata' ? `Loading ${lang} models...`
-                  : m.status === 'initializing api' ? 'Initializing OCR engine...'
-                  : m.status === 'recognizing text' ? 'Scanning glyphs...' : m.status;
+                const displayStatus = m.status === 'loading tesseract core' ? 'Loading AI OCR core...'
+                  : m.status === 'loading language traineddata' ? `Downloading ${langStr} model...`
+                  : m.status === 'initializing api' ? 'Initializing neural models...'
+                  : m.status === 'recognizing text' ? 'Scanning text...' : m.status;
                 onProgress(null, displayStatus);
               }
             }
           });
+          // PSM 3 is Fully Automatic Page Segmentation (handles titles, paragraphs, and multi-line notes)
           await worker.setParameters({
-            tessedit_pageseg_mode: '6',
+            tessedit_pageseg_mode: '3',
             preserve_interword_spaces: '1'
           });
           const ret = await worker.recognize(imageSrc);
@@ -847,7 +859,8 @@
 
       // Fallback: standard recognize with selected language
       try {
-        const ret = await window.Tesseract.recognize(imageSrc, lang, {
+        const ret = await window.Tesseract.recognize(imageSrc, langStr, {
+          langPath: 'https://tessdata.projectnaptha.com/4.0.0',
           logger: (m) => {
             if (m.status === 'recognizing text' && typeof m.progress === 'number') {
               const pct = Math.round(m.progress * 100);
@@ -870,7 +883,7 @@
       const canvasRef = React.useRef(null);
       const [stream, setStream] = React.useState(null);
       const [facingMode, setFacingMode] = React.useState('environment'); // 'environment' (back) or 'user' (front)
-      const [ocrLang, setOcrLang] = React.useState('eng+hin'); // Default to Multilingual English + Hindi
+      const [ocrLang, setOcrLang] = React.useState('hin'); // Default to Hindi for high-precision Devanagari OCR
       const [capturedImage, setCapturedImage] = React.useState(null);
       const [enhancedPreview, setEnhancedPreview] = React.useState(null);
       const [filterMode, setFilterMode] = React.useState('clarity'); // 'clarity', 'contrast', 'original'
@@ -1093,10 +1106,31 @@
               <div className="flex items-center gap-2">
                 {!capturedImage && !cameraError && (
                   <div className="flex items-center gap-1.5 mr-1">
+                    <div className="hidden sm:flex items-center gap-1 bg-slate-800 p-0.5 rounded-xl border border-slate-700 text-[11px]">
+                      <button
+                        type="button"
+                        onClick={() => setOcrLang('hin')}
+                        className={`px-2 py-1 rounded-lg font-bold transition cursor-pointer ${
+                          ocrLang === 'hin' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-300 hover:text-white'
+                        }`}
+                      >
+                        🇮🇳 Hindi
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOcrLang('eng+hin')}
+                        className={`px-2 py-1 rounded-lg font-bold transition cursor-pointer ${
+                          ocrLang === 'eng+hin' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-300 hover:text-white'
+                        }`}
+                      >
+                        🌐 Hin+Eng
+                      </button>
+                    </div>
+
                     <select
                       value={ocrLang}
                       onChange={(e) => setOcrLang(e.target.value)}
-                      className="bg-slate-800/90 border border-slate-700 text-indigo-300 text-xs rounded-xl px-2 py-1.5 font-bold focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer max-w-[150px] sm:max-w-[180px] truncate"
+                      className="bg-slate-800/90 border border-slate-700 text-indigo-300 text-xs rounded-xl px-2 py-1.5 font-bold focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer max-w-[130px] sm:max-w-[160px] truncate"
                       title="Select OCR Language"
                     >
                       {OCR_LANGUAGES.map(lang => (
@@ -1177,7 +1211,7 @@
                   <button
                     type="button"
                     onClick={() => setFilterMode('contrast')}
-                    className={`px-2 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
                       filterMode === 'contrast'
                         ? 'bg-indigo-600 text-white shadow-xs'
                         : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
@@ -1188,7 +1222,7 @@
                   <button
                     type="button"
                     onClick={() => setFilterMode('original')}
-                    className={`px-2 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
                       filterMode === 'original'
                         ? 'bg-indigo-600 text-white shadow-xs'
                         : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
@@ -1198,17 +1232,47 @@
                   </button>
                 </div>
 
-                {/* Language Selector */}
+                {/* Language Selector Quick Pills + Dropdown */}
                 <div className="flex items-center gap-1.5 ml-auto">
-                  <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                    <span>🌐</span>
-                    <span>Lang:</span>
-                  </span>
+                  <div className="flex items-center gap-1 bg-slate-800 p-0.5 rounded-lg border border-slate-700 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => setOcrLang('hin')}
+                      className={`px-2 py-0.5 rounded font-bold transition cursor-pointer ${
+                        ocrLang === 'hin' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-300 hover:text-white'
+                      }`}
+                      title="Hindi OCR (Highest accuracy for Hindi/Devanagari)"
+                    >
+                      🇮🇳 Hindi
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOcrLang('eng+hin')}
+                      className={`px-2 py-0.5 rounded font-bold transition cursor-pointer ${
+                        ocrLang === 'eng+hin' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-300 hover:text-white'
+                      }`}
+                      title="Hindi + English Multilingual OCR"
+                    >
+                      🌐 Hin+Eng
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOcrLang('eng')}
+                      className={`px-2 py-0.5 rounded font-bold transition cursor-pointer ${
+                        ocrLang === 'eng' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-300 hover:text-white'
+                      }`}
+                      title="English OCR"
+                    >
+                      🇬🇧 Eng
+                    </button>
+                  </div>
+
                   <select
                     value={ocrLang}
                     onChange={(e) => setOcrLang(e.target.value)}
                     disabled={isOcrProcessing}
-                    className="bg-slate-800 border border-slate-700 text-indigo-300 text-xs rounded-lg px-2 py-1 font-bold focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer max-w-[155px] truncate"
+                    className="bg-slate-800 border border-slate-700 text-indigo-300 text-xs rounded-lg px-1.5 py-1 font-bold focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer max-w-[110px] truncate"
+                    title="All Languages"
                   >
                     {OCR_LANGUAGES.map(lang => (
                       <option key={lang.code} value={lang.code} className="bg-slate-900 text-white">
@@ -1420,12 +1484,12 @@
                     {isOcrProcessing ? (
                       <>
                         <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                        <span>Extracting Notes...</span>
+                        <span>Extracting {ocrLang === 'hin' ? 'Hindi' : 'Text'}...</span>
                       </>
                     ) : (
                       <>
                         <span>⚡</span>
-                        <span>Extract Selected Text</span>
+                        <span>Scan & Extract {ocrLang === 'hin' ? 'Hindi (हिन्दी)' : ocrLang === 'eng+hin' ? 'Hindi + English' : 'Selected Text'}</span>
                       </>
                     )}
                   </button>
@@ -1710,7 +1774,7 @@
                 statusText: statusText || (pct ? `Recognizing text (${pct}%)...` : `Processing neural OCR...`),
                 stage: 'processing'
               });
-            }, 'eng+hin');
+            }, 'hin+eng');
           } catch (tessErr) {
             console.warn("Client image OCR notice:", tessErr);
           }
@@ -1777,7 +1841,7 @@
                       statusText: `Scanning PDF page ${info.pageNum}/${numPages}: ${statusText || 'reading text...'}`,
                       stage: 'processing'
                     });
-                  }, 'eng+hin');
+                  }, 'hin+eng');
 
                   if (pageOcr && pageOcr.trim()) {
                     extractedPageTexts.push(pageOcr.trim());
