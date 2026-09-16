@@ -18,10 +18,47 @@ class TextExtractor:
     """High-speed text extractor, cleaner, and format detector (Raw text, PDF, DOCX, TXT)."""
 
     @staticmethod
-    def clean_text(text: str) -> str:
-        """Cleans and normalizes extracted text with compiled regex patterns and auto-strips timestamps."""
+    def clean_ocr_text(text: str) -> str:
+        """
+        Cleans OCR artifacts, repetitive non-alphanumeric symbol runs, 
+        and noisy lines resulting from camera photo scanning or handwritten text recognition.
+        """
         if not text:
             return ""
+        
+        # 1. Strip repetitive solitary non-alphanumeric noise characters (e.g. | | | ~~~ ^^^ ___)
+        text = re.sub(r'([|~_^\/\\<>{}\[\]*+=#`¬¢§±µ¿¡])\s*\1+', ' ', text)
+        # Remove standalone isolated symbol tokens
+        text = re.sub(r'(?:^|\s)[|~_^\/\\<>{}\[\]*+=#`¬¢§±µ¿¡]{1,3}(?=\s|$)', ' ', text)
+        
+        # 2. Filter line by line
+        clean_lines = []
+        for line in text.split('\n'):
+            line_str = line.strip()
+            if not line_str:
+                continue
+            # Calculate alphanumeric vs total printable length
+            alpha_chars = sum(1 for c in line_str if c.isalnum())
+            total_printable = sum(1 for c in line_str if not c.isspace())
+            
+            # If line is mostly symbols/noise (>65% non-alphanumeric) with very few letters, ignore it
+            if total_printable > 0 and (alpha_chars / total_printable) < 0.35 and alpha_chars < 3:
+                continue
+            
+            # Clean internal spacing
+            line_clean = re.sub(r'\s+', ' ', line_str)
+            clean_lines.append(line_clean)
+            
+        cleaned = "\n".join(clean_lines)
+        return TextExtractor.clean_text(cleaned)
+
+    @staticmethod
+    def clean_text(text: str) -> str:
+        """Cleans and normalizes extracted text with compiled regex patterns and auto-strips timestamps and OCR noise."""
+        if not text:
+            return ""
+        # Strip repetitive OCR artifact characters
+        text = re.sub(r'([|~_^\/\\<>{}\[\]*+=#`¬¢§±µ¿¡])\s*\1{2,}', ' ', text)
         # Normalize whitespace and line breaks
         text = _RE_CRLF.sub('\n', text)
         text = _RE_SPACES.sub(' ', text)

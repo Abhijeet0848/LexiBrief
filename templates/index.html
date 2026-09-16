@@ -475,6 +475,106 @@
       );
     }
 
+    // Image Preprocessing Pipeline for Notes, Handwriting & Documents
+    const preprocessImageForOCR = (imageSrc, mode = 'document') => {
+      return new Promise((resolve) => {
+        if (!imageSrc) return resolve('');
+        if (mode === 'original') return resolve(imageSrc);
+
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            let width = img.naturalWidth || img.width || 1280;
+            let height = img.naturalHeight || img.height || 720;
+
+            // Optimal resolution clamp for OCR performance (max 1800px)
+            const maxDim = 1800;
+            if (width > maxDim || height > maxDim) {
+              const ratio = maxDim / Math.max(width, height);
+              width = Math.round(width * ratio);
+              height = Math.round(height * ratio);
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            const imgData = ctx.getImageData(0, 0, width, height);
+            const data = imgData.data;
+            const len = data.length;
+
+            if (mode === 'contrast') {
+              // High-Contrast Grayscale (Stretch 1.9x)
+              for (let i = 0; i < len; i += 4) {
+                const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+                let enhanced = (gray - 128) * 1.9 + 128;
+                enhanced = Math.max(0, Math.min(255, enhanced));
+                data[i] = enhanced;
+                data[i + 1] = enhanced;
+                data[i + 2] = enhanced;
+              }
+            } else {
+              // Mode: 'document' (Adaptive B&W Ink Boost for Handwritten Notes & Paper)
+              const grays = new Uint8Array(width * height);
+              let sumG = 0;
+              for (let i = 0, p = 0; i < len; i += 4, p++) {
+                const g = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+                grays[p] = g;
+                sumG += g;
+              }
+              const meanG = sumG / grays.length;
+              // Adaptive threshold for pen ink vs background paper
+              const threshold = Math.min(185, Math.max(85, meanG * 0.90));
+
+              for (let i = 0, p = 0; i < len; i += 4, p++) {
+                const g = grays[p];
+                // Deep dark ink for handwriting, pure white paper background
+                const val = g < threshold ? Math.max(0, Math.round(g * 0.45)) : 255;
+                data[i] = val;
+                data[i + 1] = val;
+                data[i + 2] = val;
+              }
+            }
+
+            ctx.putImageData(imgData, 0, 0);
+            resolve(canvas.toDataURL('image/jpeg', 0.94));
+          } catch (e) {
+            console.warn("Image preprocessor note:", e);
+            resolve(imageSrc);
+          }
+        };
+        img.onerror = () => resolve(imageSrc);
+        img.src = imageSrc;
+      });
+    };
+
+    // Smart OCR Text Cleanser for Eliminating Random Symbols
+    const cleanOCRText = (text) => {
+      if (!text) return '';
+      // 1. Strip repetitive solitary non-alphanumeric noise characters (e.g. | | | ~~~ ^^^ ___)
+      let clean = text.replace(/([|~_^\/\\<>{}\[\]*+=#`¬¢§±µ¿¡])\s*\1+/g, ' ');
+      // 2. Remove isolated random symbol tokens
+      clean = clean.replace(/(?:^|\s)[|~_^\/\\<>{}\[\]*+=#`¬¢§±µ¿¡]{1,3}(?=\s|$)/g, ' ');
+      
+      const lines = clean.split('\n');
+      const validLines = [];
+      for (let line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        const alphaCount = (trimmed.match(/[a-zA-Z0-9]/g) || []).length;
+        const nonSpaceCount = trimmed.replace(/\s+/g, '').length;
+        // If line is over 65% random symbols with very few letters, discard it
+        if (nonSpaceCount > 0 && (alphaCount / nonSpaceCount) < 0.35 && alphaCount < 3) {
+          continue;
+        }
+        validLines.push(trimmed.replace(/\s+/g, ' '));
+      }
+      return validLines.join('\n').trim();
+    };
+
     // High-Precision Real-Time Camera Scanner & OCR Modal
     function CameraCaptureModal({ isOpen, onClose, onCapturedFile, showToast }) {
       if (!isOpen) return null;
@@ -484,6 +584,8 @@
       const [stream, setStream] = React.useState(null);
       const [facingMode, setFacingMode] = React.useState('environment'); // 'environment' (back) or 'user' (front)
       const [capturedImage, setCapturedImage] = React.useState(null);
+      const [enhancedPreview, setEnhancedPreview] = React.useState(null);
+      const [filterMode, setFilterMode] = React.useState('document'); // 'document', 'contrast', 'original'
       const [cameraError, setCameraError] = React.useState(null);
       const [isInitializing, setIsInitializing] = React.useState(true);
       const [isOcrProcessing, setIsOcrProcessing] = React.useState(false);
@@ -536,6 +638,17 @@
         };
       }, [facingMode]);
 
+      // When photo or filterMode changes, generate enhanced preview
+      React.useEffect(() => {
+        if (capturedImage) {
+          preprocessImageForOCR(capturedImage, filterMode).then(res => {
+            setEnhancedPreview(res);
+          });
+        } else {
+          setEnhancedPreview(null);
+        }
+      }, [capturedImage, filterMode]);
+
       // Stop stream on modal close
       const handleClose = () => {
         if (stream) {
@@ -543,6 +656,7 @@
         }
         setStream(null);
         setCapturedImage(null);
+        setEnhancedPreview(null);
         setIsOcrProcessing(false);
         onClose();
       };
@@ -573,6 +687,7 @@
       // Retake photo
       const retakePhoto = () => {
         setCapturedImage(null);
+        setEnhancedPreview(null);
         setIsOcrProcessing(false);
         setOcrProgress({ status: '', percent: 0 });
         startCamera(facingMode);
@@ -580,13 +695,14 @@
 
       // Extract text via Tesseract.js & Upload
       const processCapturedPhoto = async () => {
-        if (!capturedImage) return;
+        const imageToProcess = enhancedPreview || capturedImage;
+        if (!imageToProcess) return;
         setIsOcrProcessing(true);
-        setOcrProgress({ status: 'Initializing Neural OCR Engine...', percent: 15 });
+        setOcrProgress({ status: 'Optimizing image & Neural OCR engine...', percent: 15 });
 
         try {
           // Convert dataURL to Blob & File
-          const res = await fetch(capturedImage);
+          const res = await fetch(imageToProcess);
           const blob = await res.blob();
           const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
           const file = new File([blob], `Camera-Scan-${timestamp}.jpg`, { type: 'image/jpeg' });
@@ -595,24 +711,25 @@
 
           // Client-side neural OCR with Tesseract.js
           if (window.Tesseract) {
-            setOcrProgress({ status: 'Analyzing captured photo...', percent: 30 });
+            setOcrProgress({ status: 'Reading handwritten text & notes...', percent: 35 });
             try {
               const ocrRes = await window.Tesseract.recognize(
-                capturedImage,
+                imageToProcess,
                 'eng',
                 {
                   logger: (m) => {
                     if (m.status === 'recognizing text' && typeof m.progress === 'number') {
                       const pct = Math.round(m.progress * 100);
                       setOcrProgress({
-                        status: `Recognizing text (${pct}%)...`,
-                        percent: Math.max(30, Math.min(92, pct))
+                        status: `Recognizing handwriting (${pct}%)...`,
+                        percent: Math.max(35, Math.min(92, pct))
                       });
                     }
                   }
                 }
               );
-              recognizedText = ocrRes?.data?.text?.trim() || '';
+              const rawText = ocrRes?.data?.text || '';
+              recognizedText = cleanOCRText(rawText);
             } catch (tessErr) {
               console.warn("Tesseract OCR notice:", tessErr);
             }
@@ -647,7 +764,7 @@
 
       return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
-          <div className="bg-slate-900 border border-slate-700/80 w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+          <div className="bg-slate-900 border border-slate-700/80 w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
             
             {/* Header */}
             <div className="p-4 border-b border-slate-800 flex items-center justify-between text-white">
@@ -657,10 +774,10 @@
                 </div>
                 <div>
                   <h3 className="font-extrabold text-sm sm:text-base text-white font-heading">
-                    {capturedImage ? 'Review & Ingest Photo' : 'Live Document Camera'}
+                    {capturedImage ? 'Review & Enhance Scan' : 'Live Document & Notes Scanner'}
                   </h3>
                   <p className="text-[11px] text-slate-400 font-medium">
-                    {capturedImage ? 'Confirm or retake photo before OCR text extraction' : 'Position your document or text inside the frame'}
+                    {capturedImage ? 'Select filter for optimal handwritten note recognition' : 'Position your notes or document inside the viewfinder'}
                   </p>
                 </div>
               </div>
@@ -687,10 +804,55 @@
               </div>
             </div>
 
+            {/* Filter Mode Selector (When Photo is Captured) */}
+            {capturedImage && (
+              <div className="px-4 py-2.5 bg-slate-950 border-b border-slate-800/80 flex items-center justify-between gap-2 overflow-x-auto text-xs">
+                <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider hidden sm:inline">
+                  Scan Filter:
+                </span>
+                <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => setFilterMode('document')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                      filterMode === 'document'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    <span>📝 Notes B&W</span>
+                    <span className="text-[10px] opacity-75">(Best)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFilterMode('contrast')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                      filterMode === 'contrast'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    <span>🔍 Grayscale</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFilterMode('original')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                      filterMode === 'original'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    <span>📸 Original</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Viewfinder / Image Area */}
-            <div className="relative flex-1 bg-black min-h-[300px] sm:min-h-[380px] flex items-center justify-center overflow-hidden">
+            <div className="relative flex-1 bg-black min-h-[300px] sm:min-h-[360px] flex items-center justify-center overflow-hidden">
               
-              {/* Hidden Canvas for crisp snapshot rendering */}
+              {/* Hidden Canvas for snapshot rendering */}
               <canvas ref={canvasRef} className="hidden" />
 
               {!capturedImage ? (
@@ -743,17 +905,17 @@
                       {/* Hint pill */}
                       <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-[11px] font-bold text-emerald-300 pointer-events-none flex items-center gap-1.5 shadow-md">
                         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                        <span>Align document within frame</span>
+                        <span>Align handwritten notes inside frame</span>
                       </div>
                     </div>
                   )}
                 </>
               ) : (
-                <div className="relative w-full h-full flex items-center justify-center bg-slate-950">
+                <div className="relative w-full h-full flex items-center justify-center bg-slate-950 p-2">
                   <img
-                    src={capturedImage}
-                    alt="Captured Scan"
-                    className="max-h-[380px] w-auto max-w-full object-contain rounded-xl shadow-lg border border-slate-800"
+                    src={enhancedPreview || capturedImage}
+                    alt="Captured Scan Preview"
+                    className="max-h-[340px] w-auto max-w-full object-contain rounded-xl shadow-lg border border-slate-800"
                   />
 
                   {/* OCR Processing Overlay */}
@@ -763,7 +925,7 @@
                         ⚡
                       </div>
                       <div className="space-y-1">
-                        <h4 className="font-extrabold text-sm text-white font-heading">Extracting Text from Photo</h4>
+                        <h4 className="font-extrabold text-sm text-white font-heading">Recognizing Handwritten Text</h4>
                         <p className="text-xs text-indigo-200 font-medium">{ocrProgress.status || 'Processing neural OCR...'}</p>
                       </div>
                       <div className="w-full max-w-xs bg-slate-800 rounded-full h-2 overflow-hidden shadow-inner border border-slate-700">
@@ -838,7 +1000,7 @@
                     ) : (
                       <>
                         <span>⚡</span>
-                        <span>Extract & Ingest</span>
+                        <span>Extract & Ingest Notes</span>
                       </>
                     )}
                   </button>
@@ -1049,7 +1211,7 @@
         }
       };
 
-      const uploadFileObject = (file) => {
+      const uploadFileObject = async (file) => {
         if (!file) return;
 
         const maxSizeBytes = 50 * 1024 * 1024;
@@ -1082,6 +1244,8 @@
           return;
         }
 
+        const isImage = ['.jpg', '.jpeg', '.png', '.webp', '.bmp'].some(ext => lowerName.endsWith(ext));
+
         // 4. Size within limit (<= 50 MB) -> Proceed with upload
         setUploadLoading(true);
         setUploadProgress({
@@ -1089,12 +1253,59 @@
           fileName: file.name,
           totalSize: totalSizeFormatted,
           loadedSize: '0 KB',
-          statusText: `Connecting to server (${totalSizeFormatted})...`,
+          statusText: isImage ? `Enhancing image & preparing OCR engine for "${file.name}"...` : `Connecting to server (${totalSizeFormatted})...`,
           stage: 'uploading'
         });
 
+        let clientOcrText = '';
+        if (isImage && window.Tesseract) {
+          try {
+            setUploadProgress({
+              percent: 15,
+              fileName: file.name,
+              totalSize: totalSizeFormatted,
+              loadedSize: '0 KB',
+              statusText: `Enhancing contrast for handwritten notes & reading text...`,
+              stage: 'processing'
+            });
+            const dataUrl = await new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result);
+              reader.onerror = reject;
+              reader.readAsDataURL(file);
+            });
+            const enhancedUrl = await preprocessImageForOCR(dataUrl, 'document');
+            const ocrRes = await window.Tesseract.recognize(
+              enhancedUrl,
+              'eng',
+              {
+                logger: (m) => {
+                  if (m.status === 'recognizing text' && typeof m.progress === 'number') {
+                    const pct = Math.round(m.progress * 100);
+                    setUploadProgress({
+                      percent: Math.max(15, Math.min(88, pct)),
+                      fileName: file.name,
+                      totalSize: totalSizeFormatted,
+                      loadedSize: totalSizeFormatted,
+                      statusText: `Recognizing handwritten text (${pct}%)...`,
+                      stage: 'processing'
+                    });
+                  }
+                }
+              }
+            );
+            const rawText = ocrRes?.data?.text || '';
+            clientOcrText = cleanOCRText(rawText);
+          } catch (tessErr) {
+            console.warn("Client image OCR notice:", tessErr);
+          }
+        }
+
         const formData = new FormData();
         formData.append('file', file);
+        if (clientOcrText && clientOcrText.trim()) {
+          formData.append('ocr_text', clientOcrText.trim());
+        }
 
         const xhr = new XMLHttpRequest();
         xhr.open('POST', '/api/upload', true);

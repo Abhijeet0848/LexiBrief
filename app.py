@@ -343,14 +343,17 @@ async def upload_document(
         
         extracted_text, detected_format, pages_count = TextExtractor.extract(file.filename or "document.txt", content_bytes)
         
-        # If client provided OCR text (e.g. from live camera photo capture) and backend didn't find text
+        # If client provided OCR text (e.g. from live camera photo capture or image upload)
         if (not extracted_text or not extracted_text.strip()) and ocr_text and ocr_text.strip():
-            extracted_text = TextExtractor.clean_text(ocr_text)
+            extracted_text = TextExtractor.clean_ocr_text(ocr_text)
             if (file.filename or '').lower().endswith(('.jpg', '.jpeg', '.png', '.webp', '.bmp')):
                 detected_format = "IMAGE"
 
         if not extracted_text or not extracted_text.strip():
-            raise HTTPException(status_code=400, detail="Could not extract readable text from uploaded file or photo. Please ensure text is clear.")
+            raise HTTPException(
+                status_code=400, 
+                detail="Could not extract readable text or words from uploaded photo/document. Please ensure good lighting and clear handwriting/print."
+            )
             
         stats = NLPProcessor.compute_stats(extracted_text)
         stats["pages"] = pages_count
