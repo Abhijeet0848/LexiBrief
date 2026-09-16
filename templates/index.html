@@ -1338,34 +1338,34 @@
                 </div>
               </div>
 
-              {/* Desktop Navigation Tabs - Modern Segmented Capsule */}
+              {/* Desktop Navigation Tabs - Unified Design System */}
               <nav className="hidden md:flex items-center p-1.5 bg-slate-100/90 rounded-2xl border border-slate-200/80 shadow-2xs gap-1.5">
                 {[
-                  { id: 'summarize', label: 'Summarize', icon: <SparklesIcon className="w-4 h-4 text-amber-500" /> },
-                  { id: 'documents', label: 'Documents', icon: <DocumentIcon className="w-4 h-4 text-indigo-600" />, count: documentsList.length },
-                  { id: 'history', label: 'History', icon: <HistoryIcon className="w-4 h-4 text-indigo-600" />, count: summariesList.length },
-                  { id: 'benchmarks', label: 'ROUGE Metrics', icon: <ChartIcon className="w-4 h-4 text-indigo-600" /> }
+                  { id: 'summarize', label: 'Summarize', icon: <SparklesIcon className="w-4 h-4" /> },
+                  { id: 'documents', label: 'Documents', icon: <DocumentIcon className="w-4 h-4" />, count: documentsList.length },
+                  { id: 'history', label: 'History', icon: <HistoryIcon className="w-4 h-4" />, count: summariesList.length },
+                  { id: 'benchmarks', label: 'ROUGE Metrics', icon: <ChartIcon className="w-4 h-4" /> }
                 ].map(tab => {
                   const isActive = activeTab === tab.id;
                   return (
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`relative px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 select-none whitespace-nowrap tab-3d cursor-pointer ${
+                      className={`relative px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 select-none whitespace-nowrap transition-all cursor-pointer ${
                         isActive
-                          ? 'tab-3d-active text-indigo-700 font-bold'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
+                          ? 'bg-white text-indigo-700 font-bold shadow-xs border border-slate-200/90'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 border border-transparent'
                       }`}
                     >
-                      <span className={`transition-transform duration-200 flex items-center ${isActive ? 'scale-110' : 'opacity-70'}`}>
+                      <span className={`transition-transform duration-200 flex items-center ${isActive ? 'scale-105 text-indigo-600' : 'text-slate-500'}`}>
                         {tab.icon}
                       </span>
                       <span>{tab.label}</span>
                       {tab.count !== undefined && tab.count > 0 && (
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full transition-colors ${
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full transition-colors ${
                           isActive
                             ? 'bg-indigo-600 text-white shadow-2xs'
-                            : 'bg-slate-200/90 text-slate-700'
+                            : 'bg-slate-200 text-slate-700'
                         }`}>
                           {tab.count}
                         </span>
@@ -1400,7 +1400,7 @@
             {mobileMenuOpen && (
               <div className="md:hidden border-t border-slate-200/80 bg-white/95 backdrop-blur-md px-3 py-3 space-y-1.5 shadow-lg animate-fadeIn">
                 {[
-                  { id: 'summarize', label: 'Summarize', icon: <SparklesIcon className="w-4 h-4 text-amber-500" />, desc: 'Neural & Extractive Text Summarizer' },
+                  { id: 'summarize', label: 'Summarize', icon: <SparklesIcon className="w-4 h-4 text-indigo-600" />, desc: 'Neural & Extractive Text Summarizer' },
                   { id: 'documents', label: 'Documents', icon: <DocumentIcon className="w-4 h-4 text-indigo-600" />, count: documentsList.length, desc: 'Ingest & Manage PDF, DOCX, PPTX, TXT' },
                   { id: 'history', label: 'History', icon: <HistoryIcon className="w-4 h-4 text-indigo-600" />, count: summariesList.length, desc: 'Previous Summaries & Records' },
                   { id: 'benchmarks', label: 'ROUGE Metrics', icon: <ChartIcon className="w-4 h-4 text-indigo-600" />, desc: 'NLP Benchmarks & Evaluator' }
@@ -1423,11 +1423,11 @@
                         <span className="p-2 rounded-lg bg-white border border-slate-200/80 shadow-2xs flex-shrink-0 flex items-center justify-center">{tab.icon}</span>
                         <div>
                           <div className="text-xs font-bold text-slate-900">{tab.label}</div>
-                          <div className="text-[10px] text-slate-400 font-normal">{tab.desc}</div>
+                          <div className="text-xs text-slate-500 font-normal">{tab.desc}</div>
                         </div>
                       </div>
                       {tab.count !== undefined && tab.count > 0 && (
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                           isActive ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700'
                         }`}>
                           {tab.count}
@@ -1450,16 +1450,11 @@
                 {/* Control Toolbar - Length, Persona & Settings (Mobile-Optimized) */}
                 <div className="tactile-card p-3 sm:p-4 space-y-3 shadow-xs">
                   
-                  {/* Persona Switcher Section */}
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between text-xs px-0.5">
-                      <span className="text-slate-700 font-bold flex items-center gap-1.5 font-heading">
-                        <span>🎭</span> Persona:
-                      </span>
-                      <span className="sm:hidden text-[10px] text-indigo-600 font-semibold bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100 flex items-center gap-1">
-                        <span>Swipe ➜</span>
-                      </span>
-                    </div>
+                  {/* Persona Switcher Section - Vertically Centered Alignment */}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                    <span className="text-slate-700 font-bold flex items-center gap-1.5 font-heading shrink-0 text-xs py-1">
+                      <span>🎭</span> Persona:
+                    </span>
 
                     <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 pt-0.5 no-scrollbar touch-pan-x w-full">
                       {[
@@ -1485,8 +1480,8 @@
                     </div>
                   </div>
 
-                  {/* Mode Pills + Translation + Reset */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-100 text-xs">
+                  {/* Mode Pills + Translation + Reset - Grouped Layout */}
+                  <div className="flex flex-wrap items-center justify-between sm:justify-start gap-3 pt-2.5 border-t border-slate-100 text-xs">
                     
                     {/* Length Modes Segmented Control */}
                     <div className="grid grid-cols-3 sm:inline-flex bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 gap-1 w-full sm:w-auto">
@@ -1527,7 +1522,7 @@
                         <span>🌐</span>
                         <span>Translate (EN)</span>
                         {translateToEnglish && (
-                          <span className="text-[10px] bg-white/20 px-1.5 py-0.2 rounded-full font-bold">ON</span>
+                          <span className="text-xs bg-white/20 px-1.5 py-0.2 rounded-full font-bold">ON</span>
                         )}
                       </button>
 
@@ -1858,14 +1853,14 @@
 
                     {/* Footer Stats & Primary Summarize Button */}
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3.5 border-t border-slate-100">
-                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs text-slate-600 font-medium">
-                        <span className="px-2.5 py-1 rounded-lg bg-slate-100/80 border border-slate-200/60 font-mono text-[11px]">
+                      <div className="flex items-center gap-2 text-xs text-slate-600 font-medium">
+                        <span className="px-2.5 py-1 rounded-lg bg-slate-100/80 border border-slate-200/60 font-mono text-xs">
                           <b>{stats.words}</b> words
                         </span>
-                        <span className="px-2.5 py-1 rounded-lg bg-slate-100/80 border border-slate-200/60 font-mono text-[11px]">
+                        <span className="px-2.5 py-1 rounded-lg bg-slate-100/80 border border-slate-200/60 font-mono text-xs">
                           <b>{stats.chars}</b> chars
                         </span>
-                        <span className="px-2.5 py-1 rounded-lg bg-slate-100/80 border border-slate-200/60 font-mono text-[11px]">
+                        <span className="px-2.5 py-1 rounded-lg bg-slate-100/80 border border-slate-200/60 font-mono text-xs">
                           ~<b>{stats.readingTime}</b>s read
                         </span>
                       </div>
@@ -1873,7 +1868,7 @@
                       <button
                         onClick={handleSummarize}
                         disabled={isLoading || !inputText.trim() || inputText.trim().length < 5}
-                        className={`group relative overflow-hidden px-7 py-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 ${
+                        className={`group relative overflow-hidden px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 ${
                           isLoading || !inputText.trim() || inputText.trim().length < 5
                             ? 'bg-slate-100 text-slate-400 border border-slate-200/80 cursor-not-allowed shadow-none'
                             : 'btn-3d-primary text-white cursor-pointer select-none'
@@ -1917,7 +1912,7 @@
                           </span>
                           <span className="text-sm sm:text-base font-bold text-slate-900 font-heading tracking-tight">Executive Brief</span>
                           {persona !== 'general' && (
-                            <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-100 uppercase">
+                            <span className="text-xs font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-100 uppercase">
                               {persona.replace('_', ' ')}
                             </span>
                           )}
@@ -1947,26 +1942,26 @@
                                 <span>🏷️</span>
                                 <span className="font-semibold">{summaryResult.method_used || 'Abstractive Transformer'}</span>
                               </div>
-                              <div className="text-[11px] text-slate-500 font-mono font-medium flex items-center gap-1">
+                              <div className="text-xs text-slate-500 font-mono font-medium flex items-center gap-1">
                                 <span>⚡</span>
                                 <span>{summaryResult.analytics?.latency_ms || 0}ms latency</span>
                               </div>
                             </div>
                             <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200/70 text-xs">
                               <div className="p-2.5 rounded-xl bg-white border border-slate-200 shadow-2xs">
-                                <span className="text-[11px] uppercase text-slate-600 font-extrabold tracking-wider block">Original Words</span>
+                                <span className="text-xs uppercase text-slate-600 font-extrabold tracking-wider block">Original Words</span>
                                 <span className="font-extrabold text-sm sm:text-base text-slate-900 mt-0.5 block font-heading">
                                   {(summaryResult.nlp_stats?.words || stats.words || 0).toLocaleString()}
                                 </span>
                               </div>
                               <div className="p-2.5 rounded-xl bg-white border border-slate-200 shadow-2xs">
-                                <span className="text-[11px] uppercase text-slate-600 font-extrabold tracking-wider block">Summary Words</span>
+                                <span className="text-xs uppercase text-slate-600 font-extrabold tracking-wider block">Summary Words</span>
                                 <span className="font-extrabold text-sm sm:text-base text-indigo-700 mt-0.5 block font-heading">
                                   {(summaryResult.summary_stats?.summary_words || summaryResult.summary.split(/\s+/).filter(Boolean).length).toLocaleString()}
                                 </span>
                               </div>
                               <div className="p-2.5 rounded-xl bg-white border border-slate-200 shadow-2xs">
-                                <span className="text-[11px] uppercase text-slate-600 font-extrabold tracking-wider block">Compression</span>
+                                <span className="text-xs uppercase text-slate-600 font-extrabold tracking-wider block">Compression</span>
                                 <span className="font-extrabold text-sm sm:text-base text-emerald-700 mt-0.5 block font-heading">
                                   {summaryResult.summary_stats?.compression_ratio
                                     ? `${(summaryResult.summary_stats.compression_ratio * 100).toFixed(1)}%`
@@ -2095,11 +2090,11 @@
                                     <span className="font-bold text-amber-900 flex items-center gap-1.5">
                                       <span>🔍</span> Traceability Mapping for Sentence #{targetIdx + 1}
                                     </span>
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-200/80 text-amber-900 border border-amber-300 shadow-2xs font-mono">
+                                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-200/80 text-amber-900 border border-amber-300 shadow-2xs font-mono">
                                       {targetItem.confidence}% Confidence
                                     </span>
                                   </div>
-                                  <div className="space-y-1.5 text-[11px] pt-1.5 border-t border-amber-200/70">
+                                  <div className="space-y-1.5 text-xs pt-1.5 border-t border-amber-200/70">
                                     <div>
                                       <span className="text-amber-800 font-semibold block">Summary Statement:</span>
                                       <span className="text-amber-950 italic font-medium">"{targetItem.summary_sentence}"</span>
@@ -2121,14 +2116,14 @@
                                 <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5 font-heading">
                                   <span>📌</span> Key Takeaways
                                 </span>
-                                <span className="text-[10px] font-mono text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100 font-bold">
+                                <span className="text-xs font-mono text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100 font-bold">
                                   {summaryResult.key_points.length} Essential Points
                                 </span>
                               </div>
                               <div className="space-y-2">
                                 {summaryResult.key_points.map((pt, i) => (
                                   <div key={i} className="takeaway-block p-3 text-xs text-slate-800 flex items-start gap-2.5">
-                                    <span className="flex-shrink-0 w-5 h-5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/80 font-bold flex items-center justify-center text-[10px] font-mono mt-0.5">
+                                    <span className="flex-shrink-0 w-5 h-5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/80 font-bold flex items-center justify-center text-xs font-mono mt-0.5">
                                       {i + 1}
                                     </span>
                                     <span className="leading-relaxed font-medium">{pt}</span>
@@ -2147,7 +2142,7 @@
                                   <span key={i} className="tactile-tag px-3 py-1 text-slate-700 text-xs font-semibold flex items-center gap-1 cursor-default">
                                     <span className="text-indigo-600 font-bold">#</span>
                                     <span>{kw.keyword}</span>
-                                    <span className="text-slate-400 text-[10px] font-mono ml-0.5">({kw.count}x)</span>
+                                    <span className="text-slate-400 text-xs font-mono ml-0.5">({kw.count}x)</span>
                                   </span>
                                 ))}
                               </div>
@@ -2158,15 +2153,15 @@
                           {summaryResult.rouge && (
                             <div className="grid grid-cols-3 gap-2.5 text-center pt-1">
                               <div className="p-3 rounded-2xl bg-white border border-slate-200 border-b-[3px] border-b-slate-300 shadow-2xs">
-                                <span className="text-[11px] text-slate-500 font-semibold block">ROUGE-1 F1</span>
+                                <span className="text-xs text-slate-500 font-semibold block">ROUGE-1 F1</span>
                                 <span className="text-base font-bold text-indigo-600 font-mono">{(summaryResult.rouge.rouge1.f1 * 100).toFixed(1)}%</span>
                               </div>
                               <div className="p-3 rounded-2xl bg-white border border-slate-200 border-b-[3px] border-b-slate-300 shadow-2xs">
-                                <span className="text-[11px] text-slate-500 font-semibold block">ROUGE-2 F1</span>
+                                <span className="text-xs text-slate-500 font-semibold block">ROUGE-2 F1</span>
                                 <span className="text-base font-bold text-indigo-600 font-mono">{(summaryResult.rouge.rouge2.f1 * 100).toFixed(1)}%</span>
                               </div>
                               <div className="p-3 rounded-2xl bg-white border border-slate-200 border-b-[3px] border-b-slate-300 shadow-2xs">
-                                <span className="text-[11px] text-slate-500 font-semibold block">ROUGE-L F1</span>
+                                <span className="text-xs text-slate-500 font-semibold block">ROUGE-L F1</span>
                                 <span className="text-base font-bold text-emerald-600 font-mono">{(summaryResult.rouge.rougeL.f1 * 100).toFixed(1)}%</span>
                               </div>
                             </div>
@@ -2187,14 +2182,14 @@
                             Select a persona above, paste text, upload a document, or enter a YouTube/Web URL.
                           </p>
 
-                          <div className="flex flex-wrap items-center justify-center gap-2 mt-4">
-                            <span className="px-2.5 py-1 rounded-lg bg-white/90 border border-slate-200/80 text-[11px] font-semibold text-slate-600 shadow-2xs">
+                          <div className="flex flex-wrap items-center justify-center gap-2 mt-4 text-xs">
+                            <span className="px-3 py-1 rounded-lg bg-white/90 border border-slate-200/80 font-semibold text-slate-600 shadow-2xs">
                               🎭 5 Personas
                             </span>
-                            <span className="px-2.5 py-1 rounded-lg bg-white/90 border border-slate-200/80 text-[11px] font-semibold text-slate-600 shadow-2xs">
+                            <span className="px-3 py-1 rounded-lg bg-white/90 border border-slate-200/80 font-semibold text-slate-600 shadow-2xs">
                               🔍 Source Attribution
                             </span>
-                            <span className="px-2.5 py-1 rounded-lg bg-white/90 border border-slate-200/80 text-[11px] font-semibold text-slate-600 shadow-2xs">
+                            <span className="px-3 py-1 rounded-lg bg-white/90 border border-slate-200/80 font-semibold text-slate-600 shadow-2xs">
                               🌐 Web & YouTube
                             </span>
                           </div>
