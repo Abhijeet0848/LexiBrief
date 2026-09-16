@@ -1573,20 +1573,20 @@
                           {/* YouTube Metadata Preview Card */}
                           {urlDocData && urlDocData.format === 'YOUTUBE' && (
                             <div className="space-y-2 animate-fadeIn">
-                              <div className="p-3 rounded-xl bg-slate-900 text-white border border-slate-800 flex items-start gap-3 shadow-md">
+                              <div className="p-3 rounded-2xl bg-white/95 text-slate-800 border border-slate-200/90 flex items-start gap-3 shadow-xs">
                                 {urlDocData.thumbnail && (
                                   <img
                                     src={urlDocData.thumbnail}
                                     alt="Thumbnail"
-                                    className="w-24 h-16 object-cover rounded-lg flex-shrink-0 border border-slate-700"
+                                    className="w-24 h-16 object-cover rounded-xl flex-shrink-0 border border-slate-200 shadow-2xs"
                                   />
                                 )}
                                 <div className="min-w-0 flex-1 space-y-1">
-                                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-red-400">
+                                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-rose-600">
                                     <span>▶️</span> {urlDocData.is_fallback ? 'YouTube Video Linked' : 'YouTube Video Transcript Ingested'}
                                   </div>
-                                  <h4 className="text-xs font-bold text-white truncate">{urlDocData.title}</h4>
-                                  <div className="flex items-center gap-3 text-[10px] text-slate-400">
+                                  <h4 className="text-xs font-bold text-slate-900 truncate">{urlDocData.title}</h4>
+                                  <div className="flex items-center gap-3 text-[10px] text-slate-500 font-medium">
                                     <span>By: {urlDocData.author || 'Creator'}</span>
                                     {urlDocData.words > 0 && (
                                       <>
@@ -1863,33 +1863,34 @@
                       {summaryResult ? (
                         <div className="space-y-4 animate-fadeIn">
                           
-                          {/* Summary Metadata & Compression Banner */}
-                          <div className="p-3.5 rounded-2xl bg-slate-900 text-white border border-slate-800 shadow-md space-y-2">
+                          {/* Summary Metadata & Compression Banner (Clean Light-Frosted Glass) */}
+                          <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/50 border border-slate-200/90 shadow-2xs space-y-2.5">
                             <div className="flex items-center justify-between text-xs">
-                              <div className="flex items-center gap-1.5 text-indigo-300 font-bold">
+                              <div className="flex items-center gap-1.5 text-indigo-700 font-bold">
                                 <span>🏷️</span>
-                                <span>{summaryResult.method_used || 'Abstractive Transformer'}</span>
+                                <span className="font-semibold">{summaryResult.method_used || 'Abstractive Transformer'}</span>
                               </div>
-                              <div className="text-[10px] text-emerald-400 font-mono">
-                                ⚡ {summaryResult.analytics?.latency_ms || 0}ms latency
+                              <div className="text-[11px] text-slate-500 font-mono font-medium flex items-center gap-1">
+                                <span>⚡</span>
+                                <span>{summaryResult.analytics?.latency_ms || 0}ms latency</span>
                               </div>
                             </div>
-                            <div className="grid grid-cols-3 gap-2 pt-1.5 border-t border-slate-800 text-xs">
-                              <div>
-                                <span className="text-[10px] uppercase text-slate-400 font-semibold block">Original Words</span>
-                                <span className="font-bold text-sm text-white">
+                            <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200/70 text-xs">
+                              <div className="p-2.5 rounded-xl bg-white/90 border border-slate-200/80 shadow-2xs">
+                                <span className="text-[10px] uppercase text-slate-400 font-bold tracking-wider block">Original Words</span>
+                                <span className="font-bold text-sm text-slate-900 mt-0.5 block font-heading">
                                   {(summaryResult.nlp_stats?.words || stats.words || 0).toLocaleString()}
                                 </span>
                               </div>
-                              <div>
-                                <span className="text-[10px] uppercase text-slate-400 font-semibold block">Summary Words</span>
-                                <span className="font-bold text-sm text-white">
+                              <div className="p-2.5 rounded-xl bg-white/90 border border-slate-200/80 shadow-2xs">
+                                <span className="text-[10px] uppercase text-slate-400 font-bold tracking-wider block">Summary Words</span>
+                                <span className="font-bold text-sm text-indigo-600 mt-0.5 block font-heading">
                                   {(summaryResult.summary_stats?.summary_words || summaryResult.summary.split(/\s+/).filter(Boolean).length).toLocaleString()}
                                 </span>
                               </div>
-                              <div>
-                                <span className="text-[10px] uppercase text-slate-400 font-semibold block">Compression</span>
-                                <span className="font-bold text-sm text-emerald-400">
+                              <div className="p-2.5 rounded-xl bg-white/90 border border-slate-200/80 shadow-2xs">
+                                <span className="text-[10px] uppercase text-slate-400 font-bold tracking-wider block">Compression</span>
+                                <span className="font-bold text-sm text-emerald-600 mt-0.5 block font-heading">
                                   {summaryResult.summary_stats?.compression_ratio
                                     ? `${(summaryResult.summary_stats.compression_ratio * 100).toFixed(1)}%`
                                     : (summaryResult.nlp_stats?.words || stats.words) > 0
@@ -2012,23 +2013,23 @@
                               if (!targetItem) return null;
 
                               return (
-                                <div className="p-3.5 rounded-2xl bg-slate-900 text-white border border-slate-800 shadow-md space-y-2 animate-fadeIn text-xs">
+                                <div className="p-3.5 rounded-2xl bg-amber-50/90 text-amber-950 border border-amber-200/90 shadow-2xs space-y-2 animate-fadeIn text-xs">
                                   <div className="flex items-center justify-between">
-                                    <span className="font-bold text-amber-400 flex items-center gap-1.5">
+                                    <span className="font-bold text-amber-900 flex items-center gap-1.5">
                                       <span>🔍</span> Traceability Mapping for Sentence #{targetIdx + 1}
                                     </span>
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500 text-slate-900">
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-200/80 text-amber-900 border border-amber-300 shadow-2xs">
                                       {targetItem.confidence}% Confidence
                                     </span>
                                   </div>
-                                  <div className="space-y-1.5 text-[11px] pt-1 border-t border-slate-800">
+                                  <div className="space-y-1.5 text-[11px] pt-1.5 border-t border-amber-200/70">
                                     <div>
-                                      <span className="text-slate-400 font-semibold block">Summary Statement:</span>
-                                      <span className="text-amber-200 italic font-medium">"{targetItem.summary_sentence}"</span>
+                                      <span className="text-amber-800 font-semibold block">Summary Statement:</span>
+                                      <span className="text-amber-950 italic font-medium">"{targetItem.summary_sentence}"</span>
                                     </div>
                                     <div>
-                                      <span className="text-slate-400 font-semibold block">Matched Source Statement (Sentence #{targetItem.source_idx + 1}):</span>
-                                      <span className="text-slate-200 italic font-medium">"{targetItem.source_sentence}"</span>
+                                      <span className="text-slate-500 font-semibold block">Matched Source Statement (Sentence #{targetItem.source_idx + 1}):</span>
+                                      <span className="text-slate-800 italic font-medium">"{targetItem.source_sentence}"</span>
                                     </div>
                                   </div>
                                 </div>
