@@ -287,9 +287,33 @@ class TextExtractor:
             from youtube_transcript_api import YouTubeTranscriptApi
             languages = ['en', 'en-US', 'en-GB', 'hi', 'mr', 'bn', 'ta', 'te', 'gu', 'kn', 'ml', 'ur', 'pa', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'zh', 'ja', 'ar']
             
-            # Tier 1: Modern Instance API (v1.2.4+)
+            # Prepare optional authenticated session via cookies if configured in environment
+            session = requests.Session()
+            cookies_txt = os.getenv("YOUTUBE_COOKIES_TXT", "").strip()
+            cookie_path = os.getenv("YOUTUBE_COOKIE_PATH", "cookies.txt").strip()
+            if cookies_txt:
+                try:
+                    import http.cookiejar
+                    from io import StringIO
+                    cj = http.cookiejar.MozillaCookieJar()
+                    cj._really_load(StringIO(cookies_txt), "cookies_env", ignore_discard=True, ignore_expires=True)
+                    session.cookies = cj
+                    logger.info("Loaded YouTube cookies from YOUTUBE_COOKIES_TXT.")
+                except Exception as ck_err:
+                    logger.debug(f"Could not parse YOUTUBE_COOKIES_TXT: {ck_err}")
+            elif os.path.exists(cookie_path):
+                try:
+                    import http.cookiejar
+                    cj = http.cookiejar.MozillaCookieJar(cookie_path)
+                    cj.load(ignore_discard=True, ignore_expires=True)
+                    session.cookies = cj
+                    logger.info(f"Loaded YouTube cookies from {cookie_path}.")
+                except Exception as ck_err:
+                    logger.debug(f"Could not parse cookie file: {ck_err}")
+
+            # Tier 1: Modern Instance API (v1.2.4+) with session
             try:
-                ytt = YouTubeTranscriptApi()
+                ytt = YouTubeTranscriptApi(http_client=session)
                 try:
                     t_list = ytt.list(video_id)
                     target_transcript = None
@@ -345,7 +369,7 @@ class TextExtractor:
                         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
                         "Accept-Language": "en-US,en;q=0.9,hi;q=0.8",
                     }
-                    yt_page = requests.get(f"https://www.youtube.com/watch?v={video_id}", headers=headers, timeout=6)
+                    yt_page = session.get(f"https://www.youtube.com/watch?v={video_id}", headers=headers, timeout=6)
                     if yt_page.status_code == 200:
                         m = re.search(r'ytInitialPlayerResponse\s*=\s*({.+?});(?:var|\s*<\/script>)', yt_page.text)
                         if m:
@@ -360,7 +384,7 @@ class TextExtractor:
                                         cap_url = track.get("baseUrl")
                                         break
                                 if cap_url:
-                                    cap_resp = requests.get(cap_url + "&fmt=json3", headers=headers, timeout=6)
+                                    cap_resp = session.get(cap_url + "&fmt=json3", headers=headers, timeout=6)
                                     if cap_resp.status_code == 200:
                                         try:
                                             cap_data = cap_resp.json()
@@ -381,11 +405,14 @@ class TextExtractor:
                 except Exception as innertube_err:
                     logger.debug(f"Direct player scraping notice: {innertube_err}")
 
-            # Tier 4: Public Invidious Cloud Proxy Mirror Fallback
+            # Tier 4: Public Cloud Proxy Mirrors Fallback
             if not transcript_list:
                 invidious_mirrors = [
                     f"https://inv.nadeko.net/api/v1/captions/{video_id}",
-                    f"https://invidious.nerdvpn.de/api/v1/captions/{video_id}"
+                    f"https://invidious.nerdvpn.de/api/v1/captions/{video_id}",
+                    f"https://invidious.jing.rocks/api/v1/captions/{video_id}",
+                    f"https://inv.tux.pizza/api/v1/captions/{video_id}",
+                    f"https://invidious.private.coffee/api/v1/captions/{video_id}"
                 ]
                 for mirror_url in invidious_mirrors:
                     try:
@@ -402,7 +429,6 @@ class TextExtractor:
                                         c_url = f"{base_domain}{c_url}"
                                     c_res = requests.get(c_url, timeout=5)
                                     if c_res.status_code == 200:
-                                        # Simple VTT parser
                                         lines = c_res.text.splitlines()
                                         vtt_texts = []
                                         for line in lines:

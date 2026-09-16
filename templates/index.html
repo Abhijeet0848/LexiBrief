@@ -878,6 +878,59 @@
 
           const data = await res.json();
           if (data && data.is_fallback) {
+            // Attempt client-side resolution using the browser's residential IP across multiple public CORS mirrors
+            const videoId = data.video_id;
+            let resolvedClientText = null;
+            if (videoId) {
+              const clientMirrors = [
+                `https://inv.nadeko.net/api/v1/captions/${videoId}`,
+                `https://invidious.nerdvpn.de/api/v1/captions/${videoId}`,
+                `https://invidious.jing.rocks/api/v1/captions/${videoId}`,
+                `https://inv.tux.pizza/api/v1/captions/${videoId}`
+              ];
+              for (const mirrorUrl of clientMirrors) {
+                try {
+                  const mRes = await fetch(mirrorUrl);
+                  if (mRes.ok) {
+                    const mData = await mRes.json();
+                    const caps = mData?.captions || [];
+                    if (caps.length > 0) {
+                      let cUrl = caps[0].url;
+                      if (cUrl && !cUrl.startsWith('http')) {
+                        const baseDomain = mirrorUrl.split('/').slice(0, 3).join('/');
+                        cUrl = `${baseDomain}${cUrl}`;
+                      }
+                      const cRes = await fetch(cUrl);
+                      if (cRes.ok) {
+                        const vtt = await cRes.text();
+                        const lines = vtt.split('\n')
+                          .map(l => l.trim())
+                          .filter(l => l && !l.startsWith('WEBVTT') && !l.includes('-->') && !/^\d+$/.test(l));
+                        if (lines.length > 0) {
+                          resolvedClientText = lines.join(' ').replace(/\s+/g, ' ');
+                          break;
+                        }
+                      }
+                    }
+                  }
+                } catch (e) {}
+              }
+            }
+
+            if (resolvedClientText) {
+              setInputText(resolvedClientText);
+              setUrlDocData({ ...data, is_fallback: false, text: resolvedClientText, words: resolvedClientText.split(/\s+/).length });
+              setUploadedDocInfo({
+                filename: data.title || 'YouTube Video',
+                format: 'YOUTUBE',
+                pages: 1,
+                words: resolvedClientText.split(/\s+/).length
+              });
+              setSourceViewMode('editor');
+              showToast(`✓ YouTube subtitles loaded via client! (${resolvedClientText.split(/\s+/).length.toLocaleString()} words)`, "success");
+              return resolvedClientText;
+            }
+
             setUrlDocData(data);
             setUploadedDocInfo({
               filename: data.title || 'YouTube Video',
