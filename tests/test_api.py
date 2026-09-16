@@ -307,4 +307,12 @@ def test_upload_pptx_endpoint():
     assert "LexiBrief NLP Architecture" in data["text"]
 
 
+def test_multilingual_ocr_cleansing():
+    """Verify that OCR cleansing preserves Hindi, Indic, and non-Latin scripts and Indic punctuation."""
+    hindi_raw_ocr = "तोता हमारे देश का एक लोकप्रिय पक्षी है। |~^ तोता मुझे बहुत अच्छा लगता है।\nतोते की बोली मीठी होती है।"
+    cleaned = TextExtractor.clean_ocr_text(hindi_raw_ocr)
+    assert "तोता हमारे देश का एक लोकप्रिय पक्षी है।" in cleaned
+    assert "तोते की बोली मीठी होती है।" in cleaned
+    assert "|" not in cleaned
+    assert "~" not in cleaned
 

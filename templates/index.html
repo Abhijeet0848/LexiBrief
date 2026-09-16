@@ -551,13 +551,37 @@
       });
     };
 
-    // Smart OCR Text Cleanser for Eliminating Confusing Symbols and Healing Words
+    // Universal Multi-Language OCR Configuration
+    const OCR_LANGUAGES = [
+      { code: 'eng+hin', label: '🌐 Multilingual (English + Hindi)', short: 'Eng + Hin' },
+      { code: 'hin', label: '🇮🇳 Hindi (हिन्दी)', short: 'Hindi' },
+      { code: 'eng', label: '🇬🇧 English', short: 'English' },
+      { code: 'spa', label: '🇪🇸 Spanish (Español)', short: 'Spanish' },
+      { code: 'fra', label: '🇫🇷 French (Français)', short: 'French' },
+      { code: 'deu', label: '🇩🇪 German (Deutsch)', short: 'German' },
+      { code: 'ara', label: '🇸🇦 Arabic (العربية)', short: 'Arabic' },
+      { code: 'chi_sim', label: '🇨🇳 Chinese (中文)', short: 'Chinese' },
+      { code: 'jpn', label: '🇯🇵 Japanese (日本語)', short: 'Japanese' },
+      { code: 'rus', label: '🇷🇺 Russian (Русский)', short: 'Russian' },
+      { code: 'ben', label: '🇮🇳 Bengali (বাংলা)', short: 'Bengali' },
+      { code: 'mar', label: '🇮🇳 Marathi (मराठी)', short: 'Marathi' },
+      { code: 'tam', label: '🇮🇳 Tamil (தமிழ்)', short: 'Tamil' },
+      { code: 'tel', label: '🇮🇳 Telugu (తెలుగు)', short: 'Telugu' },
+      { code: 'guj', label: '🇮🇳 Gujarati (ગુજરાતી)', short: 'Gujarati' },
+      { code: 'urd', label: '🇵🇰 Urdu (اردو)', short: 'Urdu' },
+      { code: 'ita', label: '🇮🇹 Italian (Italiano)', short: 'Italian' },
+      { code: 'por', label: '🇵🇹 Portuguese (Português)', short: 'Portuguese' },
+      { code: 'eng+hin+spa+fra+deu', label: '🌍 Global Multi-Script (Eng+Hin+Spa+Fra+Deu)', short: 'Global Multi' }
+    ];
+
+    // Smart OCR Text Cleanser: Preserves all International Scripts (Hindi, Indic, Arabic, CJK, Cyrillic, Latin)
     const cleanOCRText = (text) => {
       if (!text) return '';
-      // 1. Strip all non-standard symbols and OCR glitch characters
-      let clean = text.replace(/[|~_^\/\\<>{}\[\]*+=#`¬¢§±µ¿¡@$%&;:~]+/g, ' ');
+      // 1. Strip non-printable control codes & glitch symbols while preserving valid letters, numbers, and Indic/Arabic/CJK punctuation
+      let clean = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+      clean = clean.replace(/[|~_^\/\\<>{}\[\]*+=#`¬¢§±µ¿¡@$%&~]+/g, ' ');
       
-      // 2. Fix OCR digit-in-word substitutions (e.g. m0del -> model, w1th -> with, th3 -> the, sy5tem -> system)
+      // 2. Fix English OCR digit-in-word substitutions (e.g. m0del -> model) only for Latin words
       clean = clean.replace(/\b([a-zA-Z0-9]+)\b/g, (match) => {
         if (/^\d+$/.test(match) || /^\d+[a-zA-Z]{1,2}$/.test(match)) return match;
         const alphas = (match.match(/[a-zA-Z]/g) || []).length;
@@ -571,14 +595,14 @@
         return match;
       });
 
-      // 3. Clean line by line and eliminate isolated single-character noise
+      // 3. Clean line by line and eliminate isolated single-character Latin noise without touching Unicode
       const lines = clean.split('\n');
       const validLines = [];
       for (let line of lines) {
         const words = line.trim().split(/\s+/);
         const validWords = [];
         for (let w of words) {
-          if (w.length === 1 && !['a', 'i', 'A', 'I', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'].includes(w)) {
+          if (w.length === 1 && /^[a-zA-Z]$/.test(w) && !['a', 'i', 'A', 'I'].includes(w)) {
             continue;
           }
           if (w) validWords.push(w);
@@ -590,23 +614,28 @@
       return validLines.join('\n').trim();
     };
 
-    // Helper: Execute High-Precision Client OCR with Strict Whitelist
-    const executeHandwritingOCR = async (imageSrc, onProgress) => {
+    // Helper: Execute High-Precision Client OCR with Universal Multilingual Support
+    const executeHandwritingOCR = async (imageSrc, onProgress, selectedLang = 'eng+hin') => {
       if (!window.Tesseract || !imageSrc) return '';
+      const lang = selectedLang || 'eng+hin';
       
-      // Preferred: createWorker with strict character whitelist
       if (typeof window.Tesseract.createWorker === 'function') {
         try {
-          const worker = await window.Tesseract.createWorker('eng', 1, {
+          const worker = await window.Tesseract.createWorker(lang, 1, {
             logger: (m) => {
               if (m.status === 'recognizing text' && typeof m.progress === 'number') {
                 const pct = Math.round(m.progress * 100);
-                if (onProgress) onProgress(pct);
+                if (onProgress) onProgress(pct, `Recognizing text (${pct}%)...`);
+              } else if (m.status && onProgress) {
+                const displayStatus = m.status === 'loading tesseract core' ? 'Loading AI core...'
+                  : m.status === 'loading language traineddata' ? `Loading ${lang} models...`
+                  : m.status === 'initializing api' ? 'Initializing OCR engine...'
+                  : m.status === 'recognizing text' ? 'Scanning glyphs...' : m.status;
+                onProgress(null, displayStatus);
               }
             }
           });
           await worker.setParameters({
-            tessedit_char_whitelist: '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ .,!?\'"-\n\r',
             tessedit_pageseg_mode: '6',
             preserve_interword_spaces: '1'
           });
@@ -619,16 +648,21 @@
         }
       }
 
-      // Fallback: standard recognize with post-cleaner
-      const ret = await window.Tesseract.recognize(imageSrc, 'eng', {
-        logger: (m) => {
-          if (m.status === 'recognizing text' && typeof m.progress === 'number') {
-            const pct = Math.round(m.progress * 100);
-            if (onProgress) onProgress(pct);
+      // Fallback: standard recognize with selected language
+      try {
+        const ret = await window.Tesseract.recognize(imageSrc, lang, {
+          logger: (m) => {
+            if (m.status === 'recognizing text' && typeof m.progress === 'number') {
+              const pct = Math.round(m.progress * 100);
+              if (onProgress) onProgress(pct, `Recognizing text (${pct}%)...`);
+            }
           }
-        }
-      });
-      return cleanOCRText(ret?.data?.text || '');
+        });
+        return cleanOCRText(ret?.data?.text || '');
+      } catch (err) {
+        console.error("Tesseract recognize error:", err);
+        throw err;
+      }
     };
 
     // High-Precision Real-Time Camera Scanner & OCR Modal
@@ -639,6 +673,7 @@
       const canvasRef = React.useRef(null);
       const [stream, setStream] = React.useState(null);
       const [facingMode, setFacingMode] = React.useState('environment'); // 'environment' (back) or 'user' (front)
+      const [ocrLang, setOcrLang] = React.useState('eng+hin'); // Default to Multilingual English + Hindi
       const [capturedImage, setCapturedImage] = React.useState(null);
       const [enhancedPreview, setEnhancedPreview] = React.useState(null);
       const [filterMode, setFilterMode] = React.useState('document'); // 'document', 'contrast', 'original'
@@ -758,15 +793,16 @@
         const imageToProcess = enhancedPreview || capturedImage;
         if (!imageToProcess) return;
         setIsOcrProcessing(true);
-        setOcrProgress({ status: 'Optimizing ink contrast & preparing Neural OCR...', percent: 15 });
+        const langObj = OCR_LANGUAGES.find(l => l.code === ocrLang);
+        setOcrProgress({ status: `Preparing OCR engine (${langObj ? langObj.short : ocrLang})...`, percent: 15 });
 
         try {
-          const recognizedText = await executeHandwritingOCR(imageToProcess, (pct) => {
+          const recognizedText = await executeHandwritingOCR(imageToProcess, (pct, statusText) => {
             setOcrProgress({
-              status: `Recognizing handwriting (${pct}%)...`,
-              percent: Math.max(25, Math.min(92, pct))
+              status: statusText || (pct ? `Recognizing text (${pct}%)...` : 'Processing neural OCR...'),
+              percent: pct !== null ? Math.max(15, Math.min(92, pct)) : 35
             });
-          });
+          }, ocrLang);
 
           setIsOcrProcessing(false);
           setExtractedTextPreview(recognizedText || ' ');
@@ -832,11 +868,27 @@
                     {extractedTextPreview !== null ? 'Verify & Review Extracted Notes' : capturedImage ? 'Review & Enhance Handwriting Scan' : 'Live Document & Notes Scanner'}
                   </h3>
                   <p className="text-[11px] text-slate-400 font-medium">
-                    {extractedTextPreview !== null ? 'Review or tweak recognized text before sending to summarizer' : capturedImage ? 'Select filter for optimal handwritten note recognition' : 'Position your notes or document inside the viewfinder'}
+                    {extractedTextPreview !== null ? 'Review or tweak recognized text before sending to summarizer' : capturedImage ? 'Select filter & language for optimal recognition' : 'Position notes inside viewfinder or choose target language'}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                {!capturedImage && !cameraError && (
+                  <div className="flex items-center gap-1.5 mr-1">
+                    <select
+                      value={ocrLang}
+                      onChange={(e) => setOcrLang(e.target.value)}
+                      className="bg-slate-800/90 border border-slate-700 text-indigo-300 text-xs rounded-xl px-2 py-1.5 font-bold focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer max-w-[150px] sm:max-w-[180px] truncate"
+                      title="Select OCR Language"
+                    >
+                      {OCR_LANGUAGES.map(lang => (
+                        <option key={lang.code} value={lang.code} className="bg-slate-900 text-white">
+                          {lang.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 {!capturedImage && !cameraError && (
                   <button
                     type="button"
@@ -859,13 +911,13 @@
               </div>
             </div>
 
-            {/* Filter Mode Selector (When Photo is Captured & Not in text review mode) */}
+            {/* Filter & Language Mode Selector (When Photo is Captured & Not in text review mode) */}
             {capturedImage && extractedTextPreview === null && (
-              <div className="px-4 py-2.5 bg-slate-950 border-b border-slate-800/80 flex items-center justify-between gap-2 overflow-x-auto text-xs">
-                <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider hidden sm:inline">
-                  Scan Filter:
-                </span>
-                <div className="flex items-center gap-1.5 w-full sm:w-auto">
+              <div className="px-4 py-2.5 bg-slate-950 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-1.5 overflow-x-auto">
+                  <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider hidden sm:inline">
+                    Scan Filter:
+                  </span>
                   <button
                     type="button"
                     onClick={() => setFilterMode('document')}
@@ -900,6 +952,26 @@
                   >
                     <span>📸 Original</span>
                   </button>
+                </div>
+
+                {/* Language Selector */}
+                <div className="flex items-center gap-1.5 ml-auto">
+                  <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                    <span>🌐</span>
+                    <span>Lang:</span>
+                  </span>
+                  <select
+                    value={ocrLang}
+                    onChange={(e) => setOcrLang(e.target.value)}
+                    disabled={isOcrProcessing}
+                    className="bg-slate-800 border border-slate-700 text-indigo-300 text-xs rounded-lg px-2 py-1 font-bold focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer max-w-[170px] truncate"
+                  >
+                    {OCR_LANGUAGES.map(lang => (
+                      <option key={lang.code} value={lang.code} className="bg-slate-900 text-white">
+                        {lang.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
             )}
@@ -1383,16 +1455,16 @@
               reader.readAsDataURL(file);
             });
             const enhancedUrl = await preprocessImageForOCR(dataUrl, 'document');
-            clientOcrText = await executeHandwritingOCR(enhancedUrl, (pct) => {
+            clientOcrText = await executeHandwritingOCR(enhancedUrl, (pct, statusText) => {
               setUploadProgress({
-                percent: Math.max(15, Math.min(88, pct)),
+                percent: pct !== null ? Math.max(15, Math.min(88, pct)) : 35,
                 fileName: file.name,
                 totalSize: totalSizeFormatted,
                 loadedSize: totalSizeFormatted,
-                statusText: `Recognizing handwritten text (${pct}%)...`,
+                statusText: statusText || (pct ? `Recognizing text (${pct}%)...` : `Processing neural OCR...`),
                 stage: 'processing'
               });
-            });
+            }, 'eng+hin');
           } catch (tessErr) {
             console.warn("Client image OCR notice:", tessErr);
           }

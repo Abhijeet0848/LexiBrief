@@ -20,32 +20,34 @@ class TextExtractor:
     @staticmethod
     def clean_ocr_text(text: str) -> str:
         """
-        Cleans OCR artifacts, completely removes confusing non-alphanumeric symbols, 
-        and heals digit-in-word confusions resulting from handwritten text recognition.
+        Cleans OCR artifacts, removes confusing non-alphanumeric/non-word symbols, 
+        and heals digit-in-word confusions resulting from handwritten text recognition
+        while preserving all international Unicode characters and Indic punctuation (e.g., Hindi danda).
         """
         if not text:
             return ""
         
-        # 1. Strip all non-word symbols and OCR glitch characters
-        text = re.sub(r'[|~_^\/\\<>{}\[\]*+=#`¬¢§±µ¿¡@$%&;:~]+', ' ', text)
+        # 1. Strip glitch symbols while preserving valid letters, numbers, and Indic/CJK/Arabic punctuation
+        text = re.sub(r'[|~_^\/\\<>{}\[\]*+=#`¬¢§±µ¿¡@$%&~]+', ' ', text)
         
-        # 2. Fix OCR digit-in-word confusions (e.g., 'm0del' -> 'model', 'w1th' -> 'with', 'th3' -> 'the')
+        # 2. Fix English OCR digit-in-word confusions (e.g., 'm0del' -> 'model', 'w1th' -> 'with')
         def _heal_word(w: str) -> str:
             if not w:
                 return ""
             # If word is a standard number or date, keep it intact
             if w.isdigit() or re.match(r'^\d+[a-zA-Z]{1,2}$', w):
                 return w
-            # If word contains multiple letters with embedded OCR digits
-            alpha_count = sum(1 for c in w if c.isalpha())
-            if alpha_count >= 2:
-                w = re.sub(r'(?<=[a-zA-Z])0(?=[a-zA-Z])', 'o', w)
-                w = re.sub(r'(?<=[a-zA-Z])1(?=[a-zA-Z])', 'l', w)
-                w = re.sub(r'(?<=[a-zA-Z])3(?=[a-zA-Z])', 'e', w)
-                w = re.sub(r'(?<=[a-zA-Z])5(?=[a-zA-Z])', 's', w)
+            # Only apply Latin letter heuristic if word is pure ASCII alphanumeric
+            if re.match(r'^[a-zA-Z0-9]+$', w):
+                alpha_count = sum(1 for c in w if c.isalpha())
+                if alpha_count >= 2:
+                    w = re.sub(r'(?<=[a-zA-Z])0(?=[a-zA-Z])', 'o', w)
+                    w = re.sub(r'(?<=[a-zA-Z])1(?=[a-zA-Z])', 'l', w)
+                    w = re.sub(r'(?<=[a-zA-Z])3(?=[a-zA-Z])', 'e', w)
+                    w = re.sub(r'(?<=[a-zA-Z])5(?=[a-zA-Z])', 's', w)
             return w
 
-        # 3. Filter line by line and eliminate isolated single-character noise
+        # 3. Filter line by line and eliminate isolated single-character Latin noise
         clean_lines = []
         for line in text.split('\n'):
             line_str = line.strip()
@@ -55,8 +57,8 @@ class TextExtractor:
             healed_words = []
             for raw_w in words:
                 w = _heal_word(raw_w.strip())
-                # Drop solitary random single letters that aren't valid words
-                if len(w) == 1 and w.lower() not in ['a', 'i', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9']:
+                # Drop solitary random single Latin letters that aren't valid words
+                if len(w) == 1 and w.isascii() and w.isalpha() and w.lower() not in ['a', 'i']:
                     continue
                 if w:
                     healed_words.append(w)
@@ -281,12 +283,18 @@ class TextExtractor:
             page_count = len(doc)
             for page in doc:
                 try:
-                    tp = page.get_textpage_ocr(language="eng", dpi=150)
+                    tp = page.get_textpage_ocr(language="eng+hin", dpi=150)
                     text = page.get_text(textpage=tp)
                     if text and text.strip():
                         pages.append(text.strip())
                 except Exception:
-                    pass
+                    try:
+                        tp = page.get_textpage_ocr(language="eng", dpi=150)
+                        text = page.get_text(textpage=tp)
+                        if text and text.strip():
+                            pages.append(text.strip())
+                    except Exception:
+                        pass
             doc.close()
             if pages:
                 return "\n\n".join(pages), max(1, page_count)
