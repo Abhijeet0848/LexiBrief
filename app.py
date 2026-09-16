@@ -272,6 +272,7 @@ async def favicon():
     candidate_favicons = [
         os.path.join(STATIC_DIR, "logo.jpg"),
         os.path.join(BASE_DIR, "static", "logo.jpg"),
+        os.path.join(os.getcwd(), "static", "logo.jpg"),
         "/var/task/static/logo.jpg",
         "static/logo.jpg"
     ]
@@ -279,10 +280,71 @@ async def favicon():
         if os.path.exists(p) and os.path.isfile(p):
             try:
                 with open(p, "rb") as f:
-                    return Response(content=f.read(), media_type="image/jpeg")
+                    return Response(content=f.read(), media_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400"})
             except Exception:
                 pass
     return Response(status_code=204)
+
+
+@app.get("/logo.jpg", include_in_schema=False)
+@app.get("/static/logo.jpg", include_in_schema=False)
+async def serve_logo():
+    candidate_paths = [
+        os.path.join(STATIC_DIR, "logo.jpg"),
+        os.path.join(BASE_DIR, "static", "logo.jpg"),
+        os.path.join(os.getcwd(), "static", "logo.jpg"),
+        "/var/task/static/logo.jpg",
+        "static/logo.jpg"
+    ]
+    for p in candidate_paths:
+        if os.path.exists(p) and os.path.isfile(p):
+            try:
+                with open(p, "rb") as f:
+                    return Response(
+                        content=f.read(),
+                        media_type="image/jpeg",
+                        headers={"Cache-Control": "public, max-age=86400"}
+                    )
+            except Exception:
+                pass
+    raise HTTPException(status_code=404, detail="Logo file not found")
+
+
+@app.get("/static/{file_path:path}", include_in_schema=False)
+async def serve_static_file(file_path: str):
+    import mimetypes
+    clean_path = file_path.lstrip("/\\")
+    candidate_paths = [
+        os.path.join(STATIC_DIR, clean_path),
+        os.path.join(BASE_DIR, "static", clean_path),
+        os.path.join(os.getcwd(), "static", clean_path),
+        f"/var/task/static/{clean_path}",
+        f"static/{clean_path}"
+    ]
+    for p in candidate_paths:
+        if os.path.exists(p) and os.path.isfile(p):
+            try:
+                mime_type, _ = mimetypes.guess_type(p)
+                if not mime_type:
+                    if p.lower().endswith((".jpg", ".jpeg")):
+                        mime_type = "image/jpeg"
+                    elif p.lower().endswith(".png"):
+                        mime_type = "image/png"
+                    elif p.lower().endswith(".svg"):
+                        mime_type = "image/svg+xml"
+                    elif p.lower().endswith(".ico"):
+                        mime_type = "image/x-icon"
+                    else:
+                        mime_type = "application/octet-stream"
+                with open(p, "rb") as f:
+                    return Response(
+                        content=f.read(),
+                        media_type=mime_type,
+                        headers={"Cache-Control": "public, max-age=86400"}
+                    )
+            except Exception:
+                pass
+    raise HTTPException(status_code=404, detail=f"Static file '{file_path}' not found")
 
 
 @app.get("/api/health", tags=["System"])
