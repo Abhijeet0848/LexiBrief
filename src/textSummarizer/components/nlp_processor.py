@@ -226,42 +226,118 @@ class NLPProcessor:
 
     @classmethod
     def extract_key_points(cls, text: str, top_k: int = 4, precomputed_sentences: List[str] = None) -> List[str]:
-        """Extracts bulleted key takeaways and essential declarative clauses."""
+        """
+        Extracts salient, high-diversity bulleted key takeaways and essential declarative clauses
+        using TF-IDF term scoring, position biasing, and Maximal Marginal Relevance (MMR) redundancy suppression.
+        """
         sentences = precomputed_sentences if precomputed_sentences is not None else cls.split_sentences(text)
         if not sentences:
             return []
         if len(sentences) <= top_k:
-            return sentences
+            return [s.strip() for s in sentences if s.strip()]
 
-        # Precompute sentence tokens and keyword dictionary in single pass
+        # Precompute sentence tokens and content words
         sent_tokens = [cls.tokenize_words(s) for s in sentences]
-        all_words = [w for toks in sent_tokens for w in toks if w not in cls.STOPWORDS and not w.isdigit() and len(w) >= 3]
-        
+        sent_content_words = [
+            [w for w in toks if w not in cls.STOPWORDS and not w.isdigit() and len(w) >= 2]
+            for toks in sent_tokens
+        ]
+
+        all_words = [w for words in sent_content_words for w in words]
         if not all_words:
-            return sentences[:top_k]
+            return [s.strip() for s in sentences[:top_k]]
 
         word_counts = Counter(all_words)
-        top_kw = dict(word_counts.most_common(15))
+        max_wc = max(word_counts.values()) if word_counts else 1.0
+        word_weights = {w: math.log(1.0 + (cnt / max_wc)) + 1.0 for w, cnt in word_counts.items()}
 
-        scored = []
+        scored_candidates = []
         num_sentences = len(sentences)
+
         for idx, sentence in enumerate(sentences):
-            words = sent_tokens[idx]
-            token_count = len(words)
-            if token_count == 0:
+            words = sent_content_words[idx]
+            token_count = len(sent_tokens[idx])
+            if token_count == 0 or len(words) == 0:
                 continue
-            kw_score = sum(top_kw.get(w, 0) for w in words)
-            pos_weight = 1.05 if idx == 0 else 1.0
-            norm = math.sqrt(token_count) if token_count > 0 else 1.0
-            score = (kw_score / norm) * pos_weight
-            scored.append((idx, score, sentence))
 
-        if not scored:
-            return sentences[:top_k]
+            # Base keyword coverage score
+            kw_score = sum(word_weights.get(w, 0.0) for w in words)
+            norm = math.sqrt(len(words)) if len(words) > 0 else 1.0
+            base_score = kw_score / norm
 
-        top_sentences = sorted(scored, key=lambda x: x[1], reverse=True)[:top_k]
-        top_sentences.sort(key=lambda x: x[0])  # Preserve narrative sequence
-        return [s[2] for s in top_sentences]
+            # Position weight: strong intro premise boost and concluding summary boost
+            pos_weight = 1.15 if idx == 0 else (1.08 if idx == num_sentences - 1 else 1.0)
+
+            # Rhetorical questions are inquiry prompts rather than conclusive takeaways
+            cleaned_s = sentence.strip()
+            question_penalty = 0.60 if cleaned_s.endswith('?') or '?' in cleaned_s else 1.0
+
+            # Penalize isolated dangling demonstratives without prior context
+            first_words = sent_tokens[idx][:2]
+            dangling_penalty = 0.85 if any(fw in {'यह', 'इस', 'ये', 'वे', 'this', 'these', 'it', 'they'} for fw in first_words) and idx > 0 else 1.0
+
+            # Length normalization (favor informative, concise clauses between 8 and 35 words)
+            if 8 <= token_count <= 35:
+                length_factor = 1.10
+            elif token_count > 45:
+                length_factor = 0.80
+            else:
+                length_factor = 0.95
+
+            final_score = base_score * pos_weight * question_penalty * dangling_penalty * length_factor
+
+            # Clean leading bullet markers if present (e.g. •, -, 1.)
+            display_sent = re.sub(r'^(?:[•\-\*]|\d+[\.\)])\s*', '', cleaned_s).strip()
+
+            scored_candidates.append({
+                "idx": idx,
+                "score": final_score,
+                "sentence": display_sent,
+                "words_set": set(words)
+            })
+
+        if not scored_candidates:
+            return [s.strip() for s in sentences[:top_k]]
+
+        # Maximal Marginal Relevance (MMR) selection for high information coverage without redundancy
+        selected = []
+        selected_word_sets = []
+        candidates = list(scored_candidates)
+
+        # 1. Select the top-ranked foundation sentence
+        candidates.sort(key=lambda x: x["score"], reverse=True)
+        first = candidates.pop(0)
+        selected.append(first)
+        selected_word_sets.append(first["words_set"])
+
+        # 2. Iteratively select subsequent key points balancing topical relevance & lexical diversity
+        lambda_param = 0.65  # 65% relevance, 35% diversity penalty
+
+        while len(selected) < top_k and candidates:
+            best_mmr_score = -1e9
+            best_candidate_idx = 0
+
+            for c_idx, cand in enumerate(candidates):
+                cand_set = cand["words_set"]
+                max_sim = 0.0
+                for sel_set in selected_word_sets:
+                    if cand_set and sel_set:
+                        sim = len(cand_set.intersection(sel_set)) / len(cand_set.union(sel_set))
+                        if sim > max_sim:
+                            max_sim = sim
+
+                mmr_score = (lambda_param * cand["score"]) - ((1.0 - lambda_param) * max_sim * cand["score"] * 2.0)
+                if mmr_score > best_mmr_score:
+                    best_mmr_score = mmr_score
+                    best_candidate_idx = c_idx
+
+            picked = candidates.pop(best_candidate_idx)
+            selected.append(picked)
+            selected_word_sets.append(picked["words_set"])
+
+        # Sort chronologically to preserve logical discourse progression
+        selected.sort(key=lambda x: x["idx"])
+        return [item["sentence"] for item in selected]
 
     @classmethod
     def compute_stats(cls, text: str, precomputed_words: List[str] = None, precomputed_sentences: List[str] = None) -> Dict[str, Any]:
