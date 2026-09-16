@@ -181,47 +181,8 @@ class TTSRequest(BaseModel):
     speed: Optional[float] = Field(1.0, description="Speech rate multiplier")
 
 
-SAMPLE_PRESETS = [
-    {
-        "id": "meeting",
-        "title": "Project Sprint Meeting",
-        "category": "Dialogue",
-        "badge": "SAMSum Format",
-        "text": """Alex: Hey everyone, let's do a quick sync on the Q3 release deliverables.
-Sarah: The data pipeline refactoring is finished. Ingestion throughput is up by 45%.
-Michael: Awesome. Frontend migration to the new design system is 90% done. Just ironing out a few responsive glitches on tablet views.
-Alex: Great work. What about the model training and AWS ECR CI/CD pipeline?
-David: Docker images are building cleanly, and the automated evaluation tests passed with ROUGE-1 score of 0.42. We're scheduled to deploy to EC2 on Thursday.
-Alex: Perfect! Let's lock in Thursday morning for the staging deployment and notify the product team.
-Sarah: Sounds like a plan. I'll prepare the release notes."""
-    },
-    {
-        "id": "technews",
-        "title": "Generative NLP Breakthrough",
-        "category": "News Article",
-        "badge": "Tech News",
-        "text": """Artificial intelligence research laboratories have unveiled a new generation of encoder-decoder transformer architectures specifically optimized for abstractive document comprehension and summarization. By employing advanced sparse attention mechanisms and memory-efficient sequence-to-sequence fine-tuning, the new models achieve human-parity synthesis while reducing computational energy requirements by over 60 percent. Industry analysts predict this breakthrough will drastically streamline corporate workflows across legal discovery, medical literature review, and financial reporting, allowing knowledge workers to distill multi-hundred-page dossiers into actionable executive briefs in real time."""
-    },
-    {
-        "id": "support",
-        "title": "Customer Support Escalation",
-        "category": "Support Chat",
-        "badge": "Customer Ops",
-        "text": """Customer: Hi, our production API integration began throwing 429 rate limit errors starting at 08:00 UTC today despite us being on the Enterprise tier.
-Agent: Hello! I apologize for the disruption. Let me pull up your account credentials and system logs right away.
-Customer: Thanks, our payment webhook processing is currently queued up.
-Agent: I have located the issue. A recent load balancer update temporarily misclassified your API key pool. I have applied an immediate hotfix to whitelist your endpoint and doubled your burst concurrency limits.
-Customer: Verified on our dashboard! Traffic is clearing normally now and queue is draining.
-Agent: Excellent to hear. I have filed an internal incident report to ensure this edge case is permanently prevented in future deployments."""
-    },
-    {
-        "id": "research",
-        "title": "Scientific Study Abstract",
-        "category": "Research",
-        "badge": "Academic",
-        "text": """Recent investigations into multi-modal deep learning architectures have demonstrated substantial efficacy in unifying cross-domain sequence reasoning. This study evaluates the generalization capability of pre-trained language models when fine-tuned on highly specialized domain taxonomies without auxiliary knowledge graphs. Empirical benchmarking across five diverse corpora reveals that selective layer unfreezing paired with adaptive learning rate warmup yields a 14.8% relative gain in semantic fidelity and reduces hallucination rates from 8.2% to 1.9%. These findings validate the hypothesis that intermediate representation regularization is critical for robust domain-adapted abstractive summarization."""
-    }
-]
+SAMPLE_PRESETS = []
+
 
 
 def _find_index_html() -> Optional[str]:
