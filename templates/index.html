@@ -1864,68 +1864,77 @@
 
         setAudioLoading(true);
 
+        const playDeviceSpeech = () => {
+          if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(cleanText);
+            utterance.lang = /[\u0900-\u097F]/.test(cleanText) ? 'hi-IN' : 'en-US';
+            window._activeUtterance = utterance;
+            utterance.onstart = () => { setIsSpeaking(true); setAudioLoading(false); };
+            utterance.onend = () => { setIsSpeaking(false); setAudioLoading(false); window._activeUtterance = null; };
+            utterance.onerror = () => { setIsSpeaking(false); setAudioLoading(false); window._activeUtterance = null; };
+            window.speechSynthesis.speak(utterance);
+          } else {
+            setIsSpeaking(false);
+            setAudioLoading(false);
+            showToast("Speech synthesis is not supported on this browser.", "error");
+          }
+        };
+
         try {
           const ttsUrl = `/api/tts?text=${encodeURIComponent(cleanText)}&voice=${encodeURIComponent(selectedVoice)}&_t=${Date.now()}`;
           const audio = new Audio(ttsUrl);
           audioRef.current = audio;
 
+          // Latency safety guard: if network takes > 1200ms to buffer audio, start device speech instantly
+          const fallbackTimer = setTimeout(() => {
+            if (audioLoading && !isSpeaking) {
+              console.warn("Neural voice buffering latency threshold reached, starting instant device speech.");
+              if (audioRef.current) {
+                audioRef.current.pause();
+                audioRef.current = null;
+              }
+              playDeviceSpeech();
+            }
+          }, 1200);
+
           audio.onplaying = () => {
+            clearTimeout(fallbackTimer);
             setIsSpeaking(true);
             setAudioLoading(false);
           };
 
           audio.onplay = () => {
+            clearTimeout(fallbackTimer);
             setIsSpeaking(true);
             setAudioLoading(false);
           };
 
           audio.onended = () => {
+            clearTimeout(fallbackTimer);
             setIsSpeaking(false);
             setAudioLoading(false);
             audioRef.current = null;
           };
 
           audio.onerror = () => {
-            console.warn("Backend audio stream fallback to speech synthesis");
-            // Device speech synthesis fallback
-            if ('speechSynthesis' in window) {
-              window.speechSynthesis.cancel();
-              const utterance = new SpeechSynthesisUtterance(cleanText);
-              utterance.lang = /[\u0900-\u097F]/.test(cleanText) ? 'hi-IN' : 'en-US';
-              window._activeUtterance = utterance;
-              utterance.onstart = () => { setIsSpeaking(true); setAudioLoading(false); };
-              utterance.onend = () => { setIsSpeaking(false); setAudioLoading(false); window._activeUtterance = null; };
-              utterance.onerror = () => { setIsSpeaking(false); setAudioLoading(false); window._activeUtterance = null; };
-              window.speechSynthesis.speak(utterance);
-            } else {
-              setIsSpeaking(false);
-              setAudioLoading(false);
-              audioRef.current = null;
-            }
+            clearTimeout(fallbackTimer);
+            console.warn("Neural audio stream unavailable, falling back to local speech engine.");
+            playDeviceSpeech();
           };
 
           const playPromise = audio.play();
           if (playPromise !== undefined) {
             playPromise.catch((e) => {
-              console.warn("Auto-play error:", e);
-              if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel();
-                const utterance = new SpeechSynthesisUtterance(cleanText);
-                utterance.lang = /[\u0900-\u097F]/.test(cleanText) ? 'hi-IN' : 'en-US';
-                window._activeUtterance = utterance;
-                utterance.onstart = () => { setIsSpeaking(true); setAudioLoading(false); };
-                utterance.onend = () => { setIsSpeaking(false); setAudioLoading(false); window._activeUtterance = null; };
-                utterance.onerror = () => { setIsSpeaking(false); setAudioLoading(false); window._activeUtterance = null; };
-                window.speechSynthesis.speak(utterance);
-              } else {
-                setIsSpeaking(false);
-                setAudioLoading(false);
-              }
+              clearTimeout(fallbackTimer);
+              console.warn("Auto-play interaction notice:", e);
+              playDeviceSpeech();
             });
           }
         } catch (err) {
           setIsSpeaking(false);
           setAudioLoading(false);
+          playDeviceSpeech();
         }
       };
 

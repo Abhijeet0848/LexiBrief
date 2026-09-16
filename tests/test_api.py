@@ -39,6 +39,12 @@ def test_presets_endpoint():
     assert "presets" in data
     assert isinstance(data["presets"], list)
 
+def test_tts_endpoint():
+    """Verify that neural text-to-speech audio streaming endpoint returns valid audio."""
+    response = client.get("/api/tts?text=LexiBrief+audio+test&voice=neerja")
+    assert response.status_code == 200
+    assert "audio" in response.headers.get("content-type", "")
+
 def test_metrics_endpoint():
     """Verify that pipeline architecture and ROUGE metrics endpoint returns properly."""
     response = client.get("/api/metrics")

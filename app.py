@@ -479,6 +479,80 @@ async def fetch_url_content(req: URLIngestRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+VOICE_MAP = {
+    "neerja": "en-IN-NeerjaNeural",
+    "prabhat": "en-IN-PrabhatNeural",
+    "jenny": "en-US-JennyNeural",
+    "guy": "en-US-GuyNeural",
+    "swara": "hi-IN-SwaraNeural",
+    "madhur": "hi-IN-MadhurNeural",
+    "aria": "en-US-AriaNeural",
+    "sonia": "en-GB-SoniaNeural",
+}
+
+
+@app.get("/api/tts", tags=["Audio & Speech"])
+@app.get("/tts", tags=["Audio & Speech"], include_in_schema=False)
+async def generate_speech_audio(
+    text: str = Query(..., min_length=1, description="Text to synthesize"),
+    voice: Optional[str] = Query("neerja", description="Voice identifier"),
+    speed: Optional[float] = Query(1.0, description="Speed multiplier")
+):
+    """Generates high-fidelity neural speech audio using edge-tts with resilient gTTS fallback."""
+    clean_text = text.strip()
+    if not clean_text:
+        raise HTTPException(status_code=400, detail="Text cannot be empty.")
+    
+    if len(clean_text) > 4000:
+        clean_text = clean_text[:4000]
+
+    voice_id = VOICE_MAP.get((voice or "neerja").lower().strip(), "en-IN-NeerjaNeural")
+
+    # 1. High-speed neural edge-tts
+    try:
+        import edge_tts
+        spd = speed or 1.0
+        rate_str = f"+{int((spd - 1.0)*100)}%" if spd >= 1.0 else f"-{int((1.0 - spd)*100)}%"
+        communicate = edge_tts.Communicate(clean_text, voice_id, rate=rate_str)
+        
+        async def audio_generator():
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    yield chunk["data"]
+
+        return StreamingResponse(
+            audio_generator(),
+            media_type="audio/mpeg",
+            headers={
+                "Cache-Control": "public, max-age=86400",
+                "Content-Disposition": "inline; filename=speech.mp3"
+            }
+        )
+    except Exception as e:
+        logger.warning(f"edge-tts stream notice: {e}. Falling back to gTTS.")
+
+    # 2. Resilient fallback: gTTS
+    try:
+        from gtts import gTTS
+        is_hindi = bool(re.search(r'[\u0900-\u097F]', clean_text))
+        lang = 'hi' if is_hindi else 'en'
+        tts = gTTS(text=clean_text, lang=lang, slow=False)
+        fp = io.BytesIO()
+        tts.write_to_fp(fp)
+        fp.seek(0)
+        return StreamingResponse(
+            fp,
+            media_type="audio/mpeg",
+            headers={
+                "Cache-Control": "public, max-age=86400",
+                "Content-Disposition": "inline; filename=speech.mp3"
+            }
+        )
+    except Exception as e:
+        logger.error(f"TTS generation error: {e}")
+        raise HTTPException(status_code=500, detail=f"TTS generation failed: {str(e)}")
+
+
 @app.get("/api/documents", tags=["MongoDB Documents"])
 async def get_documents(limit: int = 50):
     """Retrieves uploaded documents from MongoDB."""
