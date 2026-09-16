@@ -25,7 +25,7 @@ for path in [BASE_DIR, SRC_DIR, current_file_dir, os.getcwd(), "/var/task", "/va
     if path and os.path.exists(path) and path not in sys.path:
         sys.path.insert(0, path)
 
-from fastapi import FastAPI, Request, Form, HTTPException, UploadFile, File, Response, BackgroundTasks, Body
+from fastapi import FastAPI, Request, Form, HTTPException, UploadFile, File, Response, BackgroundTasks, Body, Query
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -601,6 +601,14 @@ async def synthesize_edge_neural(text: str, voice_key: str = "neerja", rate: str
     except Exception as e:
         logger.warning(f"Edge Neural TTS generation error: {e}")
     return None, "Fallback"
+
+
+@app.get("/api/tts", tags=["Text-to-Speech"])
+@app.get("/tts", tags=["Text-to-Speech"], include_in_schema=False)
+async def text_to_speech_get(text: str = Query(...), voice: str = Query("neerja")):
+    """GET streaming endpoint for direct browser <audio src="..."> element playback."""
+    req = TTSRequest(text=text, voice=voice)
+    return await text_to_speech(req)
 
 
 @app.post("/api/tts", tags=["Text-to-Speech"])

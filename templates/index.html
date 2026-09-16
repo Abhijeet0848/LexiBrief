@@ -1129,26 +1129,25 @@
         showToast("Cleared evaluator inputs.", "info");
       };
 
-      // Instant Zero-Latency Text-to-Speech Engine
+      // Studio Neural Text-to-Speech Engine
       const handleSpeak = (text) => {
         if (!text || !text.trim()) return;
 
-        // If audio is currently playing or loading, cancel/stop it immediately
+        // If audio is currently playing or loading, stop it immediately
         if (isSpeaking || audioLoading) {
-          if ('speechSynthesis' in window) {
-            window.speechSynthesis.cancel();
-          }
           if (audioRef.current) {
             audioRef.current.pause();
             audioRef.current.currentTime = 0;
             audioRef.current = null;
+          }
+          if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
           }
           setIsSpeaking(false);
           setAudioLoading(false);
           return;
         }
 
-        // Clean text of markdown bullet points and code artifacts for smooth, fluent narration
         const cleanText = text
           .replace(/[#*_`~>-]/g, ' ')
           .replace(/\s+/g, ' ')
@@ -1156,76 +1155,71 @@
 
         if (!cleanText) return;
 
-        // 1. Instant Zero-Latency Device Speech (Starts immediately in < 20ms)
-        if ('speechSynthesis' in window) {
-          window.speechSynthesis.cancel();
+        setAudioLoading(true);
 
-          const isHindi = /[\u0900-\u097F]/.test(cleanText);
-          const utterance = new SpeechSynthesisUtterance(cleanText);
-          utterance.lang = isHindi ? 'hi-IN' : 'en-US';
-          utterance.rate = isHindi ? 0.95 : 1.0;
-          utterance.pitch = 1.0;
+        try {
+          const ttsUrl = `/api/tts?text=${encodeURIComponent(cleanText)}&voice=${encodeURIComponent(selectedVoice)}&_t=${Date.now()}`;
+          const audio = new Audio(ttsUrl);
+          audioRef.current = audio;
 
-          const availableVoices = window.speechSynthesis.getVoices() || [];
-          if (availableVoices.length > 0) {
-            let matchedVoice = null;
-            if (isHindi) {
-              matchedVoice = availableVoices.find(v => (v.lang && v.lang.toLowerCase().startsWith('hi')) || v.name.toLowerCase().includes('hindi') || v.name.toLowerCase().includes('swara') || v.name.toLowerCase().includes('india'));
-            } else {
-              matchedVoice = availableVoices.find(v => (v.lang && (v.lang.toLowerCase().startsWith('en-in') || v.lang.toLowerCase().startsWith('en-us') || v.lang.toLowerCase().startsWith('en-gb'))) || v.name.toLowerCase().includes('natural') || v.name.toLowerCase().includes('google') || v.name.toLowerCase().includes('zira') || v.name.toLowerCase().includes('jenny'));
-            }
-            if (matchedVoice) {
-              utterance.voice = matchedVoice;
-            }
-          }
-
-          utterance.onstart = () => {
+          audio.onplaying = () => {
             setIsSpeaking(true);
             setAudioLoading(false);
           };
 
-          utterance.onend = () => {
-            setIsSpeaking(false);
+          audio.onplay = () => {
+            setIsSpeaking(true);
             setAudioLoading(false);
           };
 
-          utterance.onerror = () => {
+          audio.onended = () => {
             setIsSpeaking(false);
             setAudioLoading(false);
+            audioRef.current = null;
           };
 
-          setIsSpeaking(true);
-          window.speechSynthesis.speak(utterance);
-          return;
-        }
+          audio.onerror = () => {
+            console.warn("Backend audio stream fallback to speech synthesis");
+            // Device speech synthesis fallback
+            if ('speechSynthesis' in window) {
+              window.speechSynthesis.cancel();
+              const utterance = new SpeechSynthesisUtterance(cleanText);
+              utterance.lang = /[\u0900-\u097F]/.test(cleanText) ? 'hi-IN' : 'en-US';
+              window._activeUtterance = utterance;
+              utterance.onstart = () => { setIsSpeaking(true); setAudioLoading(false); };
+              utterance.onend = () => { setIsSpeaking(false); setAudioLoading(false); window._activeUtterance = null; };
+              utterance.onerror = () => { setIsSpeaking(false); setAudioLoading(false); window._activeUtterance = null; };
+              window.speechSynthesis.speak(utterance);
+            } else {
+              setIsSpeaking(false);
+              setAudioLoading(false);
+              audioRef.current = null;
+            }
+          };
 
-        // 2. Fallback to backend audio stream if browser SpeechSynthesis is unavailable
-        setAudioLoading(true);
-        fetch('/api/tts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            text: cleanText,
-            voice: selectedVoice
-          })
-        })
-        .then(res => {
-          if (!res.ok) throw new Error(`TTS server error: ${res.status}`);
-          return res.blob();
-        })
-        .then(blob => {
-          const audioUrl = URL.createObjectURL(blob);
-          const audio = new Audio(audioUrl);
-          audioRef.current = audio;
-          audio.onplay = () => { setIsSpeaking(true); setAudioLoading(false); };
-          audio.onended = () => { setIsSpeaking(false); setAudioLoading(false); URL.revokeObjectURL(audioUrl); audioRef.current = null; };
-          audio.onerror = () => { setIsSpeaking(false); setAudioLoading(false); URL.revokeObjectURL(audioUrl); audioRef.current = null; };
-          audio.play();
-        })
-        .catch(() => {
-          setAudioLoading(false);
+          const playPromise = audio.play();
+          if (playPromise !== undefined) {
+            playPromise.catch((e) => {
+              console.warn("Auto-play error:", e);
+              if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(cleanText);
+                utterance.lang = /[\u0900-\u097F]/.test(cleanText) ? 'hi-IN' : 'en-US';
+                window._activeUtterance = utterance;
+                utterance.onstart = () => { setIsSpeaking(true); setAudioLoading(false); };
+                utterance.onend = () => { setIsSpeaking(false); setAudioLoading(false); window._activeUtterance = null; };
+                utterance.onerror = () => { setIsSpeaking(false); setAudioLoading(false); window._activeUtterance = null; };
+                window.speechSynthesis.speak(utterance);
+              } else {
+                setIsSpeaking(false);
+                setAudioLoading(false);
+              }
+            });
+          }
+        } catch (err) {
           setIsSpeaking(false);
-        });
+          setAudioLoading(false);
+        }
       };
 
       // Copy & Export
