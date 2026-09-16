@@ -1129,19 +1129,19 @@
         showToast("Cleared evaluator inputs.", "info");
       };
 
-      // Text to Speech with Studio Neural Indian Voice Audio Streaming
-      const handleSpeak = async (text) => {
+      // Instant Zero-Latency Text-to-Speech Engine
+      const handleSpeak = (text) => {
         if (!text || !text.trim()) return;
 
-        // If audio is currently playing or loading, cancel/stop it
+        // If audio is currently playing or loading, cancel/stop it immediately
         if (isSpeaking || audioLoading) {
+          if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+          }
           if (audioRef.current) {
             audioRef.current.pause();
             audioRef.current.currentTime = 0;
             audioRef.current = null;
-          }
-          if ('speechSynthesis' in window) {
-            window.speechSynthesis.cancel();
           }
           setIsSpeaking(false);
           setAudioLoading(false);
@@ -1156,80 +1156,76 @@
 
         if (!cleanText) return;
 
-        setAudioLoading(true);
+        // 1. Instant Zero-Latency Device Speech (Starts immediately in < 20ms)
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
 
-        try {
-          // Call Studio Neural backend TTS
-          const res = await fetch('/api/tts', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              text: cleanText,
-              voice: selectedVoice
-            })
-          });
+          const isHindi = /[\u0900-\u097F]/.test(cleanText);
+          const utterance = new SpeechSynthesisUtterance(cleanText);
+          utterance.lang = isHindi ? 'hi-IN' : 'en-US';
+          utterance.rate = isHindi ? 0.95 : 1.0;
+          utterance.pitch = 1.0;
 
-          if (!res.ok) {
-            throw new Error(`TTS server response error: ${res.status}`);
+          const availableVoices = window.speechSynthesis.getVoices() || [];
+          if (availableVoices.length > 0) {
+            let matchedVoice = null;
+            if (isHindi) {
+              matchedVoice = availableVoices.find(v => (v.lang && v.lang.toLowerCase().startsWith('hi')) || v.name.toLowerCase().includes('hindi') || v.name.toLowerCase().includes('swara') || v.name.toLowerCase().includes('india'));
+            } else {
+              matchedVoice = availableVoices.find(v => (v.lang && (v.lang.toLowerCase().startsWith('en-in') || v.lang.toLowerCase().startsWith('en-us') || v.lang.toLowerCase().startsWith('en-gb'))) || v.name.toLowerCase().includes('natural') || v.name.toLowerCase().includes('google') || v.name.toLowerCase().includes('zira') || v.name.toLowerCase().includes('jenny'));
+            }
+            if (matchedVoice) {
+              utterance.voice = matchedVoice;
+            }
           }
 
-          const blob = await res.blob();
-          const audioUrl = URL.createObjectURL(blob);
-          const audio = new Audio(audioUrl);
-          audioRef.current = audio;
-
-          audio.onplay = () => {
+          utterance.onstart = () => {
             setIsSpeaking(true);
             setAudioLoading(false);
           };
 
-          audio.onended = () => {
+          utterance.onend = () => {
             setIsSpeaking(false);
             setAudioLoading(false);
-            URL.revokeObjectURL(audioUrl);
-            audioRef.current = null;
           };
 
-          audio.onerror = () => {
+          utterance.onerror = () => {
             setIsSpeaking(false);
             setAudioLoading(false);
-            URL.revokeObjectURL(audioUrl);
-            audioRef.current = null;
-            showToast("Audio playback encountered an error.", "error");
           };
 
-          await audio.play();
-          
-          const voiceLabel = selectedVoice === 'prabhat' ? 'Prabhat (Studio Indian Male)' : 'Neerja (Studio Indian Female)';
-          showToast(`🎙️ Speaking with ${voiceLabel}`, "info");
-        } catch (err) {
-          console.warn("Backend TTS stream fallback to browser speech synthesis:", err);
-          // Fallback to browser SpeechSynthesis if network or server error
-          if ('speechSynthesis' in window) {
-            const utterance = new SpeechSynthesisUtterance(cleanText);
-            utterance.lang = 'en-IN';
-            utterance.rate = 0.93;
-            utterance.pitch = 1.0;
-
-            const availableVoices = voices.length > 0 ? voices : window.speechSynthesis.getVoices();
-            const indVoice = availableVoices.find(v => 
-              (v.lang === 'en-IN' || v.lang === 'en_IN' || v.lang.toLowerCase().includes('en-in')) ||
-              v.name.toLowerCase().includes('india')
-            );
-            if (indVoice) utterance.voice = indVoice;
-
-            utterance.onstart = () => { setIsSpeaking(true); setAudioLoading(false); };
-            utterance.onend = () => { setIsSpeaking(false); setAudioLoading(false); };
-            utterance.onerror = () => { setIsSpeaking(false); setAudioLoading(false); };
-
-            window.speechSynthesis.speak(utterance);
-            showToast("Playing summary audio...", "info");
-          } else {
-            setAudioLoading(false);
-            setIsSpeaking(false);
-            showToast("Text-to-speech audio could not be generated.", "error");
-          }
+          setIsSpeaking(true);
+          window.speechSynthesis.speak(utterance);
+          return;
         }
+
+        // 2. Fallback to backend audio stream if browser SpeechSynthesis is unavailable
+        setAudioLoading(true);
+        fetch('/api/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            text: cleanText,
+            voice: selectedVoice
+          })
+        })
+        .then(res => {
+          if (!res.ok) throw new Error(`TTS server error: ${res.status}`);
+          return res.blob();
+        })
+        .then(blob => {
+          const audioUrl = URL.createObjectURL(blob);
+          const audio = new Audio(audioUrl);
+          audioRef.current = audio;
+          audio.onplay = () => { setIsSpeaking(true); setAudioLoading(false); };
+          audio.onended = () => { setIsSpeaking(false); setAudioLoading(false); URL.revokeObjectURL(audioUrl); audioRef.current = null; };
+          audio.onerror = () => { setIsSpeaking(false); setAudioLoading(false); URL.revokeObjectURL(audioUrl); audioRef.current = null; };
+          audio.play();
+        })
+        .catch(() => {
+          setAudioLoading(false);
+          setIsSpeaking(false);
+        });
       };
 
       // Copy & Export
