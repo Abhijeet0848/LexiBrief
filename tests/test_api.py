@@ -254,3 +254,36 @@ def test_url_and_youtube_extraction():
     res_empty = client.post("/api/fetch-url", json={"url": ""})
     assert res_empty.status_code == 400
 
+
+def test_translation_endpoint():
+    """Verify neural translation endpoint."""
+    hindi_text = "आर्टिफिशियल इंटेलिजेंस और मशीन लर्निंग आधुनिक दुनिया को बदल रहे हैं।"
+    res = client.post("/api/translate", json={"text": hindi_text, "source_lang": "auto", "target_lang": "en"})
+    assert res.status_code == 200
+    data = res.json()
+    assert "translated_text" in data
+    assert len(data["translated_text"]) > 0
+    assert any(w in data["translated_text"].lower() for w in ["artificial", "intelligence", "machine", "learning", "modern", "world"])
+
+
+def test_multilingual_summarize_with_translation():
+    """Verify predict endpoint with translate_to_english toggle for non-English passage."""
+    hindi_passage = (
+        "भारत एक महान और विविधतापूर्ण देश है। यहाँ कई भाषाएँ और संस्कृतियाँ एक साथ फलती-फूलती हैं। "
+        "आधुनिक तकनीकी विकास ने देश के हर नागरिक के जीवन को सुगम बना दिया है। "
+        "डिजिटल शिक्षा और इंटरनेट ने युवाओं को नए अवसर प्रदान किए हैं।"
+    )
+    res = client.post("/predict", json={
+        "text": hindi_passage,
+        "mode": "balanced",
+        "method": "auto",
+        "translate_to_english": True
+    })
+    assert res.status_code == 200
+    data = res.json()
+    assert "summary" in data
+    assert len(data["summary"]) > 0
+    assert data.get("translated_to_english") is True
+    assert data.get("original_language") == "hi"
+
+

@@ -46,7 +46,12 @@ from gtts import gTTS
 from textSummarizer.components.text_extractor import TextExtractor
 from textSummarizer.components.nlp_processor import NLPProcessor
 from textSummarizer.components.mongo_manager import MongoDBManager
+from textSummarizer.components.translator import Translator
 from textSummarizer.logging import logger
+
+class TranslateRequest(BaseModel):
+    text: str = Field(..., description="Text or summary to translate to English")
+    source_lang: Optional[str] = Field("auto", description="Source language code ('auto', 'hi', 'fr', 'es', etc.)")
 
 app = FastAPI(
     title="LexiBrief API",
@@ -651,6 +656,23 @@ async def text_to_speech(req: TTSRequest):
         raise HTTPException(status_code=500, detail="Error generating text-to-speech audio.")
 
 
+@app.post("/api/translate", tags=["Translation"])
+async def translate_endpoint(request: TranslateRequest):
+    """Translates any non-English text, summary, or document into clean fluent English in real time."""
+    try:
+        if not request.text or not request.text.strip():
+            raise HTTPException(status_code=400, detail="Text cannot be empty.")
+        translated, detected = Translator.translate_to_english(request.text, source_lang=request.source_lang or "auto")
+        return {
+            "translated_text": translated,
+            "detected_language": detected,
+            "original_text": request.text
+        }
+    except Exception as e:
+        logger.error(f"Translation endpoint error: {e}")
+        raise HTTPException(status_code=500, detail=f"Translation error: {str(e)}")
+
+
 @app.post("/predict", tags=["Prediction & MongoDB"])
 @app.post("/api/predict", tags=["Prediction & MongoDB"], include_in_schema=False)
 @app.post("/", tags=["Prediction & MongoDB"], include_in_schema=False)
@@ -663,6 +685,7 @@ async def predict_route(request: Request, background_tasks: BackgroundTasks):
         selected_method = "auto"
         selected_model = "bart"
         selected_persona = "general"
+        translate_to_english = False
         max_len = None
         min_len = None
 
@@ -673,6 +696,7 @@ async def predict_route(request: Request, background_tasks: BackgroundTasks):
             selected_method = body.get("method", "auto")
             selected_model = body.get("model_name", "bart")
             selected_persona = body.get("persona", "general")
+            translate_to_english = bool(body.get("translate_to_english", False))
             max_len = body.get("max_length")
             min_len = body.get("min_length")
         else:
@@ -683,6 +707,7 @@ async def predict_route(request: Request, background_tasks: BackgroundTasks):
                 selected_method = form.get("method", "auto")
                 selected_model = form.get("model_name", "bart")
                 selected_persona = form.get("persona", "general")
+                translate_to_english = str(form.get("translate_to_english", "false")).lower() in ["true", "1", "yes"]
             except Exception:
                 body = await request.json()
                 input_text = body.get("text", "")
@@ -690,6 +715,7 @@ async def predict_route(request: Request, background_tasks: BackgroundTasks):
                 selected_method = body.get("method", "auto")
                 selected_model = body.get("model_name", "bart")
                 selected_persona = body.get("persona", "general")
+                translate_to_english = bool(body.get("translate_to_english", False))
 
         if not input_text or not str(input_text).strip():
             raise HTTPException(status_code=400, detail="Input text cannot be empty.")
@@ -709,7 +735,8 @@ async def predict_route(request: Request, background_tasks: BackgroundTasks):
             model_name=selected_model,
             persona=selected_persona,
             max_length=max_len,
-            min_length=min_len
+            min_length=min_len,
+            translate_to_english=translate_to_english
         )
 
         summary_text = prediction_result.get("summary", "")
@@ -722,7 +749,11 @@ async def predict_route(request: Request, background_tasks: BackgroundTasks):
 
         result_payload = {
             "summary": summary_text,
+            "original_summary": prediction_result.get("original_summary", summary_text),
             "key_points": prediction_result.get("key_points", []),
+            "original_key_points": prediction_result.get("original_key_points", []),
+            "translated_to_english": prediction_result.get("translated_to_english", False),
+            "original_language": prediction_result.get("original_language", "en"),
             "mode": selected_mode,
             "persona": selected_persona,
             "method_used": prediction_result.get("method_used", selected_method),

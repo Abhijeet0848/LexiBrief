@@ -4,10 +4,11 @@ from textSummarizer.components.text_extractor import TextExtractor
 from textSummarizer.components.nlp_processor import NLPProcessor
 from textSummarizer.components.extractive_summarizer import ExtractiveSummarizer
 from textSummarizer.components.abstractive_summarizer import AbstractiveSummarizer
+from textSummarizer.components.translator import Translator
 from textSummarizer.logging import logger
 
 class PredictionPipeline:
-    """Unified NLP Summarization Pipeline coordinating Extractive and Abstractive Transformer engines with LRU caching, Persona routing, and Explainable Attribution."""
+    """Unified NLP Summarization Pipeline coordinating Extractive, Abstractive Transformer, and Neural Translation engines with LRU caching, Persona routing, and Explainable Attribution."""
 
     def __init__(self):
         self.abstractive_engine = AbstractiveSummarizer()
@@ -15,8 +16,8 @@ class PredictionPipeline:
         self._cache: Dict[str, Dict[str, Any]] = {}
         self._max_cache_entries = 128
 
-    def _make_cache_key(self, text: str, mode: str, method: str, model_name: str, persona: str, max_len: Optional[int], min_len: Optional[int]) -> str:
-        key_raw = f"{text}|{mode}|{method}|{model_name}|{persona}|{max_len}|{min_len}"
+    def _make_cache_key(self, text: str, mode: str, method: str, model_name: str, persona: str, max_len: Optional[int], min_len: Optional[int], translate_to_english: bool = False) -> str:
+        key_raw = f"{text}|{mode}|{method}|{model_name}|{persona}|{max_len}|{min_len}|{translate_to_english}"
         return hashlib.sha256(key_raw.encode("utf-8")).hexdigest()
 
     def predict(
@@ -27,7 +28,8 @@ class PredictionPipeline:
         model_name: str = "bart",
         persona: str = "general",
         max_length: Optional[int] = None,
-        min_length: Optional[int] = None
+        min_length: Optional[int] = None,
+        translate_to_english: bool = False
     ) -> Dict[str, Any]:
         """
         Executes high-speed end-to-end NLP summarization, persona conditioning, keyword extraction,
@@ -56,7 +58,7 @@ class PredictionPipeline:
         persona_clean = (persona or "general").lower().strip()
 
         # Check in-memory prediction cache
-        cache_key = self._make_cache_key(cleaned_text, mode, method, model_name, persona_clean, max_length, min_length)
+        cache_key = self._make_cache_key(cleaned_text, mode, method, model_name, persona_clean, max_length, min_length, translate_to_english)
         if cache_key in self._cache:
             return self._cache[cache_key]
 
@@ -127,20 +129,41 @@ class PredictionPipeline:
                 engine_used = "Extractive (TF-IDF / Saliency)"
                 model_source = "extractive_nlp_engine"
 
-        # 6. Compute real-time ROUGE evaluation scores against original source text
-        rouge_scores = NLPProcessor.compute_rouge(cleaned_text, summary)
+        # 6. Optional Neural Translation to English (if requested and source is multilingual)
+        original_summary = summary
+        original_key_points = key_points
+        translated_flag = False
 
-        # 7. Compute Explainable Sentence Attribution Mapping
-        attribution_data = NLPProcessor.compute_attribution(cleaned_text, summary)
+        if translate_to_english and lang_code != "en":
+            try:
+                translated_summary, _ = Translator.translate_to_english(summary, source_lang=lang_code)
+                translated_kp = [Translator.translate_to_english(kp, source_lang=lang_code)[0] for kp in key_points]
+                if translated_summary and translated_summary.strip():
+                    summary = translated_summary
+                    key_points = translated_kp
+                    engine_used = f"{engine_used} + English Translation"
+                    translated_flag = True
+            except Exception as trans_err:
+                logger.warning(f"Translation to English error: {trans_err}")
 
-        # 8. Compute summary-specific NLP statistics
+        # 7. Compute real-time ROUGE evaluation scores against original source text
+        rouge_scores = NLPProcessor.compute_rouge(cleaned_text, original_summary)
+
+        # 8. Compute Explainable Sentence Attribution Mapping
+        attribution_data = NLPProcessor.compute_attribution(cleaned_text, original_summary)
+
+        # 9. Compute summary-specific NLP statistics
         summary_stats = NLPProcessor.compute_stats(summary)
-        summary_stats["language"] = lang_code
-        summary_stats["language_name"] = lang_name
+        summary_stats["language"] = "en" if translated_flag else lang_code
+        summary_stats["language_name"] = "English" if translated_flag else lang_name
 
         result = {
             "summary": summary,
+            "original_summary": original_summary,
             "key_points": key_points,
+            "original_key_points": original_key_points,
+            "translated_to_english": translated_flag,
+            "original_language": lang_code,
             "method_used": engine_used,
             "model_source": model_source,
             "mode": mode,
