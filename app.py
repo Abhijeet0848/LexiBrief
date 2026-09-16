@@ -343,11 +343,13 @@ async def upload_document(
         
         extracted_text, detected_format, pages_count = TextExtractor.extract(file.filename or "document.txt", content_bytes)
         
-        # If client provided OCR text (e.g. from live camera photo capture or image upload)
-        if (not extracted_text or not extracted_text.strip()) and ocr_text and ocr_text.strip():
-            extracted_text = TextExtractor.clean_ocr_text(ocr_text)
-            if (file.filename or '').lower().endswith(('.jpg', '.jpeg', '.png', '.webp', '.bmp')):
-                detected_format = "IMAGE"
+        # If client provided OCR text (e.g. from live camera photo capture, image upload, or scanned PDF)
+        if ocr_text and ocr_text.strip():
+            cleaned_ocr = TextExtractor.clean_ocr_text(ocr_text)
+            if not extracted_text or not extracted_text.strip() or len(cleaned_ocr) > len(extracted_text) + 20:
+                extracted_text = cleaned_ocr
+                if (file.filename or '').lower().endswith(('.jpg', '.jpeg', '.png', '.webp', '.bmp')):
+                    detected_format = "IMAGE"
 
         if not extracted_text or not extracted_text.strip():
             raise HTTPException(

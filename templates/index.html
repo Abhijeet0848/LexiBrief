@@ -49,6 +49,8 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <!-- Tesseract.js for Live Camera OCR & Document Extraction -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <!-- PDF.js for Client-Side PDF Parsing & Scanned Page OCR Rendering -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
   <style>
     html {
@@ -1425,6 +1427,7 @@
         }
 
         const isImage = ['.jpg', '.jpeg', '.png', '.webp', '.bmp'].some(ext => lowerName.endsWith(ext));
+        const isPdf = lowerName.endsWith('.pdf');
 
         // 4. Size within limit (<= 50 MB) -> Proceed with upload
         setUploadLoading(true);
@@ -1433,7 +1436,7 @@
           fileName: file.name,
           totalSize: totalSizeFormatted,
           loadedSize: '0 KB',
-          statusText: isImage ? `Enhancing image & preparing OCR engine for "${file.name}"...` : `Connecting to server (${totalSizeFormatted})...`,
+          statusText: isImage ? `Enhancing image & preparing OCR engine for "${file.name}"...` : isPdf ? `Inspecting PDF structure for "${file.name}"...` : `Connecting to server (${totalSizeFormatted})...`,
           stage: 'uploading'
         });
 
@@ -1467,6 +1470,83 @@
             }, 'eng+hin');
           } catch (tessErr) {
             console.warn("Client image OCR notice:", tessErr);
+          }
+        } else if (isPdf && window.pdfjsLib && window.Tesseract) {
+          try {
+            setUploadProgress({
+              percent: 10,
+              fileName: file.name,
+              totalSize: totalSizeFormatted,
+              loadedSize: '0 KB',
+              statusText: `Checking PDF pages for scanned image content...`,
+              stage: 'processing'
+            });
+
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            const arrayBuffer = await file.arrayBuffer();
+            const pdfDoc = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            const numPages = pdfDoc.numPages || 1;
+            const pageInfoList = [];
+            let neededOcrCount = 0;
+
+            for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+              const page = await pdfDoc.getPage(pageNum);
+              const textContent = await page.getTextContent();
+              const textItems = (textContent.items || []).map(it => it.str).join(' ').trim();
+              const hasText = textItems.length >= 35;
+              if (!hasText) neededOcrCount++;
+              pageInfoList.push({ pageNum, page, textItems, hasText });
+            }
+
+            // If scanned pages exist without digital text
+            if (neededOcrCount > 0) {
+              const extractedPageTexts = [];
+              for (let i = 0; i < pageInfoList.length; i++) {
+                const info = pageInfoList[i];
+                if (info.hasText) {
+                  extractedPageTexts.push(info.textItems);
+                } else {
+                  setUploadProgress({
+                    percent: Math.round(15 + (i / pageInfoList.length) * 75),
+                    fileName: file.name,
+                    totalSize: totalSizeFormatted,
+                    loadedSize: totalSizeFormatted,
+                    statusText: `OCR scanning page ${info.pageNum} of ${numPages}...`,
+                    stage: 'processing'
+                  });
+
+                  const viewport = info.page.getViewport({ scale: 2.0 });
+                  const canvas = document.createElement('canvas');
+                  canvas.width = viewport.width;
+                  canvas.height = viewport.height;
+                  const ctx = canvas.getContext('2d');
+                  await info.page.render({ canvasContext: ctx, viewport }).promise;
+
+                  const pageDataUrl = canvas.toDataURL('image/jpeg', 0.94);
+                  const enhancedUrl = await preprocessImageForOCR(pageDataUrl, 'document');
+                  const pageOcr = await executeHandwritingOCR(enhancedUrl, (pct, statusText) => {
+                    const currentPct = Math.round(15 + ((i + (pct || 0) / 100) / pageInfoList.length) * 75);
+                    setUploadProgress({
+                      percent: Math.max(15, Math.min(92, currentPct)),
+                      fileName: file.name,
+                      totalSize: totalSizeFormatted,
+                      loadedSize: totalSizeFormatted,
+                      statusText: `Scanning PDF page ${info.pageNum}/${numPages}: ${statusText || 'reading text...'}`,
+                      stage: 'processing'
+                    });
+                  }, 'eng+hin');
+
+                  if (pageOcr && pageOcr.trim()) {
+                    extractedPageTexts.push(pageOcr.trim());
+                  } else if (info.textItems) {
+                    extractedPageTexts.push(info.textItems);
+                  }
+                }
+              }
+              clientOcrText = extractedPageTexts.join('\n\n');
+            }
+          } catch (pdfOcrErr) {
+            console.warn("Client PDF OCR scan notice:", pdfOcrErr);
           }
         }
 
