@@ -5,7 +5,7 @@ from typing import List, Dict, Any, Tuple
 
 # Precompiled regular expressions for multilingual performance (supports English, Indic, and Global scripts)
 _RE_SENTENCE_SPLIT = re.compile(r'(?:(?<=[.!?।॥؛۔\n])\s+)|(?:\n+)')
-_RE_WORDS = re.compile(r'\b[\w-]{2,}\b', re.UNICODE)
+_RE_WORDS = re.compile(r'[^\s.,!?;:()\[\]{}"\'`।॥؛۔«»–—/\\<>+=@#$%^&*~|]+', re.UNICODE)
 _RE_VOWELS = re.compile(r'[aeiouy\u0904-\u0914\u0960-\u0963]', re.UNICODE)
 
 LANGUAGE_NAMES = {
@@ -55,7 +55,20 @@ class NLPProcessor:
         'whom', 'why', 'why\'s', 'with', 'won\'t', 'would', 'wouldn\'t', 'you', 'you\'d', 'you\'ll',
         'you\'re', 'you\'ve', 'your', 'yours', 'yourself', 'yourselves', 'uses', 'used', 'using',
         'also', 'such', 'major', 'large', 'different', 'examples', 'combines', 'improved', 'process',
-        'tasks', 'learn', 'complex', 'patterns', 'component', 'provides', 'based'
+        'tasks', 'learn', 'complex', 'patterns', 'component', 'provides', 'based',
+
+        # Hindi & Indic Stopwords (particles, pronouns, auxiliary verbs, conjunctions, prepositions)
+        'का', 'के', 'की', 'को', 'में', 'से', 'पर', 'ने', 'है', 'हैं', 'था', 'थे', 'थी', 'थीं',
+        'और', 'या', 'तथा', 'एवं', 'भी', 'तो', 'ही', 'होता', 'होती', 'होते', 'होना', 'होने',
+        'रहा', 'रहे', 'रही', 'गया', 'गए', 'गई', 'कर', 'करता', 'करते', 'करती', 'करना', 'करने',
+        'किया', 'किए', 'यह', 'वह', 'ये', 'वे', 'इस', 'उस', 'इन', 'उन', 'जिस', 'जिसके',
+        'जिसकी', 'जिसमें', 'जिससे', 'जिसे', 'जिन', 'जिन्हें', 'जो', 'जब', 'तब', 'अब', 'तक',
+        'यहाँ', 'वहाँ', 'कहाँ', 'जहाँ', 'कैसे', 'ऐसा', 'ऐसी', 'ऐसे', 'वैसा', 'वैसे', 'वैसी',
+        'क्या', 'क्यों', 'कौन', 'किस', 'किसी', 'कुछ', 'कोई', 'बहुत', 'ज्यादा', 'कम', 'अधिक',
+        'सकता', 'सकते', 'सकती', 'सकना', 'हुए', 'हुई', 'हुआ', 'अपने', 'अपनी', 'अपना', 'द्वारा',
+        'लिए', 'साथ', 'बाद', 'पहले', 'बीच', 'अनुसार', 'कारण', 'बारे', 'तरह', 'रूप', 'दिया',
+        'दिए', 'दी', 'देना', 'लेना', 'एक', 'दो', 'तीन', 'चार', 'पाँच', 'कुल', 'अन्य', 'सभी',
+        'वाले', 'वाली', 'वाला', 'कहा', 'कहते', 'बात', 'सकते', 'सकता', 'सकती'
     }
 
     @classmethod
@@ -115,29 +128,31 @@ class NLPProcessor:
 
     @classmethod
     def tokenize_words(cls, text: str) -> List[str]:
-        """Extracts lowercase alphabetic words of length >= 2 using Unicode regex."""
+        """Extracts lowercase words of length >= 2 using accurate multilingual Unicode regex."""
         if not text:
             return []
-        return _RE_WORDS.findall(text.lower())
+        raw_tokens = _RE_WORDS.findall(text.lower())
+        return [t.strip("-–_") for t in raw_tokens if len(t.strip("-–_")) >= 2]
 
     @classmethod
     def extract_keywords(cls, text: str, top_k: int = 12, precomputed_tokens: List[str] = None) -> List[Dict[str, Any]]:
         """
         Extracts salient domain keyphrases, technical multi-word concepts, and acronyms
-        with rapid single-pass clause tokenization and canonical casing.
+        with rapid single-pass clause tokenization and canonical casing across multilingual scripts.
         """
         if not text:
             return []
 
         stopwords = cls.STOPWORDS
-        # Split by punctuation and line breaks into discrete candidate clauses
-        clauses = re.split(r'[,;.!?()\n]+', text)
+        # Split by punctuation, symbols, and line breaks into discrete candidate clauses
+        clauses = re.split(r'[,;.!?()\[\]{}"\'`।॥؛۔«»\n]+', text)
         casing_map: Dict[str, str] = {}
         phrase_counts = Counter()
         multi_word_pool = set()
 
         for cl in clauses:
-            words = _RE_WORDS.findall(cl)
+            raw_words = _RE_WORDS.findall(cl)
+            words = [w.strip("-–_") for w in raw_words if len(w.strip("-–_")) >= 2]
             cur = []
             for w in words:
                 w_lower = w.lower()
@@ -159,7 +174,7 @@ class NLPProcessor:
 
         for norm_phrase, count in phrase_counts.most_common():
             words_in_p = norm_phrase.split()
-            display_name = casing_map.get(norm_phrase, norm_phrase.title())
+            display_name = casing_map.get(norm_phrase, norm_phrase.title() if re.search(r'[a-zA-Z]', norm_phrase) else norm_phrase)
 
             if len(words_in_p) == 1:
                 is_fragment = any(norm_phrase in other_p.split() and norm_phrase != other_p for other_p in multi_word_pool)
@@ -181,14 +196,20 @@ class NLPProcessor:
     def _process_keyword_candidate(cls, words: List[str], counter: Counter, casing_map: Dict[str, str], pool: set, stopwords: set):
         if not words:
             return
+
+        def _format_display(w: str) -> str:
+            # If word is in a cased script (Latin / ASCII), apply canonical capitalization
+            if re.search(r'[a-zA-Z]', w):
+                if w.isupper() or (len(w) <= 3 and any(c.isdigit() for c in w)):
+                    return w.upper()
+                return w.capitalize()
+            # For non-cased scripts (Hindi, Devanagari, Bengali, Tamil, etc.), preserve ligature/word intact
+            return w
+
         # Register full multi-word phrase (up to 3 words)
         if len(words) <= 3:
             norm_full = ' '.join(w.lower() for w in words)
-            display_full = ' '.join(
-                w.upper() if (w.isupper() or (len(w) <= 3 and any(c.isdigit() for c in w)))
-                else w.capitalize()
-                for w in words
-            )
+            display_full = ' '.join(_format_display(w) for w in words)
             casing_map[norm_full] = display_full
             counter[norm_full] += 2.0 if len(words) > 1 else 1.0
             if len(words) > 1:
@@ -198,7 +219,7 @@ class NLPProcessor:
         for w in words:
             nw = w.lower()
             if nw not in stopwords and len(nw) >= 2:
-                dw = w.upper() if (w.isupper() or (len(w) <= 3 and any(c.isdigit() for c in w))) else w.capitalize()
+                dw = _format_display(w)
                 casing_map[nw] = dw
                 if len(words) == 1 or dw.isupper() or any(c.isdigit() for c in dw) or dw in ['Transformer', 'Pegasus', 'BERT', 'BART', 'T5']:
                     counter[nw] += 1.0

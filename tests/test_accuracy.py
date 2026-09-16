@@ -129,3 +129,26 @@ def test_end_to_end_prediction_accuracy(benchmark_test_cases):
         assert "key_points" in result
         assert len(result["key_points"]) > 0
         assert result["nlp_stats"]["words"] >= result["summary_stats"]["words"]
+
+
+def test_multilingual_indic_keyword_extraction():
+    """Verify that multilingual Indic/Hindi text extracts intact, authentic words instead of broken character fragments."""
+    hindi_doc = (
+        "दर्शनशास्त्र ज्ञान, वास्तविकता और अस्तित्व की प्रकृति से संबंधित मौलिक प्रश्नों का अध्ययन है। "
+        "जब हम ज्ञान की सीमाओं पर विचार करते हैं, तो हमें मस्तिष्क और चेतना के कई अनसुलझे प्रश्न मिलते हैं। "
+        "इस सिद्धांत में कई महत्वपूर्ण प्रश्न शामिल हैं।"
+    )
+    keywords = NLPProcessor.extract_keywords(hindi_doc, top_k=6)
+    kw_words = [k["keyword"] for k in keywords]
+    
+    # Must extract intact Devanagari words like 'प्रश्न', 'ज्ञान', 'मस्तिष्क', 'सिद्धांत'
+    assert any("प्रश्न" in w for w in kw_words)
+    assert any("ज्ञान" in w for w in kw_words)
+    assert any("मस्तिष्क" in w or "सिद्धांत" in w or "सीमाओं" in w or "वास्तविकता" in w for w in kw_words)
+    
+    # Ensure no single-character fragment or broken matras like 'रक', 'बलकत', 'यर'
+    for kw in kw_words:
+        assert len(kw) >= 2
+        # No dangling or broken combining virama at word start
+        assert not kw.startswith('\u094d')
+
