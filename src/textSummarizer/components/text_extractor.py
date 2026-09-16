@@ -1,5 +1,6 @@
 import re
 import io
+import os
 import zipfile
 import xml.etree.ElementTree as ET
 from typing import Tuple
@@ -636,4 +637,3 @@ class TextExtractor:
             "format": "WEB_URL",
             "source_url": clean_url
         }
-
