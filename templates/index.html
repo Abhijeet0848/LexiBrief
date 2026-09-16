@@ -122,15 +122,16 @@
     @keyframes toastDropIn {
       from {
         opacity: 0;
-        transform: translateY(-20px) scale(0.96);
+        transform: translate(-50%, -12px) scale(0.96);
       }
       to {
         opacity: 1;
-        transform: translateY(0) scale(1);
+        transform: translate(-50%, 0) scale(1);
       }
     }
     .animate-toast-drop {
-      animation: toastDropIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      animation: toastDropIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      transform: translate(-50%, 0);
     }
 
     /* 3D Modern Tactile Buttons & Interactive Elements */
@@ -310,7 +311,7 @@
       }
 
       return (
-        <div className="fixed top-3 sm:top-5 left-1/2 -translate-x-1/2 z-[9999] max-w-[92vw] sm:max-w-md w-max animate-toast-drop pointer-events-auto select-none px-2">
+        <div className="fixed top-16 sm:top-20 left-1/2 z-[9999] max-w-[92vw] sm:max-w-md w-max animate-toast-drop pointer-events-auto select-none px-2">
           <div className={`relative flex items-center justify-between gap-2.5 px-3.5 py-2 sm:py-2.5 rounded-full shadow-2xl border backdrop-blur-2xl transition-all duration-300 ${
             isError
               ? 'bg-white/98 border-rose-200 text-slate-800 shadow-rose-950/15 ring-1 ring-rose-400/30'
