@@ -47,6 +47,8 @@
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Tesseract.js for Live Camera OCR & Document Extraction -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
   <style>
     html {
@@ -473,6 +475,382 @@
       );
     }
 
+    // High-Precision Real-Time Camera Scanner & OCR Modal
+    function CameraCaptureModal({ isOpen, onClose, onCapturedFile, showToast }) {
+      if (!isOpen) return null;
+
+      const videoRef = React.useRef(null);
+      const canvasRef = React.useRef(null);
+      const [stream, setStream] = React.useState(null);
+      const [facingMode, setFacingMode] = React.useState('environment'); // 'environment' (back) or 'user' (front)
+      const [capturedImage, setCapturedImage] = React.useState(null);
+      const [cameraError, setCameraError] = React.useState(null);
+      const [isInitializing, setIsInitializing] = React.useState(true);
+      const [isOcrProcessing, setIsOcrProcessing] = React.useState(false);
+      const [ocrProgress, setOcrProgress] = React.useState({ status: '', percent: 0 });
+
+      const startCamera = async (facing) => {
+        setIsInitializing(true);
+        setCameraError(null);
+
+        // Stop previous stream
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+        }
+
+        try {
+          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error("Web Camera API is not supported on this browser context (HTTPS or localhost is required).");
+          }
+
+          const constraints = {
+            video: {
+              facingMode: { ideal: facing },
+              width: { ideal: 1920 },
+              height: { ideal: 1080 }
+            },
+            audio: false
+          };
+
+          const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+          setStream(mediaStream);
+          if (videoRef.current) {
+            videoRef.current.srcObject = mediaStream;
+          }
+          setIsInitializing(false);
+        } catch (err) {
+          console.warn("Camera access note:", err);
+          setIsInitializing(false);
+          setCameraError(err.message || "Camera permission was denied or no video input device was found.");
+        }
+      };
+
+      React.useEffect(() => {
+        if (!capturedImage) {
+          startCamera(facingMode);
+        }
+        return () => {
+          if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+          }
+        };
+      }, [facingMode]);
+
+      // Stop stream on modal close
+      const handleClose = () => {
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+        }
+        setStream(null);
+        setCapturedImage(null);
+        setIsOcrProcessing(false);
+        onClose();
+      };
+
+      // Toggle camera facing mode
+      const toggleCamera = () => {
+        setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
+      };
+
+      // Snap photo
+      const snapPhoto = () => {
+        if (!videoRef.current || !canvasRef.current) return;
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        canvas.width = video.videoWidth || 1280;
+        canvas.height = video.videoHeight || 720;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.94);
+        setCapturedImage(dataUrl);
+
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+          setStream(null);
+        }
+      };
+
+      // Retake photo
+      const retakePhoto = () => {
+        setCapturedImage(null);
+        setIsOcrProcessing(false);
+        setOcrProgress({ status: '', percent: 0 });
+        startCamera(facingMode);
+      };
+
+      // Extract text via Tesseract.js & Upload
+      const processCapturedPhoto = async () => {
+        if (!capturedImage) return;
+        setIsOcrProcessing(true);
+        setOcrProgress({ status: 'Initializing Neural OCR Engine...', percent: 15 });
+
+        try {
+          // Convert dataURL to Blob & File
+          const res = await fetch(capturedImage);
+          const blob = await res.blob();
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+          const file = new File([blob], `Camera-Scan-${timestamp}.jpg`, { type: 'image/jpeg' });
+
+          let recognizedText = '';
+
+          // Client-side neural OCR with Tesseract.js
+          if (window.Tesseract) {
+            setOcrProgress({ status: 'Analyzing captured photo...', percent: 30 });
+            try {
+              const ocrRes = await window.Tesseract.recognize(
+                capturedImage,
+                'eng',
+                {
+                  logger: (m) => {
+                    if (m.status === 'recognizing text' && typeof m.progress === 'number') {
+                      const pct = Math.round(m.progress * 100);
+                      setOcrProgress({
+                        status: `Recognizing text (${pct}%)...`,
+                        percent: Math.max(30, Math.min(92, pct))
+                      });
+                    }
+                  }
+                }
+              );
+              recognizedText = ocrRes?.data?.text?.trim() || '';
+            } catch (tessErr) {
+              console.warn("Tesseract OCR notice:", tessErr);
+            }
+          }
+
+          setOcrProgress({ status: 'Uploading document & extracting NLP features...', percent: 95 });
+
+          // Send to parent upload handler
+          await onCapturedFile(file, recognizedText);
+
+          handleClose();
+        } catch (err) {
+          setIsOcrProcessing(false);
+          showToast(err.message || "Failed to process photo", "error");
+        }
+      };
+
+      // Fallback: Choose image from device
+      const handleFallbackFile = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          setCapturedImage(ev.target.result);
+          if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            setStream(null);
+          }
+        };
+        reader.readAsDataURL(file);
+      };
+
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-700/80 w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            
+            {/* Header */}
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between text-white">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-sm border border-indigo-500/30">
+                  📸
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white font-heading">
+                    {capturedImage ? 'Review & Ingest Photo' : 'Live Document Camera'}
+                  </h3>
+                  <p className="text-[11px] text-slate-400 font-medium">
+                    {capturedImage ? 'Confirm or retake photo before OCR text extraction' : 'Position your document or text inside the frame'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {!capturedImage && !cameraError && (
+                  <button
+                    type="button"
+                    onClick={toggleCamera}
+                    className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer border border-slate-700 text-xs flex items-center gap-1"
+                    title="Flip camera"
+                  >
+                    <span>🔄</span>
+                    <span className="hidden sm:inline text-[11px] font-bold">Flip</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition flex items-center justify-center cursor-pointer border border-slate-700"
+                  title="Close"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Viewfinder / Image Area */}
+            <div className="relative flex-1 bg-black min-h-[300px] sm:min-h-[380px] flex items-center justify-center overflow-hidden">
+              
+              {/* Hidden Canvas for crisp snapshot rendering */}
+              <canvas ref={canvasRef} className="hidden" />
+
+              {!capturedImage ? (
+                <>
+                  {isInitializing && !cameraError && (
+                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-slate-950/90 text-white">
+                      <div className="w-10 h-10 border-3 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
+                      <p className="text-xs text-slate-300 font-medium">Initializing camera stream...</p>
+                    </div>
+                  )}
+
+                  {cameraError ? (
+                    <div className="p-6 text-center space-y-4 max-w-md">
+                      <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center justify-center text-2xl">
+                        📷
+                      </div>
+                      <div className="space-y-1">
+                        <h4 className="text-white font-bold text-sm">Direct Camera Access Blocked</h4>
+                        <p className="text-slate-400 text-xs leading-relaxed">{cameraError}</p>
+                      </div>
+                      <div className="pt-2">
+                        <label className="btn-3d-primary cursor-pointer inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white shadow-md">
+                          <span>📸 Take Photo with Device Camera</span>
+                          <input type="file" accept="image/*" capture="environment" onChange={handleFallbackFile} className="hidden" />
+                        </label>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="relative w-full h-full flex items-center justify-center">
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        className="w-full h-full object-cover"
+                      />
+
+                      {/* Document Scanner Viewfinder Overlay */}
+                      <div className="absolute inset-6 sm:inset-10 pointer-events-none flex flex-col justify-between">
+                        <div className="flex justify-between">
+                          <div className="w-8 h-8 border-t-4 border-l-4 border-emerald-400 rounded-tl-xl shadow-xs"></div>
+                          <div className="w-8 h-8 border-t-4 border-r-4 border-emerald-400 rounded-tr-xl shadow-xs"></div>
+                        </div>
+                        <div className="flex justify-between">
+                          <div className="w-8 h-8 border-b-4 border-l-4 border-emerald-400 rounded-bl-xl shadow-xs"></div>
+                          <div className="w-8 h-8 border-b-4 border-r-4 border-emerald-400 rounded-br-xl shadow-xs"></div>
+                        </div>
+                      </div>
+
+                      {/* Hint pill */}
+                      <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-[11px] font-bold text-emerald-300 pointer-events-none flex items-center gap-1.5 shadow-md">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span>Align document within frame</span>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="relative w-full h-full flex items-center justify-center bg-slate-950">
+                  <img
+                    src={capturedImage}
+                    alt="Captured Scan"
+                    className="max-h-[380px] w-auto max-w-full object-contain rounded-xl shadow-lg border border-slate-800"
+                  />
+
+                  {/* OCR Processing Overlay */}
+                  {isOcrProcessing && (
+                    <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-white text-center space-y-3.5 animate-fadeIn">
+                      <div className="w-12 h-12 rounded-2xl bg-indigo-600/20 border border-indigo-500/40 text-indigo-400 flex items-center justify-center font-bold text-xl animate-pulse">
+                        ⚡
+                      </div>
+                      <div className="space-y-1">
+                        <h4 className="font-extrabold text-sm text-white font-heading">Extracting Text from Photo</h4>
+                        <p className="text-xs text-indigo-200 font-medium">{ocrProgress.status || 'Processing neural OCR...'}</p>
+                      </div>
+                      <div className="w-full max-w-xs bg-slate-800 rounded-full h-2 overflow-hidden shadow-inner border border-slate-700">
+                        <div
+                          className="h-full bg-gradient-to-r from-indigo-500 via-indigo-400 to-purple-500 transition-all duration-200"
+                          style={{ width: `${Math.max(5, ocrProgress.percent)}%` }}
+                        />
+                      </div>
+                      <span className="text-[11px] font-mono text-slate-400">{ocrProgress.percent}% Complete</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Bottom Actions Bar */}
+            <div className="p-4 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-3">
+              {!capturedImage ? (
+                <>
+                  <label className="text-xs font-bold text-slate-400 hover:text-white transition cursor-pointer flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-slate-800">
+                    <span>📁 Gallery</span>
+                    <input type="file" accept="image/*" onChange={handleFallbackFile} className="hidden" />
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={snapPhoto}
+                    disabled={isInitializing || !!cameraError}
+                    className={`group relative flex items-center justify-center w-14 h-14 rounded-full bg-white text-slate-950 hover:scale-105 active:scale-95 transition shadow-lg cursor-pointer ${
+                      isInitializing || !!cameraError ? 'opacity-40 cursor-not-allowed' : ''
+                    }`}
+                    title="Take Photo"
+                  >
+                    <div className="w-12 h-12 rounded-full border-2 border-slate-950 flex items-center justify-center">
+                      <div className="w-9 h-9 rounded-full bg-indigo-600 group-hover:bg-indigo-700 transition"></div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleClose}
+                    className="text-xs font-bold text-slate-400 hover:text-white transition px-3 py-2 rounded-xl hover:bg-slate-800 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <div className="flex items-center justify-between gap-3 w-full">
+                  <button
+                    type="button"
+                    onClick={retakePhoto}
+                    disabled={isOcrProcessing}
+                    className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition border border-slate-700 cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>🔄</span>
+                    <span>Retake</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={processCapturedPhoto}
+                    disabled={isOcrProcessing}
+                    className={`btn-3d-primary px-6 py-2.5 rounded-xl text-white text-xs font-extrabold flex items-center gap-2 cursor-pointer shadow-md ${
+                      isOcrProcessing ? 'opacity-60 cursor-wait' : ''
+                    }`}
+                  >
+                    {isOcrProcessing ? (
+                      <>
+                        <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                        <span>Extracting Text...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>⚡</span>
+                        <span>Extract & Ingest</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+
+          </div>
+        </div>
+      );
+    }
+
     function App() {
       // Navigation
       const [activeTab, setActiveTab] = useState('summarize');
@@ -494,8 +872,9 @@
       const [translateToEnglish, setTranslateToEnglish] = useState(false);
       const [isTranslating, setIsTranslating] = useState(false);
 
-      // Multi-Source Ingestion & URL / YouTube State
-      const [inputSourceTab, setInputSourceTab] = useState('text'); // 'text', 'upload', 'url'
+      // Multi-Source Ingestion & URL / YouTube / Camera State
+      const [inputSourceTab, setInputSourceTab] = useState('text'); // 'text', 'upload', 'camera', 'url'
+      const [showCameraModal, setShowCameraModal] = useState(false);
       const [urlInput, setUrlInput] = useState('');
       const [urlLoading, setUrlLoading] = useState(false);
       const [urlDocData, setUrlDocData] = useState(null);
@@ -674,8 +1053,13 @@
         if (!file) return;
 
         const maxSizeBytes = 50 * 1024 * 1024;
-        const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
-        const fileSizeFormatted = file.size >= 1024 * 1024 ? `${fileSizeMB} MB` : `${Math.max(1, Math.round(file.size / 1024))} KB`;
+        const formatBytes = (bytes) => {
+          if (!bytes || bytes <= 0) return '0 KB';
+          if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+          return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+        };
+
+        const totalSizeFormatted = formatBytes(file.size);
 
         // 1. Check for empty file
         if (file.size === 0) {
@@ -685,16 +1069,16 @@
 
         // 2. Pre-upload file size validation: Greater than 50 MB -> display message & abort
         if (file.size > maxSizeBytes) {
-          showToast(`⚠️ File "${file.name}" (${fileSizeFormatted}) exceeds the 50 MB maximum limit. Please select a smaller file.`, "error", 6000);
+          showToast(`⚠️ File "${file.name}" (${totalSizeFormatted}) exceeds the 50 MB maximum limit. Please select a smaller file.`, "error", 6000);
           return;
         }
 
         // 3. Supported extension check
-        const allowedExts = ['.pdf', '.docx', '.doc', '.pptx', '.ppt', '.txt'];
+        const allowedExts = ['.pdf', '.docx', '.doc', '.pptx', '.ppt', '.txt', '.jpg', '.jpeg', '.png', '.webp', '.bmp'];
         const lowerName = (file.name || '').toLowerCase();
         const hasValidExt = allowedExts.some(ext => lowerName.endsWith(ext));
         if (!hasValidExt) {
-          showToast(`Unsupported format for "${file.name}". Please upload PDF, DOCX, PPTX, or TXT.`, "error", 5000);
+          showToast(`Unsupported format for "${file.name}". Please upload PDF, DOCX, PPTX, TXT, or Images.`, "error", 5000);
           return;
         }
 
@@ -703,9 +1087,9 @@
         setUploadProgress({
           percent: 0,
           fileName: file.name,
-          totalSize: fileSizeFormatted,
+          totalSize: totalSizeFormatted,
           loadedSize: '0 KB',
-          statusText: `Connecting to server (${fileSizeFormatted})...`,
+          statusText: `Connecting to server (${totalSizeFormatted})...`,
           stage: 'uploading'
         });
 
@@ -717,30 +1101,30 @@
 
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable && event.total > 0) {
-            const percent = Math.min(100, Math.round((event.loaded / event.total) * 100));
-            const loadedMB = (event.loaded / (1024 * 1024)).toFixed(1);
-            const loadedFormatted = event.loaded >= 1024 * 1024 ? `${loadedMB} MB` : `${Math.round(event.loaded / 1024)} KB`;
+            const percent = Math.min(99, Math.round((event.loaded / event.total) * 100));
+            const loadedFormatted = formatBytes(event.loaded);
+            const totalFormatted = formatBytes(event.total);
 
-            if (percent < 100) {
-              setUploadProgress({
-                percent,
-                fileName: file.name,
-                totalSize: totalSizeFormatted,
-                loadedSize: loadedFormatted,
-                statusText: `Uploading ${percent}% (${loadedFormatted} / ${totalSizeFormatted})...`,
-                stage: 'uploading'
-              });
-            } else {
-              setUploadProgress({
-                percent: 100,
-                fileName: file.name,
-                totalSize: totalSizeFormatted,
-                loadedSize: totalSizeFormatted,
-                statusText: 'Upload completed! Parsing pages, OCR & extracting NLP structure...',
-                stage: 'processing'
-              });
-            }
+            setUploadProgress({
+              percent,
+              fileName: file.name,
+              totalSize: totalFormatted,
+              loadedSize: loadedFormatted,
+              statusText: `Uploading ${percent}% (${loadedFormatted} of ${totalFormatted})...`,
+              stage: 'uploading'
+            });
           }
+        };
+
+        xhr.upload.onload = () => {
+          setUploadProgress({
+            percent: 100,
+            fileName: file.name,
+            totalSize: totalSizeFormatted,
+            loadedSize: totalSizeFormatted,
+            statusText: 'Upload completed! Parsing PDF pages, OCR & extracting NLP structure...',
+            stage: 'processing'
+          });
         };
 
         xhr.onload = () => {
@@ -760,10 +1144,10 @@
                 fileName: file.name,
                 totalSize: totalSizeFormatted,
                 loadedSize: totalSizeFormatted,
-                statusText: `✓ Extracted ${(data.words || 0).toLocaleString()} words from ${data.pages || 1} pages!`,
+                statusText: `✓ Extracted ${(data.words || 0).toLocaleString()} words from ${data.pages || 1} ${data.pages === 1 ? 'page' : 'pages'}!`,
                 stage: 'done'
               });
-              showToast(`Ingested ${data.filename} (${(data.words || 0).toLocaleString()} words)`, "success");
+              showToast(`✓ Ingested ${data.filename} (${(data.words || 0).toLocaleString()} words)`, "success");
               fetchDocuments();
               setActiveTab('summarize');
               setTimeout(() => {
@@ -796,11 +1180,88 @@
 
         xhr.onerror = () => {
           setUploadLoading(false);
-          setUploadProgress(null);
+          setUploadProgress({
+            percent: 0,
+            fileName: file.name,
+            totalSize: totalSizeFormatted,
+            loadedSize: '0 KB',
+            statusText: "Network error occurred during document upload.",
+            stage: 'error'
+          });
           showToast("Network error occurred during document upload.", "error");
+          setTimeout(() => {
+            setUploadProgress(null);
+          }, 4000);
         };
 
         xhr.send(formData);
+      };
+
+      // Upload Handler for Camera-Captured Photos with client OCR
+      const handleCameraCapturedFile = async (file, ocrText) => {
+        setUploadLoading(true);
+        const formatBytes = (bytes) => {
+          if (!bytes || bytes <= 0) return '0 KB';
+          if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+          return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+        };
+        const totalSizeFormatted = formatBytes(file.size);
+
+        setUploadProgress({
+          percent: 60,
+          fileName: file.name,
+          totalSize: totalSizeFormatted,
+          loadedSize: totalSizeFormatted,
+          statusText: 'Ingesting camera scan & computing NLP statistics...',
+          stage: 'processing'
+        });
+
+        const formData = new FormData();
+        formData.append('file', file);
+        if (ocrText && ocrText.trim()) {
+          formData.append('ocr_text', ocrText.trim());
+        }
+
+        try {
+          const res = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+          });
+
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.detail || 'Could not process captured photo');
+          }
+
+          const data = await res.json();
+          const cleanText = data.text || ocrText || '';
+          setInputText(cleanText);
+          setUploadedDocInfo({
+            filename: data.filename || file.name,
+            format: data.format || 'IMAGE',
+            pages: 1,
+            words: data.words || data.stats?.words || (cleanText ? cleanText.split(/\s+/).filter(Boolean).length : 0)
+          });
+          setUploadProgress({
+            percent: 100,
+            fileName: file.name,
+            totalSize: totalSizeFormatted,
+            loadedSize: totalSizeFormatted,
+            statusText: `✓ Extracted ${(data.words || 0).toLocaleString()} words from camera capture!`,
+            stage: 'done'
+          });
+          showToast(`✓ Ingested camera photo (${(data.words || 0).toLocaleString()} words)`, "success");
+          fetchDocuments();
+          setActiveTab('summarize');
+          setTimeout(() => {
+            setUploadProgress(null);
+          }, 3500);
+        } catch (e) {
+          setUploadProgress(null);
+          showToast(e.message || "Failed to upload photo", "error");
+        } finally {
+          setUploadLoading(false);
+        }
       };
 
       const handleFileUpload = async (e) => {
@@ -826,15 +1287,17 @@
         let docx = 0;
         let pptx = 0;
         let txt = 0;
+        let image = 0;
         documentsList.forEach(d => {
           words += (d.words || 0);
           const f = (d.format || 'TXT').toUpperCase();
           if (f === 'PDF') pdf++;
           else if (f === 'DOCX') docx++;
           else if (f === 'PPTX' || f === 'PPT') pptx++;
+          else if (f === 'IMAGE' || f === 'PHOTO') image++;
           else txt++;
         });
-        return { total, words, pdf, docx, pptx, txt };
+        return { total, words, pdf, docx, pptx, txt, image };
       }, [documentsList]);
 
       // Filtered Documents List
@@ -1550,7 +2013,7 @@
                     <div className="flex flex-col flex-1">
                       {/* Ingestion Source Tabs */}
                       <div className="flex items-center justify-between gap-2 mb-3">
-                        <div className="inline-flex bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 gap-1 w-full sm:w-auto">
+                        <div className="inline-flex bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 gap-1 w-full sm:w-auto flex-wrap">
                           <button
                             onClick={() => setInputSourceTab('text')}
                             className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold transition tab-3d cursor-pointer select-none ${
@@ -1568,6 +2031,19 @@
                             📄 Upload File
                           </button>
                           <button
+                            onClick={() => {
+                              setInputSourceTab('camera');
+                              setShowCameraModal(true);
+                            }}
+                            className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold transition tab-3d cursor-pointer select-none flex items-center justify-center gap-1 ${
+                              inputSourceTab === 'camera' ? 'tab-3d-active text-indigo-700 font-extrabold' : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                          >
+                            <span>📸</span>
+                            <span>Live Camera</span>
+                            <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded font-mono font-bold">OCR</span>
+                          </button>
+                          <button
                             onClick={() => setInputSourceTab('url')}
                             className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold transition tab-3d cursor-pointer select-none flex items-center justify-center gap-1 ${
                               inputSourceTab === 'url' ? 'tab-3d-active text-indigo-700 font-extrabold' : 'text-slate-600 hover:text-slate-900'
@@ -1578,9 +2054,37 @@
                             <span className="text-[9px] bg-indigo-100 text-indigo-800 px-1 py-0.2 rounded font-mono">NEW</span>
                           </button>
                         </div>
-
-
                       </div>
+
+                      {/* Camera Scanner Ingestion Panel */}
+                      {inputSourceTab === 'camera' && (
+                        <div className="mb-3.5 p-4 rounded-2xl bg-gradient-to-br from-indigo-50/90 via-white to-purple-50/80 border border-indigo-200/80 space-y-3 animate-fadeIn shadow-2xs">
+                          <div className="flex items-center justify-between text-xs text-indigo-950 font-bold">
+                            <span className="flex items-center gap-2">
+                              <span className="text-base">📸</span> Live Camera Document Scanner & AI OCR
+                            </span>
+                            <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-bold">
+                              Ready to Scan
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-600 leading-relaxed">
+                            Point your webcam or mobile camera at documents, printed pages, receipts, or books to capture and extract clean text in real time.
+                          </p>
+                          <div className="flex flex-wrap items-center gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setShowCameraModal(true)}
+                              className="btn-3d-primary px-4 py-2.5 rounded-xl text-white font-bold text-xs flex items-center gap-2 cursor-pointer shadow-md"
+                            >
+                              <span>📸 Open Camera Viewfinder</span>
+                            </button>
+                            <label className="btn-3d-secondary cursor-pointer px-4 py-2.5 rounded-xl text-indigo-700 font-bold text-xs inline-flex items-center gap-1.5">
+                              <span>📁 Upload Photo / Scan</span>
+                              <input type="file" accept="image/*,.pdf,.docx,.doc,.txt" onChange={handleFileUpload} disabled={uploadLoading} className="hidden" />
+                            </label>
+                          </div>
+                        </div>
+                      )}
 
                       {/* URL / YouTube Ingestion Panel */}
                       {inputSourceTab === 'url' && (
@@ -1621,8 +2125,6 @@
                               )}
                             </button>
                           </div>
-
-
 
                           {/* YouTube Metadata Preview Card */}
                           {urlDocData && urlDocData.format === 'YOUTUBE' && (
@@ -1755,15 +2257,24 @@
                             <DocumentIcon className="w-6 h-6" />
                           </div>
                           <p className="text-xs font-bold text-slate-800">
-                            Drag & drop your PDF, DOCX, PPTX, or TXT file here
+                            Drag & drop your PDF, DOCX, PPTX, TXT, or Image file here
                           </p>
                           <p className="text-[11px] text-slate-500 mt-0.5">
-                            Supports multi-page documents & slides up to 50 MB
+                            Supports multi-page documents, presentation slides & photos up to 50 MB
                           </p>
-                          <label className="btn-3d-secondary mt-3 cursor-pointer inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-indigo-700 select-none">
-                            <span>Browse File</span>
-                            <input type="file" accept=".pdf,.docx,.doc,.pptx,.ppt,.txt" onChange={handleFileUpload} disabled={uploadLoading} className="hidden" />
-                          </label>
+                          <div className="flex flex-wrap items-center justify-center gap-2 mt-3">
+                            <label className="btn-3d-secondary cursor-pointer inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-indigo-700 select-none">
+                              <span>📁 Browse File</span>
+                              <input type="file" accept=".pdf,.docx,.doc,.pptx,.ppt,.txt,.jpg,.jpeg,.png,.webp,.bmp" onChange={handleFileUpload} disabled={uploadLoading} className="hidden" />
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => setShowCameraModal(true)}
+                              className="btn-3d-primary inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white select-none cursor-pointer"
+                            >
+                              <span>📸 Live Camera</span>
+                            </button>
+                          </div>
                         </div>
                       )}
 
@@ -1948,22 +2459,22 @@
                                 <span>{summaryResult.analytics?.latency_ms || 0}ms latency</span>
                               </div>
                             </div>
-                            <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200/70 text-xs">
-                              <div className="p-2.5 rounded-xl bg-white border border-slate-200 shadow-2xs">
-                                <span className="text-xs uppercase text-slate-600 font-extrabold tracking-wider block">Original Words</span>
-                                <span className="font-extrabold text-sm sm:text-base text-slate-900 mt-0.5 block font-heading">
+                            <div className="grid grid-cols-3 gap-1.5 sm:gap-2 pt-2 border-t border-slate-200/70 text-xs">
+                              <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-slate-200 shadow-2xs min-w-0 overflow-hidden">
+                                <span className="text-[10px] sm:text-[11px] lg:text-xs uppercase text-slate-500 font-bold tracking-tight sm:tracking-normal truncate block" title="Original Words">Orig Words</span>
+                                <span className="font-extrabold text-xs sm:text-sm md:text-base text-slate-900 mt-0.5 block font-heading truncate">
                                   {(summaryResult.nlp_stats?.words || stats.words || 0).toLocaleString()}
                                 </span>
                               </div>
-                              <div className="p-2.5 rounded-xl bg-white border border-slate-200 shadow-2xs">
-                                <span className="text-xs uppercase text-slate-600 font-extrabold tracking-wider block">Summary Words</span>
-                                <span className="font-extrabold text-sm sm:text-base text-indigo-700 mt-0.5 block font-heading">
+                              <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-slate-200 shadow-2xs min-w-0 overflow-hidden">
+                                <span className="text-[10px] sm:text-[11px] lg:text-xs uppercase text-slate-500 font-bold tracking-tight sm:tracking-normal truncate block" title="Summary Words">Summ Words</span>
+                                <span className="font-extrabold text-xs sm:text-sm md:text-base text-indigo-700 mt-0.5 block font-heading truncate">
                                   {(summaryResult.summary_stats?.summary_words || summaryResult.summary.split(/\s+/).filter(Boolean).length).toLocaleString()}
                                 </span>
                               </div>
-                              <div className="p-2.5 rounded-xl bg-white border border-slate-200 shadow-2xs">
-                                <span className="text-xs uppercase text-slate-600 font-extrabold tracking-wider block">Compression</span>
-                                <span className="font-extrabold text-sm sm:text-base text-emerald-700 mt-0.5 block font-heading">
+                              <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-slate-200 shadow-2xs min-w-0 overflow-hidden">
+                                <span className="text-[10px] sm:text-[11px] lg:text-xs uppercase text-slate-500 font-bold tracking-tight sm:tracking-normal truncate block" title="Compression">Compression</span>
+                                <span className="font-extrabold text-xs sm:text-sm md:text-base text-emerald-700 mt-0.5 block font-heading truncate">
                                   {summaryResult.summary_stats?.compression_ratio
                                     ? `${(summaryResult.summary_stats.compression_ratio * 100).toFixed(1)}%`
                                     : (summaryResult.nlp_stats?.words || stats.words) > 0
@@ -2331,25 +2842,25 @@
                       <span>📊</span> NLP Comparison Statistics
                     </span>
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3 text-center text-xs">
-                      <div className="p-3 sm:p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200 shadow-2xs hover:border-indigo-300 transition">
-                        <span className="text-slate-600 text-[11px] uppercase font-extrabold tracking-wider block mb-1">Source Words</span>
-                        <span className="font-black text-slate-900 text-base sm:text-lg tracking-tight">{summaryResult.analytics?.original_words}</span>
+                      <div className="p-3 sm:p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200 shadow-2xs hover:border-indigo-300 transition min-w-0 overflow-hidden">
+                        <span className="text-slate-600 text-[10px] sm:text-[11px] uppercase font-extrabold tracking-wider block mb-1 truncate" title="Source Words">Source Words</span>
+                        <span className="font-black text-slate-900 text-base sm:text-lg tracking-tight truncate block">{summaryResult.analytics?.original_words}</span>
                       </div>
-                      <div className="p-3 sm:p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200 shadow-2xs hover:border-indigo-300 transition">
-                        <span className="text-slate-600 text-[11px] uppercase font-extrabold tracking-wider block mb-1">Summary Words</span>
-                        <span className="font-black text-indigo-700 text-base sm:text-lg tracking-tight">{summaryResult.analytics?.summary_words}</span>
+                      <div className="p-3 sm:p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200 shadow-2xs hover:border-indigo-300 transition min-w-0 overflow-hidden">
+                        <span className="text-slate-600 text-[10px] sm:text-[11px] uppercase font-extrabold tracking-wider block mb-1 truncate" title="Summary Words">Summary Words</span>
+                        <span className="font-black text-indigo-700 text-base sm:text-lg tracking-tight truncate block">{summaryResult.analytics?.summary_words}</span>
                       </div>
-                      <div className="p-3 sm:p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200 shadow-2xs hover:border-emerald-300 transition">
-                        <span className="text-slate-600 text-[11px] uppercase font-extrabold tracking-wider block mb-1">Time Saved</span>
-                        <span className="font-black text-emerald-700 text-base sm:text-lg tracking-tight">{summaryResult.analytics?.estimated_read_time_saved}</span>
+                      <div className="p-3 sm:p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200 shadow-2xs hover:border-emerald-300 transition min-w-0 overflow-hidden">
+                        <span className="text-slate-600 text-[10px] sm:text-[11px] uppercase font-extrabold tracking-wider block mb-1 truncate" title="Time Saved">Time Saved</span>
+                        <span className="font-black text-emerald-700 text-base sm:text-lg tracking-tight truncate block">{summaryResult.analytics?.estimated_read_time_saved}</span>
                       </div>
-                      <div className="p-3 sm:p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200 shadow-2xs hover:border-indigo-300 transition">
-                        <span className="text-slate-600 text-[11px] uppercase font-extrabold tracking-wider block mb-1">Source Readability</span>
-                        <span className="font-black text-slate-900 text-base sm:text-lg tracking-tight">{summaryResult.nlp_stats?.readability_score || 72.5}</span>
+                      <div className="p-3 sm:p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200 shadow-2xs hover:border-indigo-300 transition min-w-0 overflow-hidden">
+                        <span className="text-slate-600 text-[10px] sm:text-[11px] uppercase font-extrabold tracking-wider block mb-1 truncate" title="Source Readability">Source Readability</span>
+                        <span className="font-black text-slate-900 text-base sm:text-lg tracking-tight truncate block">{summaryResult.nlp_stats?.readability_score || 72.5}</span>
                       </div>
-                      <div className="p-3 sm:p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200 shadow-2xs hover:border-indigo-300 transition col-span-2 sm:col-span-1">
-                        <span className="text-slate-600 text-[11px] uppercase font-extrabold tracking-wider block mb-1">Summary Readability</span>
-                        <span className="font-black text-indigo-700 text-base sm:text-lg tracking-tight">{summaryResult.summary_stats?.readability_score || 78.0}</span>
+                      <div className="p-3 sm:p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200 shadow-2xs hover:border-indigo-300 transition col-span-2 sm:col-span-1 min-w-0 overflow-hidden">
+                        <span className="text-slate-600 text-[10px] sm:text-[11px] uppercase font-extrabold tracking-wider block mb-1 truncate" title="Summary Readability">Summary Readability</span>
+                        <span className="font-black text-indigo-700 text-base sm:text-lg tracking-tight truncate block">{summaryResult.summary_stats?.readability_score || 78.0}</span>
                       </div>
                     </div>
                   </div>
@@ -2389,10 +2900,10 @@
                       ) : (
                         <>
                           <span>+ Ingest Document</span>
-                          <span className="opacity-80 text-[10px] font-normal">(PDF / DOCX / PPTX / TXT)</span>
+                          <span className="opacity-80 text-[10px] font-normal">(PDF / DOCX / PPTX / TXT / Images)</span>
                         </>
                       )}
-                      <input type="file" accept=".pdf,.docx,.doc,.pptx,.ppt,.txt" onChange={handleFileUpload} className="hidden" disabled={uploadLoading} />
+                      <input type="file" accept=".pdf,.docx,.doc,.pptx,.ppt,.txt,.jpg,.jpeg,.png,.webp,.bmp" onChange={handleFileUpload} className="hidden" disabled={uploadLoading} />
                     </label>
                   </div>
 
@@ -2443,6 +2954,11 @@
                           <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-orange-50 border border-orange-200 text-orange-700 font-bold text-[10px]">
                             {docStats.pptx} PPTX
                           </span>
+                          {docStats.image > 0 && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold text-[10px]">
+                              {docStats.image} IMAGE
+                            </span>
+                          )}
                           <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold text-[10px]">
                             {docStats.txt} TXT
                           </span>
@@ -2474,17 +2990,32 @@
                       : 'border-slate-300 hover:border-indigo-400 bg-white card-shadow'
                   }`}
                 >
-                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 text-lg">
-                      📤
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 text-lg flex-shrink-0">
+                        📤
+                      </div>
+                      <div className="text-center sm:text-left">
+                        <div className="text-xs font-bold text-slate-800">
+                          Drag & Drop your PDF, DOCX, PPTX, TXT, or Image file here to ingest instantly
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">
+                          Supports text, presentations & camera scans up to 50MB with instant NLP metrics calculation
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-center sm:text-left">
-                      <div className="text-xs font-bold text-slate-800">
-                        Drag & Drop your PDF, DOCX, PPTX, or TXT file here to ingest instantly
-                      </div>
-                      <div className="text-[11px] text-slate-400 mt-0.5">
-                        Supports text & slide extraction up to 50MB with instant NLP metrics calculation
-                      </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label className="btn-3d-secondary cursor-pointer inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-indigo-700 select-none flex-shrink-0">
+                        <span>📁 Browse File</span>
+                        <input type="file" accept=".pdf,.docx,.doc,.pptx,.ppt,.txt,.jpg,.jpeg,.png,.webp,.bmp" onChange={handleFileUpload} disabled={uploadLoading} className="hidden" />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowCameraModal(true)}
+                        className="btn-3d-primary inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white select-none cursor-pointer flex-shrink-0 shadow-2xs"
+                      >
+                        <span>📸 Live Camera</span>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -3330,6 +3861,14 @@
               );
             })}
           </nav>
+
+          {/* Live Camera Capture & OCR Scanner Modal */}
+          <CameraCaptureModal
+            isOpen={showCameraModal}
+            onClose={() => setShowCameraModal(false)}
+            onCapturedFile={handleCameraCapturedFile}
+            showToast={showToast}
+          />
 
           {/* Toast Notification */}
           {toast && (

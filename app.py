@@ -366,8 +366,11 @@ async def get_presets():
 
 @app.post("/api/upload", tags=["Text Extraction & MongoDB"])
 @app.post("/upload", tags=["Text Extraction & MongoDB"], include_in_schema=False)
-async def upload_document(file: UploadFile = File(...)):
-    """Extracts and cleans raw text from uploaded files (PDF, DOCX, PPTX, PPT, TXT) and saves to MongoDB."""
+async def upload_document(
+    file: UploadFile = File(...),
+    ocr_text: Optional[str] = Form(None)
+):
+    """Extracts and cleans raw text from uploaded files (PDF, DOCX, PPTX, PPT, TXT, Images & Live Photos) and saves to MongoDB."""
     try:
         # Security: Enforce max upload file size (50 MB) to prevent OOM/DoS
         content_bytes = await file.read(MAX_UPLOAD_SIZE + 1)
@@ -379,8 +382,14 @@ async def upload_document(file: UploadFile = File(...)):
         
         extracted_text, detected_format, pages_count = TextExtractor.extract(file.filename or "document.txt", content_bytes)
         
+        # If client provided OCR text (e.g. from live camera photo capture) and backend didn't find text
+        if (not extracted_text or not extracted_text.strip()) and ocr_text and ocr_text.strip():
+            extracted_text = TextExtractor.clean_text(ocr_text)
+            if (file.filename or '').lower().endswith(('.jpg', '.jpeg', '.png', '.webp', '.bmp')):
+                detected_format = "IMAGE"
+
         if not extracted_text or not extracted_text.strip():
-            raise HTTPException(status_code=400, detail="Could not extract readable text from uploaded file.")
+            raise HTTPException(status_code=400, detail="Could not extract readable text from uploaded file or photo. Please ensure text is clear.")
             
         stats = NLPProcessor.compute_stats(extracted_text)
         stats["pages"] = pages_count

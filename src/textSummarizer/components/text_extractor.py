@@ -219,6 +219,29 @@ class TextExtractor:
             logger.error(f"PPT binary fallback error: {e}")
             return file_bytes.decode('utf-8', errors='ignore'), 1
 
+    @staticmethod
+    def extract_from_image(file_bytes: bytes) -> Tuple[str, int]:
+        """Extracts text from images (PNG, JPG, JPEG, WEBP, BMP) using PyMuPDF OCR or Pillow."""
+        try:
+            import pymupdf
+            doc = pymupdf.open(stream=file_bytes, filetype="png")
+            pages = []
+            page_count = len(doc)
+            for page in doc:
+                try:
+                    tp = page.get_textpage_ocr(language="eng", dpi=150)
+                    text = page.get_text(textpage=tp)
+                    if text and text.strip():
+                        pages.append(text.strip())
+                except Exception:
+                    pass
+            doc.close()
+            if pages:
+                return "\n\n".join(pages), max(1, page_count)
+        except Exception as e:
+            logger.debug(f"PyMuPDF image OCR note: {e}")
+        return "", 1
+
     @classmethod
     def extract(cls, filename: str, file_bytes: bytes) -> Tuple[str, str, int]:
         """Extracts text based on file extension and returns (clean_text, detected_format, page_count)."""
@@ -233,6 +256,9 @@ class TextExtractor:
         elif fn.endswith('.pdf'):
             fmt = "PDF"
             raw, pages = cls.extract_from_pdf(file_bytes)
+        elif fn.endswith(('.png', '.jpg', '.jpeg', '.webp', '.bmp', '.tiff')):
+            fmt = "IMAGE"
+            raw, pages = cls.extract_from_image(file_bytes)
         else:
             fmt = "TXT"
             raw = file_bytes.decode('utf-8', errors='ignore')
