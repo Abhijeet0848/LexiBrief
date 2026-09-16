@@ -5,7 +5,8 @@
 # ✨ LexiBrief
 ### Enterprise-Grade Neural NLP Abstractive Text Summarizer
 
-[![Live Demo](https://img.shields.io/badge/Live_Demo-lexi--brief.vercel.app-000000.svg?style=for-the-badge&logo=vercel&logoColor=white)](https://lexi-brief.vercel.app/)
+[![Live Deployment](https://img.shields.io/badge/Live_App-abhijnu.dpdns.org-4f46e5.svg?style=for-the-badge&logo=fastapi&logoColor=white)](https://abhijnu.dpdns.org/)
+[![Vercel Mirror](https://img.shields.io/badge/Vercel_Mirror-lexi--brief.vercel.app-000000.svg?style=for-the-badge&logo=vercel&logoColor=white)](https://lexi-brief.vercel.app/)
 
 [![Python Version](https://img.shields.io/badge/Python-3.10%2B-blue.svg?logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-1.0.0-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
@@ -16,9 +17,9 @@
 
 *Transform complex multi-page articles, corporate transcripts, and technical documents into clear, high-impact executive briefs in real time.*
 
-🌐 **Live Application**: [**https://lexi-brief.vercel.app**](https://lexi-brief.vercel.app/)
+🌐 **Live Application**: [**https://abhijnu.dpdns.org/**](https://abhijnu.dpdns.org/) *(Primary)* • [**https://lexi-brief.vercel.app/**](https://lexi-brief.vercel.app/) *(Mirror)*
 
-[Live Demo](https://lexi-brief.vercel.app/) • [Features](#-key-features) • [Architecture](#-modular-mlops-architecture) • [Getting Started](#-getting-started) • [API Documentation](#-api-endpoints) • [Deployment](#-aws-cicd-deployment)
+[Live Application](https://abhijnu.dpdns.org/) • [Features](#-key-features) • [Architecture](#-modular-mlops-architecture) • [Getting Started](#-getting-started) • [API Documentation](#-api-endpoints) • [Deployment](#-aws-cicd-deployment)
 
 ---
 
