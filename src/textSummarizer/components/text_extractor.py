@@ -362,48 +362,60 @@ class TextExtractor:
                 except Exception as leg_err:
                     logger.debug(f"Legacy transcript method notice: {leg_err}")
 
-            # Tier 3: Direct YouTube Innertube / Player Captions Scraping (Bypasses IP rate limit)
+            # Tier 3: Direct Official YouTube Innertube JSON Player API
             if not transcript_list:
                 try:
-                    headers = {
+                    innertube_url = "https://www.youtube.com/youtubei/v1/player?prettyPrint=false"
+                    innertube_headers = {
+                        "Content-Type": "application/json",
                         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                        "Accept-Language": "en-US,en;q=0.9,hi;q=0.8",
+                        "X-YouTube-Client-Name": "1",
+                        "X-YouTube-Client-Version": "2.20240417.01.00",
+                        "Origin": "https://www.youtube.com"
                     }
-                    yt_page = session.get(f"https://www.youtube.com/watch?v={video_id}", headers=headers, timeout=6)
-                    if yt_page.status_code == 200:
-                        m = re.search(r'ytInitialPlayerResponse\s*=\s*({.+?});(?:var|\s*<\/script>)', yt_page.text)
-                        if m:
-                            import json
-                            player_data = json.loads(m.group(1))
-                            caption_tracks = player_data.get("captions", {}).get("playerCaptionsTracklistRenderer", {}).get("captionTracks", [])
-                            if caption_tracks:
-                                cap_url = caption_tracks[0].get("baseUrl")
-                                for track in caption_tracks:
-                                    lang = track.get("languageCode", "").lower()
-                                    if lang in ["en", "hi", "en-us"]:
-                                        cap_url = track.get("baseUrl")
-                                        break
-                                if cap_url:
-                                    cap_resp = session.get(cap_url + "&fmt=json3", headers=headers, timeout=6)
-                                    if cap_resp.status_code == 200:
-                                        try:
-                                            cap_data = cap_resp.json()
-                                            events = cap_data.get("events", [])
-                                            extracted_events = []
-                                            for ev in events:
-                                                segs = ev.get("segs", [])
-                                                seg_text = "".join(s.get("utf8", "") for s in segs if s.get("utf8")).strip()
-                                                if seg_text and seg_text != "\n":
-                                                    extracted_events.append({
-                                                        "text": seg_text,
-                                                        "start": int(ev.get("tStartMs", 0)) / 1000.0
-                                                    })
-                                            if extracted_events:
-                                                transcript_list = extracted_events
-                                        except Exception:
-                                            pass
+                    innertube_payload = {
+                        "context": {
+                            "client": {
+                                "clientName": "WEB",
+                                "clientVersion": "2.20240417.01.00",
+                                "hl": "en",
+                                "gl": "US"
+                            }
+                        },
+                        "videoId": video_id
+                    }
+                    yt_post = session.post(innertube_url, headers=innertube_headers, json=innertube_payload, timeout=6)
+                    if yt_post.status_code == 200:
+                        player_data = yt_post.json()
+                        caption_tracks = player_data.get("captions", {}).get("playerCaptionsTracklistRenderer", {}).get("captionTracks", [])
+                        if caption_tracks:
+                            cap_url = caption_tracks[0].get("baseUrl")
+                            for track in caption_tracks:
+                                lang = track.get("languageCode", "").lower()
+                                if lang in ["en", "hi", "en-us", "en-gb"]:
+                                    cap_url = track.get("baseUrl")
+                                    break
+                            if cap_url:
+                                cap_resp = session.get(cap_url + "&fmt=json3", headers=innertube_headers, timeout=6)
+                                if cap_resp.status_code == 200:
+                                    try:
+                                        cap_data = cap_resp.json()
+                                        events = cap_data.get("events", [])
+                                        extracted_events = []
+                                        for ev in events:
+                                            segs = ev.get("segs", [])
+                                            seg_text = "".join(s.get("utf8", "") for s in segs if s.get("utf8")).strip()
+                                            if seg_text and seg_text != "\n":
+                                                extracted_events.append({
+                                                    "text": seg_text,
+                                                    "start": int(ev.get("tStartMs", 0)) / 1000.0
+                                                })
+                                        if extracted_events:
+                                            transcript_list = extracted_events
+                                    except Exception:
+                                        pass
                 except Exception as innertube_err:
-                    logger.debug(f"Direct player scraping notice: {innertube_err}")
+                    logger.debug(f"Direct player Innertube notice: {innertube_err}")
 
             # Tier 4: Public Cloud Proxy Mirrors Fallback
             if not transcript_list:

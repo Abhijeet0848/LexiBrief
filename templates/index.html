@@ -878,94 +878,6 @@
 
           const data = await res.json();
           if (data && data.is_fallback) {
-            // Attempt client-side resolution using the browser's residential IP across multiple public CORS mirrors
-            const videoId = data.video_id;
-            let resolvedClientText = null;
-            if (videoId) {
-              // 1. Piped public stream endpoints
-              const pipedMirrors = [
-                `https://pipedapi.kavin.rocks/streams/${videoId}`,
-                `https://api.piped.privacydev.net/streams/${videoId}`
-              ];
-              for (const pUrl of pipedMirrors) {
-                if (resolvedClientText) break;
-                try {
-                  const pRes = await fetch(pUrl);
-                  if (pRes.ok) {
-                    const pData = await pRes.json();
-                    const subs = pData?.subtitles || [];
-                    if (subs.length > 0) {
-                      const track = subs.find(s => s.code === 'en' || s.code === 'en-US' || s.code === 'hi') || subs[0];
-                      if (track && track.url) {
-                        const tRes = await fetch(track.url);
-                        if (tRes.ok) {
-                          const vtt = await tRes.text();
-                          const lines = vtt.split('\n')
-                            .map(l => l.trim())
-                            .filter(l => l && !l.startsWith('WEBVTT') && !l.includes('-->') && !/^\d+$/.test(l) && !l.startsWith('NOTE'));
-                          if (lines.length > 0) {
-                            resolvedClientText = lines.join(' ').replace(/\s+/g, ' ');
-                            break;
-                          }
-                        }
-                      }
-                    }
-                  }
-                } catch (e) {}
-              }
-
-              // 2. Invidious public caption endpoints
-              if (!resolvedClientText) {
-                const clientMirrors = [
-                  `https://inv.nadeko.net/api/v1/captions/${videoId}`,
-                  `https://invidious.nerdvpn.de/api/v1/captions/${videoId}`,
-                  `https://invidious.jing.rocks/api/v1/captions/${videoId}`,
-                  `https://inv.tux.pizza/api/v1/captions/${videoId}`
-                ];
-                for (const mirrorUrl of clientMirrors) {
-                  try {
-                    const mRes = await fetch(mirrorUrl);
-                    if (mRes.ok) {
-                      const mData = await mRes.json();
-                      const caps = mData?.captions || [];
-                      if (caps.length > 0) {
-                        let cUrl = caps[0].url;
-                        if (cUrl && !cUrl.startsWith('http')) {
-                          const baseDomain = mirrorUrl.split('/').slice(0, 3).join('/');
-                          cUrl = `${baseDomain}${cUrl}`;
-                        }
-                        const cRes = await fetch(cUrl);
-                        if (cRes.ok) {
-                          const vtt = await cRes.text();
-                          const lines = vtt.split('\n')
-                            .map(l => l.trim())
-                            .filter(l => l && !l.startsWith('WEBVTT') && !l.includes('-->') && !/^\d+$/.test(l) && !l.startsWith('NOTE'));
-                          if (lines.length > 0) {
-                            resolvedClientText = lines.join(' ').replace(/\s+/g, ' ');
-                            break;
-                          }
-                        }
-                      }
-                    }
-                  } catch (e) {}
-                }
-              }
-            }
-
-            if (resolvedClientText) {
-              setInputText(resolvedClientText);
-              setUrlDocData({ ...data, is_fallback: false, text: resolvedClientText, words: resolvedClientText.split(/\s+/).length });
-              setUploadedDocInfo({
-                filename: data.title || 'YouTube Video',
-                format: 'YOUTUBE',
-                pages: 1,
-                words: resolvedClientText.split(/\s+/).length
-              });
-              setSourceViewMode('editor');
-              showToast(`✓ YouTube subtitles loaded via browser! (${resolvedClientText.split(/\s+/).length.toLocaleString()} words)`, "success");
-              return resolvedClientText;
-            }
-
             setUrlDocData(data);
             setUploadedDocInfo({
               filename: data.title || 'YouTube Video',
@@ -995,7 +907,7 @@
           fetchDocuments();
           return extractedText;
         } catch (err) {
-          // Client-Side YouTube Fallback: If cloud backend is blocked by YouTube rate-limits, attempt client-side resolution & fetch oEmbed
+          // Client-Side YouTube Fallback: If cloud backend is blocked or video ID is detected, display guided fallback
           const ytMatch = targetUrl.match(/(?:v=|\/|youtu\.be\/|shorts\/)([0-9A-Za-z_-]{11})/);
           const videoId = ytMatch ? ytMatch[1] : null;
           if (videoId) {
@@ -1012,56 +924,6 @@
                 thumb = oeData.thumbnail_url || thumb;
               }
 
-              // Tier A: Attempt direct client-side proxy fetch (uses user residential IP, not Vercel cloud IP)
-              let clientText = null;
-              try {
-                const invRes = await fetch(`https://inv.nadeko.net/api/v1/captions/${videoId}`);
-                if (invRes.ok) {
-                  const invData = await invRes.json();
-                  const caps = invData?.captions || [];
-                  if (caps.length > 0) {
-                    let capUrl = caps[0].url;
-                    if (capUrl && !capUrl.startsWith('http')) {
-                      capUrl = `https://inv.nadeko.net${capUrl}`;
-                    }
-                    const capTextRes = await fetch(capUrl);
-                    if (capTextRes.ok) {
-                      const vttContent = await capTextRes.text();
-                      const lines = vttContent.split('\n')
-                        .map(l => l.trim())
-                        .filter(l => l && !l.startsWith('WEBVTT') && !l.includes('-->') && !/^\d+$/.test(l) && !l.startsWith('NOTE'));
-                      if (lines.length > 0) {
-                        clientText = lines.join(' ').replace(/\s+/g, ' ');
-                      }
-                    }
-                  }
-                }
-              } catch (clientErr) {}
-
-              if (clientText) {
-                setInputText(clientText);
-                setUrlDocData({
-                  format: 'YOUTUBE',
-                  title: title,
-                  author: author,
-                  thumbnail: thumb,
-                  video_id: videoId,
-                  source_url: targetUrl,
-                  is_fallback: false,
-                  text: clientText
-                });
-                setUploadedDocInfo({
-                  filename: title,
-                  format: 'YOUTUBE',
-                  pages: 1,
-                  words: clientText.split(/\s+/).length
-                });
-                setSourceViewMode('editor');
-                showToast(`✓ Subtitles extracted via browser client! (${clientText.split(/\s+/).length.toLocaleString()} words)`, "success");
-                return clientText;
-              }
-
-              // Tier B: Display guided fallback card with 1-click YouTube transcript link & auto-cleaner
               setUrlDocData({
                 format: 'YOUTUBE',
                 title: title,
