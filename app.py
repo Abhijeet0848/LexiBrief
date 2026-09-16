@@ -378,6 +378,22 @@ async def fetch_url_content(req: URLIngestRequest):
         else:
             extracted_data = TextExtractor.extract_from_url(url_str)
 
+        if is_youtube and extracted_data.get("is_fallback"):
+            return {
+                "id": str(uuid.uuid4()),
+                "title": extracted_data.get("title", "YouTube Video"),
+                "format": "YOUTUBE",
+                "author": extracted_data.get("author", "YouTube Creator"),
+                "thumbnail": extracted_data.get("thumbnail", ""),
+                "video_id": extracted_data.get("video_id", ""),
+                "chunks": [],
+                "text": "",
+                "words": 0,
+                "source_url": extracted_data.get("source_url", url_str),
+                "is_fallback": True,
+                "saved_to_db": False
+            }
+
         extracted_text = extracted_data.get("text", "")
         if not extracted_text or not extracted_text.strip():
             raise HTTPException(status_code=400, detail="Could not extract readable text from the provided URL.")
@@ -418,7 +434,8 @@ async def fetch_url_content(req: URLIngestRequest):
             "stats": stats,
             "keywords": keywords,
             "key_points": key_points,
-            "saved_to_db": True
+            "saved_to_db": True,
+            "is_fallback": False
         }
     except HTTPException as he:
         raise he

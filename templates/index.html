@@ -877,6 +877,18 @@
           }
 
           const data = await res.json();
+          if (data && data.is_fallback) {
+            setUrlDocData(data);
+            setUploadedDocInfo({
+              filename: data.title || 'YouTube Video',
+              format: 'YOUTUBE',
+              pages: 1,
+              words: 0
+            });
+            showToast("Follow the 2 quick steps to load the video transcript.", "info");
+            return "";
+          }
+
           const extractedText = (data && data.text) ? data.text.trim() : '';
           if (!extractedText) {
             throw new Error("No readable subtitles or text found for this link.");

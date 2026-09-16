@@ -416,7 +416,19 @@ class TextExtractor:
                         continue
 
             if not transcript_list:
-                raise ValueError("No subtitles or transcripts available for this YouTube video.")
+                logger.info(f"Direct transcript scraping unavailable for {video_id}; returning metadata fallback.")
+                return {
+                    "video_id": video_id,
+                    "title": title,
+                    "author": author_name,
+                    "thumbnail": thumbnail_url,
+                    "text": "",
+                    "words": 0,
+                    "chunks": [],
+                    "format": "YOUTUBE",
+                    "source_url": f"https://www.youtube.com/watch?v={video_id}",
+                    "is_fallback": True
+                }
 
             full_text_pieces = []
             formatted_chunks = []
@@ -448,11 +460,23 @@ class TextExtractor:
                 "words": word_count,
                 "chunks": formatted_chunks,
                 "format": "YOUTUBE",
-                "source_url": f"https://www.youtube.com/watch?v={video_id}"
+                "source_url": f"https://www.youtube.com/watch?v={video_id}",
+                "is_fallback": False
             }
         except Exception as yt_err:
-            logger.error(f"YouTube transcript extraction error: {yt_err}")
-            raise ValueError(f"Could not retrieve transcript from YouTube video: {str(yt_err)}")
+            logger.warning(f"YouTube transcript extraction notice: {yt_err}")
+            return {
+                "video_id": video_id if 'video_id' in locals() and video_id else "",
+                "title": title if 'title' in locals() else "YouTube Video",
+                "author": author_name if 'author_name' in locals() else "YouTube Creator",
+                "thumbnail": thumbnail_url if 'thumbnail_url' in locals() else "",
+                "text": "",
+                "words": 0,
+                "chunks": [],
+                "format": "YOUTUBE",
+                "source_url": f"https://www.youtube.com/watch?v={video_id}" if 'video_id' in locals() and video_id else url,
+                "is_fallback": True
+            }
 
     @classmethod
     def extract_from_url(cls, url: str) -> dict:
