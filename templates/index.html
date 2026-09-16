@@ -813,38 +813,88 @@
           fetchDocuments();
           return extractedText;
         } catch (err) {
-          // Client-Side YouTube Fallback: If cloud backend is blocked by YouTube rate-limits, fetch oEmbed and guide user
+          // Client-Side YouTube Fallback: If cloud backend is blocked by YouTube rate-limits, attempt client-side resolution & fetch oEmbed
           const ytMatch = targetUrl.match(/(?:v=|\/|youtu\.be\/|shorts\/)([0-9A-Za-z_-]{11})/);
           const videoId = ytMatch ? ytMatch[1] : null;
           if (videoId) {
             try {
               const oeRes = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
+              let title = `YouTube Video (${videoId})`;
+              let author = 'YouTube Creator';
+              let thumb = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+              
               if (oeRes.ok) {
                 const oeData = await oeRes.json();
-                const title = oeData.title || `YouTube Video (${videoId})`;
-                const author = oeData.author_name || 'YouTube Creator';
-                const thumb = oeData.thumbnail_url || `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-                
-                setUrlDocData({
-                  format: 'YOUTUBE',
-                  title: title,
-                  author: author,
-                  thumbnail: thumb,
-                  video_id: videoId,
-                  source_url: targetUrl,
-                  is_fallback: true
-                });
-                setUploadedDocInfo({
-                  filename: title,
-                  format: 'YOUTUBE',
-                  pages: 1,
-                  words: 0
-                });
-                setSourceViewMode('editor');
-                const displayTitle = title.length > 45 ? `${title.slice(0, 45)}...` : title;
-                showToast(`ℹ️ Video "${displayTitle}" recognized! Paste transcript below to summarize.`, "info", 5500);
-                return null;
+                title = oeData.title || title;
+                author = oeData.author_name || author;
+                thumb = oeData.thumbnail_url || thumb;
               }
+
+              // Tier A: Attempt direct client-side proxy fetch (uses user residential IP, not Vercel cloud IP)
+              try {
+                const invRes = await fetch(`https://inv.nadeko.net/api/v1/captions/${videoId}`);
+                if (invRes.ok) {
+                  const invData = await invRes.json();
+                  const caps = invData?.captions || [];
+                  if (caps.length > 0) {
+                    let capUrl = caps[0].url;
+                    if (capUrl && !capUrl.startsWith('http')) {
+                      capUrl = `https://inv.nadeko.net${capUrl}`;
+                    }
+                    const capTextRes = await fetch(capUrl);
+                    if (capTextRes.ok) {
+                      const vttContent = await capTextRes.text();
+                      const lines = vttContent.split('\n')
+                        .map(l => l.trim())
+                        .filter(l => l && !l.startsWith('WEBVTT') && !l.includes('-->') && !/^\d+$/.test(l));
+                      if (lines.length > 0) {
+                        const extracted = lines.join(' ').replace(/\s+/g, ' ');
+                        setInputText(extracted);
+                        setUrlDocData({
+                          format: 'YOUTUBE',
+                          title: title,
+                          author: author,
+                          thumbnail: thumb,
+                          video_id: videoId,
+                          source_url: targetUrl,
+                          is_fallback: false,
+                          text: extracted
+                        });
+                        setUploadedDocInfo({
+                          filename: title,
+                          format: 'YOUTUBE',
+                          pages: 1,
+                          words: extracted.split(/\s+/).length
+                        });
+                        setSourceViewMode('editor');
+                        showToast(`✓ Subtitles extracted via browser client! (${extracted.split(/\s+/).length.toLocaleString()} words)`, "success");
+                        return extracted;
+                      }
+                    }
+                  }
+                }
+              } catch (clientErr) {}
+
+              // Tier B: Display guided fallback card with 1-click YouTube transcript link & auto-cleaner
+              setUrlDocData({
+                format: 'YOUTUBE',
+                title: title,
+                author: author,
+                thumbnail: thumb,
+                video_id: videoId,
+                source_url: targetUrl,
+                is_fallback: true
+              });
+              setUploadedDocInfo({
+                filename: title,
+                format: 'YOUTUBE',
+                pages: 1,
+                words: 0
+              });
+              setSourceViewMode('editor');
+              const displayTitle = title.length > 45 ? `${title.slice(0, 45)}...` : title;
+              showToast(`ℹ️ Video "${displayTitle}" detected. Copy transcript from YouTube or paste below.`, "info", 5500);
+              return null;
             } catch (oeErr) {}
           }
           showToast(err.message, "error");
@@ -1458,22 +1508,66 @@
                               </div>
 
                               {urlDocData.is_fallback && (
-                                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-900 space-y-2 text-xs">
-                                  <div className="font-bold flex items-center gap-1.5 text-amber-900">
-                                    <span>⚡</span> YouTube Cloud Anti-Bot Notice
+                                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-900 space-y-2.5 text-xs animate-fadeIn">
+                                  <div className="font-bold flex items-center justify-between text-amber-950">
+                                    <span className="flex items-center gap-1.5">
+                                      <span>⚡</span> YouTube Cloud Anti-Bot Notice
+                                    </span>
+                                    <span className="text-[10px] font-semibold bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded-full">
+                                      Vercel Workaround
+                                    </span>
                                   </div>
                                   <p className="text-amber-800 text-[11px] leading-relaxed">
-                                    Cloud servers (Vercel) are rate-limited by YouTube. You can copy the transcript in 1 click from YouTube and paste it into the editor below for instant AI summarization:
+                                    Cloud hosting servers (Vercel) are blocked by YouTube bot-detection. You can extract the full transcript in 2 easy steps:
                                   </p>
-                                  <div className="flex items-center gap-2 pt-1">
+                                  <div className="bg-white/80 p-2.5 rounded-xl border border-amber-200 text-[11px] space-y-1.5 text-slate-700">
+                                    <div className="flex items-start gap-2">
+                                      <span className="font-bold text-amber-800">1.</span>
+                                      <span>Open the YouTube video, click <strong>"... More"</strong> below the title, and select <strong>"Show transcript"</strong>.</span>
+                                    </div>
+                                    <div className="flex items-start gap-2">
+                                      <span className="font-bold text-amber-800">2.</span>
+                                      <span>Copy the transcript and paste it into the editor. Timestamps will be <strong>automatically cleaned</strong>!</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-2 pt-1">
                                     <a
                                       href={`https://www.youtube.com/watch?v=${urlDocData.video_id || ''}`}
                                       target="_blank"
                                       rel="noreferrer"
-                                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs shadow-2xs transition"
+                                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs shadow-2xs transition"
                                     >
                                       <span>📺</span> Open YouTube Video & Transcript ↗
                                     </a>
+                                    <button
+                                      onClick={async () => {
+                                        try {
+                                          const text = await navigator.clipboard.readText();
+                                          if (text && text.trim()) {
+                                            const cleaned = text
+                                              .replace(/^\s*\[?\d{1,2}:\d{2}(?::\d{2})?\]?\s*$/gm, '')
+                                              .replace(/\[?\d{1,2}:\d{2}(?::\d{2})?\]?\s*[-–—:]?\s*/g, '')
+                                              .replace(/\n\s*\n+/g, '\n\n')
+                                              .trim();
+                                            setInputText(cleaned);
+                                            setUploadedDocInfo({
+                                              filename: urlDocData.title,
+                                              format: 'YOUTUBE',
+                                              pages: 1,
+                                              words: cleaned.split(/\s+/).length
+                                            });
+                                            showToast(`✓ Ingested clipboard transcript (${cleaned.split(/\s+/).length.toLocaleString()} words)!`, "success");
+                                          } else {
+                                            showToast("Clipboard is empty. Copy the transcript from YouTube first.", "error");
+                                          }
+                                        } catch (e) {
+                                          showToast("Please paste directly into the editor textarea below.", "info");
+                                        }
+                                      }}
+                                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-amber-50 text-amber-900 border border-amber-300 font-bold rounded-xl text-xs shadow-2xs transition cursor-pointer"
+                                    >
+                                      <span>📋</span> Paste Clipboard & Auto-Clean
+                                    </button>
                                   </div>
                                 </div>
                               )}

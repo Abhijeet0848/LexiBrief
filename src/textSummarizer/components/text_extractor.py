@@ -19,12 +19,16 @@ class TextExtractor:
 
     @staticmethod
     def clean_text(text: str) -> str:
-        """Cleans and normalizes extracted text with compiled regex patterns."""
+        """Cleans and normalizes extracted text with compiled regex patterns and auto-strips timestamps."""
         if not text:
             return ""
         # Normalize whitespace and line breaks
         text = _RE_CRLF.sub('\n', text)
         text = _RE_SPACES.sub(' ', text)
+        # Strip standalone timestamp lines (e.g. "0:15", "01:23", "[02:45]")
+        text = re.sub(r'^\s*\[?\d{1,2}:\d{2}(?::\d{2})?\]?\s*$', '', text, flags=re.MULTILINE)
+        # Strip inline timestamp prefixes (e.g. "0:15 - Hello" or "[0:15] Hello")
+        text = re.sub(r'\[?\d{1,2}:\d{2}(?::\d{2})?\]?\s*[-–—:]?\s*', '', text)
         text = _RE_MULTILINES.sub('\n\n', text)
         # Remove non-printable control characters while preserving valid punctuation & whitespace
         return "".join(ch for ch in text if ch.isprintable() or ch in '\n\t').strip()
@@ -250,6 +254,83 @@ class TextExtractor:
                             transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
                 except Exception as leg_err:
                     logger.debug(f"Legacy transcript method notice: {leg_err}")
+
+            # Tier 3: Direct YouTube Innertube / Player Captions Scraping (Bypasses IP rate limit)
+            if not transcript_list:
+                try:
+                    headers = {
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                        "Accept-Language": "en-US,en;q=0.9,hi;q=0.8",
+                    }
+                    yt_page = requests.get(f"https://www.youtube.com/watch?v={video_id}", headers=headers, timeout=6)
+                    if yt_page.status_code == 200:
+                        m = re.search(r'ytInitialPlayerResponse\s*=\s*({.+?});(?:var|\s*<\/script>)', yt_page.text)
+                        if m:
+                            import json
+                            player_data = json.loads(m.group(1))
+                            caption_tracks = player_data.get("captions", {}).get("playerCaptionsTracklistRenderer", {}).get("captionTracks", [])
+                            if caption_tracks:
+                                cap_url = caption_tracks[0].get("baseUrl")
+                                for track in caption_tracks:
+                                    lang = track.get("languageCode", "").lower()
+                                    if lang in ["en", "hi", "en-us"]:
+                                        cap_url = track.get("baseUrl")
+                                        break
+                                if cap_url:
+                                    cap_resp = requests.get(cap_url + "&fmt=json3", headers=headers, timeout=6)
+                                    if cap_resp.status_code == 200:
+                                        try:
+                                            cap_data = cap_resp.json()
+                                            events = cap_data.get("events", [])
+                                            extracted_events = []
+                                            for ev in events:
+                                                segs = ev.get("segs", [])
+                                                seg_text = "".join(s.get("utf8", "") for s in segs if s.get("utf8")).strip()
+                                                if seg_text and seg_text != "\n":
+                                                    extracted_events.append({
+                                                        "text": seg_text,
+                                                        "start": int(ev.get("tStartMs", 0)) / 1000.0
+                                                    })
+                                            if extracted_events:
+                                                transcript_list = extracted_events
+                                        except Exception:
+                                            pass
+                except Exception as innertube_err:
+                    logger.debug(f"Direct player scraping notice: {innertube_err}")
+
+            # Tier 4: Public Invidious Cloud Proxy Mirror Fallback
+            if not transcript_list:
+                invidious_mirrors = [
+                    f"https://inv.nadeko.net/api/v1/captions/{video_id}",
+                    f"https://invidious.nerdvpn.de/api/v1/captions/{video_id}"
+                ]
+                for mirror_url in invidious_mirrors:
+                    try:
+                        m_res = requests.get(mirror_url, timeout=4)
+                        if m_res.status_code == 200:
+                            m_data = m_res.json()
+                            captions = m_data.get("captions", [])
+                            if captions:
+                                cap_track = captions[0]
+                                c_url = cap_track.get("url")
+                                if c_url:
+                                    if not c_url.startswith("http"):
+                                        base_domain = "/".join(mirror_url.split("/")[:3])
+                                        c_url = f"{base_domain}{c_url}"
+                                    c_res = requests.get(c_url, timeout=5)
+                                    if c_res.status_code == 200:
+                                        # Simple VTT parser
+                                        lines = c_res.text.splitlines()
+                                        vtt_texts = []
+                                        for line in lines:
+                                            l = line.strip()
+                                            if l and not l.startswith("WEBVTT") and "-->" not in l and not l.isdigit():
+                                                vtt_texts.append({"text": l, "start": 0})
+                                        if vtt_texts:
+                                            transcript_list = vtt_texts
+                                            break
+                    except Exception:
+                        continue
 
             if not transcript_list:
                 raise ValueError("No subtitles or transcripts available for this YouTube video.")
