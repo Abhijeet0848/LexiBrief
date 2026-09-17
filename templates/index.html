@@ -1181,6 +1181,23 @@
         reader.readAsDataURL(file);
       };
 
+      const handleFallbackFile = (e) => {
+        const file = e.target.files?.[0];
+        if (file) {
+          processLoadedFile(file);
+        }
+        e.target.value = '';
+      };
+
+      const handleDropFile = (e) => {
+        e.preventDefault();
+        setIsDraggingOver(false);
+        const file = e.dataTransfer?.files?.[0];
+        if (file) {
+          processLoadedFile(file);
+        }
+      };
+
       const copyToClipboard = () => {
         if (!extractedTextPreview) return;
         navigator.clipboard.writeText(extractedTextPreview);
