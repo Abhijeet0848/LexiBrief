@@ -1526,32 +1526,32 @@
       };
 
       return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] transition-all">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-5 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[96vh] sm:max-h-[92vh] transition-all">
             
             {/* Header */}
-            <div className="px-4 sm:px-5 py-3.5 border-b border-slate-800 flex items-center justify-between bg-slate-900 flex-wrap gap-2">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center font-bold text-sm">
+            <div className="px-3.5 sm:px-5 py-3 border-b border-slate-800 flex items-center justify-between bg-slate-900 gap-2 min-w-0">
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                <div className="w-8 h-8 rounded-lg bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center font-bold text-sm shrink-0">
                   📷
                 </div>
-                <div>
-                  <h3 className="font-bold text-sm sm:text-base text-white">
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-bold text-xs sm:text-sm text-white truncate">
                     {extractedTextPreview !== null ? 'Review Extracted Text' : capturedImage ? 'Crop & Enhance Image' : 'Document Scanner & OCR'}
                   </h3>
-                  <p className="text-xs text-slate-400">
-                    {extractedTextPreview !== null ? 'Verify text before summarizing' : capturedImage ? (localSavedPath ? `Saved in ${localSavedPath}` : 'Adjust frame or filter for best OCR results') : 'Capture photo with 1x main camera, upload image, or paste screenshot'}
+                  <p className="text-[10px] sm:text-xs text-slate-400 truncate max-w-[150px] xs:max-w-[220px] sm:max-w-md font-mono" title={localSavedPath || ''}>
+                    {extractedTextPreview !== null ? 'Verify text before summarizing' : capturedImage ? (localSavedPath ? `Saved in ${localSavedPath}` : 'Adjust frame or filter for best OCR results') : 'Capture photo, upload image, or paste screenshot'}
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 shrink-0">
                 {/* Camera / Lens Switcher Dropdown (when multiple cameras detected) */}
                 {!capturedImage && !cameraError && videoDevices.length > 1 && (
                   <select
                     value={selectedDeviceId || ''}
                     onChange={(e) => selectCameraDevice(e.target.value)}
-                    className="bg-slate-800 text-indigo-300 border border-slate-700 rounded-lg px-2.5 py-1 text-xs font-semibold focus:outline-none focus:border-indigo-500 cursor-pointer max-w-[150px] truncate"
+                    className="bg-slate-800 text-indigo-300 border border-slate-700 rounded-lg px-2 py-1 text-[11px] sm:text-xs font-semibold focus:outline-none focus:border-indigo-500 cursor-pointer max-w-[105px] sm:max-w-[140px] truncate"
                     title="Select Camera Lens"
                   >
                     {videoDevices.map(d => (
@@ -1567,12 +1567,12 @@
                   value={ocrLang}
                   onChange={(e) => setOcrLang(e.target.value)}
                   disabled={isOcrProcessing}
-                  className="bg-slate-800 text-slate-200 border border-slate-700 rounded-lg px-2.5 py-1 text-xs font-medium focus:outline-none focus:border-indigo-500 cursor-pointer"
+                  className="bg-slate-800 text-slate-200 border border-slate-700 rounded-lg px-2 py-1 text-[11px] sm:text-xs font-medium focus:outline-none focus:border-indigo-500 cursor-pointer max-w-[115px] sm:max-w-[170px] truncate"
                   title="Select OCR Language"
                 >
                   {OCR_LANGUAGES.map(lang => (
                     <option key={lang.code} value={lang.code} className="bg-slate-900 text-white">
-                      {lang.label}
+                      {lang.short || lang.label}
                     </option>
                   ))}
                 </select>
@@ -1592,7 +1592,7 @@
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition flex items-center justify-center cursor-pointer border border-slate-700 text-xs"
+                  className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition flex items-center justify-center cursor-pointer border border-slate-700 text-xs shrink-0"
                   title="Close"
                 >
                   ✕
@@ -1602,27 +1602,29 @@
 
             {/* Filter & Crop Toolbar (When Photo is Captured & Not in text review) */}
             {capturedImage && extractedTextPreview === null && (
-              <div className="px-4 py-2 bg-slate-950 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
-                <div className="flex items-center gap-2">
+              <div className="px-3 sm:px-4 py-2 bg-slate-950 border-b border-slate-800 flex items-center justify-between gap-2 text-xs overflow-x-auto no-scrollbar w-full">
+                <div className="flex items-center gap-1.5 shrink-0">
                   <button
                     type="button"
                     onClick={handleRotateImage}
-                    className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-indigo-300 hover:bg-slate-700 hover:text-white transition cursor-pointer border border-slate-700 flex items-center gap-1 shadow-sm"
+                    className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-indigo-300 hover:bg-slate-700 hover:text-white transition cursor-pointer border border-slate-700 flex items-center gap-1 shadow-sm whitespace-nowrap shrink-0"
                     title="Rotate photo 90 degrees clockwise"
                   >
-                    <span>↻ Rotate</span>
+                    <span>↻</span>
+                    <span>Rotate</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setIsCropActive(prev => !prev)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer ${
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0 ${
                       isCropActive
-                        ? 'bg-indigo-600 text-white'
+                        ? 'bg-indigo-600 text-white shadow-sm'
                         : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
                     }`}
                   >
-                    <span>✂️ {isCropActive ? 'Crop Active' : 'Crop Area'}</span>
+                    <span>✂️</span>
+                    <span>{isCropActive ? 'Crop Active' : 'Crop Area'}</span>
                   </button>
 
                   {isCropActive && (
@@ -1632,28 +1634,28 @@
                         setCropBox({ x: 0, y: 0, width: 100, height: 100 });
                         setIsCropActive(false);
                       }}
-                      className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 transition cursor-pointer border border-slate-700"
+                      className="px-2 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 transition cursor-pointer border border-slate-700 whitespace-nowrap shrink-0"
                     >
-                      Reset Frame
+                      Reset
                     </button>
                   )}
 
-                  <div className="h-4 w-px bg-slate-800 mx-1"></div>
+                  <div className="h-4 w-px bg-slate-800 mx-0.5 shrink-0"></div>
 
-                  <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded-lg border border-slate-800">
+                  <div className="flex items-center gap-0.5 bg-slate-900 p-0.5 rounded-lg border border-slate-800 shrink-0">
                     <button
                       type="button"
                       onClick={() => setFilterMode('original')}
-                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition cursor-pointer ${
+                      className={`px-2 sm:px-2.5 py-1 rounded-md text-[11px] sm:text-xs font-medium transition cursor-pointer whitespace-nowrap ${
                         filterMode === 'original' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
-                      Original Photo
+                      Original
                     </button>
                     <button
                       type="button"
                       onClick={() => setFilterMode('clarity')}
-                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition cursor-pointer ${
+                      className={`px-2 sm:px-2.5 py-1 rounded-md text-[11px] sm:text-xs font-medium transition cursor-pointer whitespace-nowrap ${
                         filterMode === 'clarity' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
@@ -1662,17 +1664,17 @@
                     <button
                       type="button"
                       onClick={() => setFilterMode('contrast')}
-                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition cursor-pointer ${
+                      className={`px-2 sm:px-2.5 py-1 rounded-md text-[11px] sm:text-xs font-medium transition cursor-pointer whitespace-nowrap ${
                         filterMode === 'contrast' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
-                      High Contrast
+                      Contrast
                     </button>
                   </div>
                 </div>
 
                 {localSavedPath && (
-                  <span className="text-[11px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-mono">
+                  <span className="hidden md:inline-block text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-mono whitespace-nowrap shrink-0">
                     ✓ Saved
                   </span>
                 )}
@@ -1680,7 +1682,7 @@
             )}
 
             {/* Main Viewport */}
-            <div className="relative flex-1 bg-slate-950 min-h-[320px] sm:min-h-[400px] flex items-center justify-center overflow-hidden">
+            <div className="relative flex-1 bg-slate-950 min-h-[300px] sm:min-h-[400px] flex items-center justify-center overflow-hidden">
               <canvas ref={canvasRef} className="hidden" />
 
               <input
@@ -1701,7 +1703,7 @@
 
               {extractedTextPreview !== null ? (
                 /* State 3: Editable Extracted Text Review */
-                <div className="w-full h-full p-4 sm:p-5 flex flex-col bg-slate-950 animate-fadeIn overflow-y-auto">
+                <div className="w-full h-full p-3.5 sm:p-5 flex flex-col bg-slate-950 animate-fadeIn overflow-y-auto">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
@@ -1745,41 +1747,41 @@
                       onDragOver={(e) => { e.preventDefault(); setIsDraggingOver(true); }}
                       onDragLeave={() => setIsDraggingOver(false)}
                       onDrop={handleDropFile}
-                      className="w-full h-full p-6 sm:p-10 flex flex-col items-center justify-center text-center max-w-md mx-auto"
+                      className="w-full h-full p-4 sm:p-10 flex flex-col items-center justify-center text-center max-w-md mx-auto"
                     >
-                      <div className={`w-full p-6 rounded-2xl border border-dashed transition-all flex flex-col items-center justify-center gap-4 ${
+                      <div className={`w-full p-5 sm:p-6 rounded-2xl border border-dashed transition-all flex flex-col items-center justify-center gap-3.5 ${
                         isDraggingOver
                           ? 'border-indigo-500 bg-indigo-500/10'
                           : 'border-slate-800 bg-slate-900/50 hover:border-slate-700'
                       }`}>
-                        <div className="w-12 h-12 rounded-xl bg-slate-800 text-indigo-400 flex items-center justify-center text-2xl border border-slate-700">
+                        <div className="w-11 h-11 rounded-xl bg-slate-800 text-indigo-400 flex items-center justify-center text-xl border border-slate-700">
                           📄
                         </div>
 
                         <div className="space-y-1">
-                          <h4 className="text-white font-semibold text-sm">
+                          <h4 className="text-white font-semibold text-xs sm:text-sm">
                             Select or Capture Document Photo
                           </h4>
-                          <p className="text-slate-400 text-xs max-w-xs">
-                            Take a photo using native high-res camera, browse files, or paste screenshot (Ctrl+V)
+                          <p className="text-slate-400 text-[11px] sm:text-xs max-w-xs">
+                            Take a photo using camera, browse files, or paste screenshot (Ctrl+V)
                           </p>
                         </div>
 
-                        <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+                        <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
                           <button
                             type="button"
                             onClick={() => cameraInputRef.current?.click()}
-                            className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition cursor-pointer shadow-sm"
+                            className="bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-sm"
                           >
-                            <span>📸 Native Camera (1x)</span>
+                            <span>📸 Camera (1x)</span>
                           </button>
 
                           <button
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
-                            className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition cursor-pointer shadow-sm"
+                            className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-sm"
                           >
-                            <span>📁 Browse File</span>
+                            <span>📁 Browse</span>
                           </button>
                         </div>
 
@@ -1788,7 +1790,7 @@
                         </div>
                       </div>
 
-                      <div className="mt-3 text-xs text-slate-500 flex items-center gap-2">
+                      <div className="mt-2.5 text-xs text-slate-500 flex items-center gap-2">
                         <span>Webcam stream unavailable</span>
                         <span>•</span>
                         <button
@@ -1796,7 +1798,7 @@
                           onClick={() => startCamera(facingMode, selectedDeviceId)}
                           className="text-indigo-400 hover:text-indigo-300 underline cursor-pointer"
                         >
-                          Retry Live Viewfinder
+                          Retry Viewfinder
                         </button>
                       </div>
                     </div>
@@ -1815,32 +1817,32 @@
                       />
 
                       {/* Document Framing Box & Subtle Corner Guides */}
-                      <div className="absolute inset-6 sm:inset-10 pointer-events-none border border-white/25 rounded-2xl shadow-inner flex flex-col justify-between p-3">
+                      <div className="absolute inset-4 sm:inset-10 pointer-events-none border border-white/25 rounded-2xl shadow-inner flex flex-col justify-between p-2.5 sm:p-3">
                         <div className="flex justify-between">
-                          <div className="w-5 h-5 border-t-2 border-l-2 border-indigo-400 rounded-tl"></div>
-                          <div className="w-5 h-5 border-t-2 border-r-2 border-indigo-400 rounded-tr"></div>
+                          <div className="w-4 sm:w-5 h-4 sm:h-5 border-t-2 border-l-2 border-indigo-400 rounded-tl"></div>
+                          <div className="w-4 sm:w-5 h-4 sm:h-5 border-t-2 border-r-2 border-indigo-400 rounded-tr"></div>
                         </div>
                         <div className="flex justify-between">
-                          <div className="w-5 h-5 border-b-2 border-l-2 border-indigo-400 rounded-bl"></div>
-                          <div className="w-5 h-5 border-b-2 border-r-2 border-indigo-400 rounded-br"></div>
+                          <div className="w-4 sm:w-5 h-4 sm:h-5 border-b-2 border-l-2 border-indigo-400 rounded-bl"></div>
+                          <div className="w-4 sm:w-5 h-4 sm:h-5 border-b-2 border-r-2 border-indigo-400 rounded-br"></div>
                         </div>
                       </div>
 
                       {/* Header alignment guide badge */}
-                      <div className="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-slate-900/80 backdrop-blur-md border border-slate-700/80 text-[11px] text-slate-200 pointer-events-none flex items-center gap-1.5 shadow-md">
+                      <div className="absolute top-2.5 sm:top-3 left-1/2 -translate-x-1/2 px-2.5 sm:px-3 py-1 rounded-full bg-slate-900/80 backdrop-blur-md border border-slate-700/80 text-[10px] sm:text-[11px] text-slate-200 pointer-events-none flex items-center gap-1.5 shadow-md whitespace-nowrap">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                         <span>Align document inside frame</span>
                       </div>
 
                       {/* Floating Zoom Controls (1x, 1.5x, 2x, 3x) to effortlessly cancel wide-angle distortion */}
-                      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-slate-900/85 backdrop-blur-md px-3 py-1.5 rounded-full border border-slate-700 shadow-xl z-10">
-                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mr-1">Zoom</span>
+                      <div className="absolute bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1 sm:gap-1.5 bg-slate-900/85 backdrop-blur-md px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full border border-slate-700 shadow-xl z-10">
+                        <span className="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-wider mr-0.5">Zoom</span>
                         {[1.0, 1.5, 2.0, 3.0].map((zVal) => (
                           <button
                             key={zVal}
                             type="button"
                             onClick={() => handleZoomChange(zVal)}
-                            className={`px-2.5 py-0.5 rounded-full text-xs font-bold transition cursor-pointer ${
+                            className={`px-2 sm:px-2.5 py-0.5 rounded-full text-[11px] sm:text-xs font-bold transition cursor-pointer ${
                               Math.abs(zoomLevel - zVal) < 0.15
                                 ? 'bg-indigo-600 text-white shadow-sm'
                                 : 'bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700'
@@ -1879,8 +1881,8 @@
 
             {/* Recent Captures Thumbnail Strip (when in viewfinder mode and captures exist) */}
             {!capturedImage && capturedImagesList.length > 0 && (
-              <div className="px-4 py-2.5 bg-slate-950/90 border-t border-slate-800/80 flex items-center gap-2 overflow-x-auto no-scrollbar">
-                <span className="text-[11px] font-bold text-slate-400 whitespace-nowrap flex items-center gap-1">
+              <div className="px-3 sm:px-4 py-2 bg-slate-950/90 border-t border-slate-800/80 flex items-center gap-2 overflow-x-auto no-scrollbar">
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 whitespace-nowrap flex items-center gap-1">
                   <span>📸</span> Recent:
                 </span>
                 {capturedImagesList.slice(0, 8).map((imgItem, idx) => (
@@ -1888,7 +1890,7 @@
                     key={idx}
                     type="button"
                     onClick={() => loadCapturedImageItem(imgItem)}
-                    className="group relative w-12 h-12 rounded-lg overflow-hidden border border-slate-700 hover:border-indigo-500 flex-shrink-0 transition-all cursor-pointer shadow-sm hover:scale-105"
+                    className="group relative w-10 h-10 sm:w-12 sm:h-12 rounded-lg overflow-hidden border border-slate-700 hover:border-indigo-500 flex-shrink-0 transition-all cursor-pointer shadow-sm hover:scale-105"
                     title={`Click to load ${imgItem.filename}`}
                   >
                     <img
@@ -1897,7 +1899,7 @@
                       className="w-full h-full object-cover"
                       onError={(e) => { e.target.style.display = 'none'; }}
                     />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-[10px] text-white font-bold transition-opacity">
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-[9px] sm:text-[10px] text-white font-bold transition-opacity">
                       Load
                     </div>
                   </button>
@@ -1906,7 +1908,7 @@
             )}
 
             {/* Bottom Actions Bar */}
-            <div className="px-5 py-3.5 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-3">
+            <div className="px-3.5 sm:px-5 py-3 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
               {extractedTextPreview !== null ? (
                 /* Text Review State */
                 <>
@@ -1914,7 +1916,7 @@
                     type="button"
                     onClick={() => setExtractedTextPreview(null)}
                     disabled={isOcrProcessing}
-                    className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition border border-slate-700 cursor-pointer"
+                    className="px-3 sm:px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition border border-slate-700 cursor-pointer whitespace-nowrap"
                   >
                     ← Back to Image
                   </button>
@@ -1923,7 +1925,7 @@
                     type="button"
                     onClick={submitExtractedText}
                     disabled={isOcrProcessing || !extractedTextPreview.trim()}
-                    className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-md shadow-indigo-600/30"
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 sm:px-5 py-2 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-md shadow-indigo-600/30 whitespace-nowrap"
                   >
                     <span>✓</span>
                     <span>Use Extracted Text</span>
@@ -1945,11 +1947,11 @@
                 ) : (
                   /* Live Camera State */
                   <>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 sm:gap-2">
                       <button
                         type="button"
                         onClick={() => cameraInputRef.current?.click()}
-                        className="text-xs font-semibold text-indigo-300 hover:text-white transition cursor-pointer px-2.5 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-800 border border-slate-700 flex items-center gap-1.5"
+                        className="text-xs font-semibold text-indigo-300 hover:text-white transition cursor-pointer px-2 sm:px-2.5 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-800 border border-slate-700 flex items-center gap-1.5 whitespace-nowrap"
                         title="Open phone's native camera app for full optical quality"
                       >
                         <span>📱</span>
@@ -1959,7 +1961,7 @@
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="text-xs font-semibold text-slate-400 hover:text-white transition cursor-pointer px-2.5 py-1.5 rounded-lg hover:bg-slate-800"
+                        className="text-xs font-semibold text-slate-400 hover:text-white transition cursor-pointer px-2 sm:px-2.5 py-1.5 rounded-lg hover:bg-slate-800 whitespace-nowrap"
                       >
                         📁 File
                       </button>
@@ -1969,10 +1971,10 @@
                       type="button"
                       onClick={snapPhoto}
                       disabled={isInitializing}
-                      className="w-13 h-13 rounded-full bg-white text-slate-950 flex items-center justify-center hover:scale-105 active:scale-95 transition cursor-pointer shadow-lg ring-4 ring-indigo-500/20"
+                      className="w-12 h-12 sm:w-13 sm:h-13 rounded-full bg-white text-slate-950 flex items-center justify-center hover:scale-105 active:scale-95 transition cursor-pointer shadow-lg ring-4 ring-indigo-500/20 shrink-0"
                       title="Snap Photo (1x High Quality)"
                     >
-                      <div className="w-10 h-10 rounded-full border-2 border-slate-950 bg-indigo-600 flex items-center justify-center text-white text-xs">
+                      <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border-2 border-slate-950 bg-indigo-600 flex items-center justify-center text-white text-xs">
                         📸
                       </div>
                     </button>
@@ -1980,7 +1982,7 @@
                     <button
                       type="button"
                       onClick={handleClose}
-                      className="text-xs font-semibold text-slate-400 hover:text-white px-3 py-1.5 rounded-lg hover:bg-slate-800 cursor-pointer"
+                      className="text-xs font-semibold text-slate-400 hover:text-white px-2.5 sm:px-3 py-1.5 rounded-lg hover:bg-slate-800 cursor-pointer whitespace-nowrap"
                     >
                       Cancel
                     </button>
@@ -1993,27 +1995,29 @@
                     type="button"
                     onClick={retakePhoto}
                     disabled={isOcrProcessing}
-                    className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition border border-slate-700 cursor-pointer"
+                    className="px-2.5 sm:px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition border border-slate-700 cursor-pointer flex items-center gap-1 whitespace-nowrap"
                   >
-                    🔄 Retake / Change
+                    <span>🔄</span>
+                    <span className="hidden xs:inline">Retake</span>
                   </button>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
                     <button
                       type="button"
                       onClick={savePhotoDirectly}
                       disabled={isOcrProcessing}
-                      className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold transition border border-slate-700 cursor-pointer flex items-center gap-1.5 shadow-sm"
+                      className="px-2.5 sm:px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold transition border border-slate-700 cursor-pointer flex items-center gap-1 shadow-sm whitespace-nowrap"
                       title="Save photo directly to artifacts/captured_images/ folder"
                     >
-                      <span>💾 Save Photo</span>
+                      <span>💾</span>
+                      <span className="hidden xs:inline">Save</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={runExtractHandwriting}
                       disabled={isOcrProcessing}
-                      className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-md shadow-indigo-600/30"
+                      className="bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 sm:px-5 py-2 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-md shadow-indigo-600/30 whitespace-nowrap"
                     >
                       {isOcrProcessing ? (
                         <>
@@ -2023,7 +2027,7 @@
                       ) : (
                         <>
                           <span>⚡</span>
-                          <span>Extract Text (OCR)</span>
+                          <span>Extract Text</span>
                         </>
                       )}
                     </button>
