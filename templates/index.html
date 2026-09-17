@@ -123,6 +123,10 @@
     .animate-fadeIn {
       animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
+    @keyframes shrinkWidth {
+      from { width: 100%; }
+      to { width: 0%; }
+    }
     @keyframes toastSlideUp {
       from {
         opacity: 0;
@@ -1603,6 +1607,16 @@
           textareaRef.current.style.height = `${nextHeight}px`;
         }
       }, [inputText, sourceViewMode, inputSourceTab]);
+
+      // Auto-dismiss uploaded document banner after 4 seconds
+      useEffect(() => {
+        if (uploadedDocInfo) {
+          const timer = setTimeout(() => {
+            setUploadedDocInfo(null);
+          }, 4000);
+          return () => clearTimeout(timer);
+        }
+      }, [uploadedDocInfo]);
 
       const showToast = (msg, type = 'info', duration = 4500) => setToast({ message: msg, type, duration });
 
@@ -3147,24 +3161,41 @@
                         </div>
                       )}
 
-                      {/* Ingested Document Info Card */}
+                      {/* Ingested Document Info Card (Auto-dismisses in 4s with progress bar) */}
                       {uploadedDocInfo && inputSourceTab !== 'url' && (
-                        <div className="mb-3.5 p-3 rounded-2xl bg-slate-900 text-white border border-slate-800 shadow-md animate-fadeIn flex items-center justify-between">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <span className="text-emerald-400 text-sm font-bold">✓</span>
+                        <div className="mb-3.5 p-3 px-3.5 rounded-2xl bg-white border border-emerald-200/90 shadow-sm shadow-emerald-500/5 animate-fadeIn flex items-center justify-between gap-3 relative overflow-hidden">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-7 h-7 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                              ✓
+                            </div>
                             <div className="min-w-0">
-                              <p className="text-xs font-bold text-white truncate">{uploadedDocInfo.filename}</p>
-                              <p className="text-[10px] text-slate-400">
-                                {uploadedDocInfo.format} • {uploadedDocInfo.words?.toLocaleString()} words
+                              <div className="flex items-center gap-2">
+                                <p className="text-xs font-bold text-slate-900 truncate max-w-xs sm:max-w-md" title={uploadedDocInfo.filename}>
+                                  {uploadedDocInfo.filename}
+                                </p>
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 border border-indigo-100 text-indigo-700">
+                                  {uploadedDocInfo.format || 'DOC'}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5">
+                                <span>{uploadedDocInfo.words?.toLocaleString() || 0} words extracted</span>
+                                <span>•</span>
+                                <span className="text-emerald-600 font-semibold">Loaded into editor</span>
                               </p>
                             </div>
                           </div>
                           <button 
                             onClick={() => setUploadedDocInfo(null)}
-                            className="text-slate-400 hover:text-white text-xs px-2 py-1 rounded hover:bg-slate-800 transition"
+                            className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-slate-700 text-xs flex items-center justify-center transition flex-shrink-0 cursor-pointer"
+                            title="Dismiss"
                           >
                             ✕
                           </button>
+                          {/* 4-second Countdown Progress Indicator */}
+                          <div 
+                            className="absolute bottom-0 left-0 h-[2.5px] bg-emerald-500 rounded-full" 
+                            style={{ width: '100%', animation: 'shrinkWidth 4s linear forwards' }}
+                          />
                         </div>
                       )}
 
