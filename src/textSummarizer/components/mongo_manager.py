@@ -508,6 +508,28 @@ class MongoDBManager:
             pass
         return deleted
 
+    def delete_all_captured_images(self) -> int:
+        """Deletes all captured images from MongoDB and local storage."""
+        count = 0
+        if self.use_mongo and self.db is not None:
+            try:
+                res = self.db.captured_images.delete_many({})
+                count = res.deleted_count
+            except Exception as e:
+                logger.warning(f"MongoDB delete_all_captured_images error: {e}")
+
+        try:
+            self._ensure_local_dirs()
+            if os.path.exists(self.images_file):
+                with open(self.images_file, "r", encoding="utf-8") as fp:
+                    items = json.load(fp)
+                count = max(count, len(items))
+                with open(self.images_file, "w", encoding="utf-8") as fp:
+                    json.dump([], fp)
+        except Exception as err:
+            logger.error(f"Local delete_all_captured_images error: {err}")
+        return count
+
     def get_database_status(self) -> Dict[str, Any]:
         """Returns current database connectivity and collection counts."""
         summaries = self.get_summaries()
