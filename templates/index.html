@@ -3496,7 +3496,7 @@
               <nav className="hidden md:flex items-center p-1.5 bg-slate-100/90 rounded-2xl border border-slate-200/80 shadow-2xs gap-1.5">
                 {[
                   { id: 'summarize', label: 'Summarize', icon: <SparklesIcon className="w-4 h-4" /> },
-                  { id: 'documents', label: 'Documents', icon: <DocumentIcon className="w-4 h-4" />, count: documentsList.length },
+                  { id: 'documents', label: 'Documents', icon: <DocumentIcon className="w-4 h-4" />, count: documentsList.length + capturedImagesList.length },
                   { id: 'history', label: 'History', icon: <HistoryIcon className="w-4 h-4" />, count: summariesList.length },
                   { id: 'benchmarks', label: 'ROUGE Metrics', icon: <ChartIcon className="w-4 h-4" /> }
                 ].map(tab => {
@@ -3555,7 +3555,7 @@
               <div className="md:hidden border-t border-slate-200/80 bg-white/95 backdrop-blur-md px-3 py-3 space-y-1.5 shadow-lg animate-fadeIn">
                 {[
                   { id: 'summarize', label: 'Summarize', icon: <SparklesIcon className="w-4 h-4 text-indigo-600" />, desc: 'Neural & Extractive Text Summarizer' },
-                  { id: 'documents', label: 'Documents', icon: <DocumentIcon className="w-4 h-4 text-indigo-600" />, count: documentsList.length, desc: 'Ingest & Manage PDF, DOCX, PPTX, TXT' },
+                  { id: 'documents', label: 'Documents', icon: <DocumentIcon className="w-4 h-4 text-indigo-600" />, count: documentsList.length + capturedImagesList.length, desc: 'Ingest & Manage PDF, DOCX, PPTX, TXT' },
                   { id: 'history', label: 'History', icon: <HistoryIcon className="w-4 h-4 text-indigo-600" />, count: summariesList.length, desc: 'Previous Summaries & Records' },
                   { id: 'benchmarks', label: 'ROUGE Metrics', icon: <ChartIcon className="w-4 h-4 text-indigo-600" />, desc: 'NLP Benchmarks & Evaluator' }
                 ].map(tab => {
@@ -4846,7 +4846,7 @@
                       </div>
                       <div className="min-w-0 flex-1">
                         <span className="text-[11px] uppercase font-extrabold text-slate-600 tracking-wider block">Total Ingested</span>
-                        <span className="font-black text-slate-900 text-sm sm:text-base tracking-tight">{docStats.total} <span className="text-xs font-bold text-slate-600">files</span></span>
+                        <span className="font-black text-slate-900 text-sm sm:text-base tracking-tight">{docStats.total + capturedImagesList.length} <span className="text-xs font-bold text-slate-600">items</span></span>
                       </div>
                     </div>
 
