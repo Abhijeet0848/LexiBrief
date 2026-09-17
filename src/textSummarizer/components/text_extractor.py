@@ -598,6 +598,23 @@ class TextExtractor:
         except Exception:
             pass
 
+        # Variant 4: Human Handwriting & Cursive Stroke Enhancement (Lined paper & shadow suppression)
+        try:
+            import cv2
+            img_np = np.array(working_img)
+            gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
+            blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+            adaptive_thresh = cv2.adaptiveThreshold(
+                blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 25, 11
+            )
+            # Morphological close to bridge broken cursive pen strokes
+            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+            morph_ink = cv2.morphologyEx(adaptive_thresh, cv2.MORPH_CLOSE, kernel)
+            v4 = Image.fromarray(morph_ink).convert("RGB")
+            variants.append(("handwriting_adaptive", v4))
+        except Exception as hw_err:
+            logger.debug(f"Handwriting variant notice: {hw_err}")
+
         return variants
 
     @staticmethod
@@ -666,6 +683,18 @@ class TextExtractor:
                 ocr_res, _ = engine(target_np)
                 best_res = ocr_res
                 best_words = sum(len(box[1].split()) for box in ocr_res) if ocr_res else 0
+
+                # Check handwriting adaptive & other variants if initial detection is sparse
+                if best_words < 20 and len(variants) > 1:
+                    for v_name, v_img in variants[1:]:
+                        v_np = np.array(v_img)
+                        v_res, _ = engine(v_np)
+                        if v_res:
+                            v_words = sum(len(box[1].split()) for box in v_res)
+                            if v_words > best_words:
+                                best_words = v_words
+                                best_res = v_res
+                                target_np = v_np
 
                 # Multi-angle search for sideways phone photos (90°, 180°, 270°)
                 if best_words < 15 or not ocr_res:
