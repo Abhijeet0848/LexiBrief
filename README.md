@@ -136,6 +136,20 @@ flowchart TD
 
 ---
 
+## 📑 Multi-Format Document Ingestion & OCR Matrix
+
+| File / Document Type | Primary Library | OCR / Vision Fallback | Capabilities |
+| :--- | :--- | :--- | :--- |
+| **PDF** | `PyMuPDF` (`fitz`) | `PaddleOCR` / Tesseract | Reading-order sorting (`sort=True`), layout blocks, password auto-decrypt |
+| **TXT** | Built-in `open()` | Not needed | Raw UTF-8 string decoding & regex normalization |
+| **DOC / DOCX** | `python-docx` | `PaddleOCR` | OpenXML paragraph parsing & zipped XML decompression |
+| **PPT / PPTX** | `python-pptx` | `PaddleOCR` | Slide-by-slide XML, shape tables, and speaker notes |
+| **JPG / PNG / WebP** | `Pillow` (`PIL`) | `PaddleOCR` / Tesseract | Adaptive binarization, angle orientation classification (`cls=True`) |
+| **Tables & Grids** | `pdfplumber` / `Camelot` | `PaddleOCR` | Cell coordinate extraction & column-aligned pipe formatting |
+| **Complex Documents** | `Docling` / PyMuPDF Blocks | `PaddleOCR` | Multi-column narrative flow & structure preservation |
+
+---
+
 ## 📊 Benchmark Evaluation (SAMSum Corpus)
 
 | Metric | Score | Description |

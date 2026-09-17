@@ -365,7 +365,23 @@ class TextExtractor:
 
     @staticmethod
     def extract_from_image(file_bytes: bytes) -> Tuple[str, int]:
-        """Extracts text from images (PNG, JPG, JPEG, WEBP, BMP) using PyMuPDF OCR or Pillow."""
+        """Extracts text from images (PNG, JPG, JPEG, WEBP, BMP) using Pillow, PaddleOCR, PyMuPDF OCR, or pytesseract."""
+        # 1. State-of-the-art: PaddleOCR for deep angle classification & scene text recognition
+        try:
+            from paddleocr import PaddleOCR
+            from PIL import Image
+            import numpy as np
+            img = Image.open(io.BytesIO(file_bytes)).convert("RGB")
+            ocr_engine = PaddleOCR(use_angle_cls=True, lang='en')
+            result = ocr_engine.ocr(np.array(img), cls=True)
+            if result and result[0]:
+                lines = [line[1][0] for line in result[0] if line and len(line) > 1 and line[1]]
+                if lines:
+                    return "\n".join(lines), 1
+        except Exception:
+            pass
+
+        # 2. PyMuPDF OCR (with English & Hindi Devanagari models)
         try:
             import pymupdf
             doc = pymupdf.open(stream=file_bytes, filetype="png")
@@ -373,13 +389,13 @@ class TextExtractor:
             page_count = len(doc)
             for page in doc:
                 try:
-                    tp = page.get_textpage_ocr(language="eng+hin", dpi=150)
+                    tp = page.get_textpage_ocr(language="eng+hin", dpi=200)
                     text = page.get_text(textpage=tp)
                     if text and text.strip():
                         pages.append(text.strip())
                 except Exception:
                     try:
-                        tp = page.get_textpage_ocr(language="eng", dpi=150)
+                        tp = page.get_textpage_ocr(language="eng", dpi=200)
                         text = page.get_text(textpage=tp)
                         if text and text.strip():
                             pages.append(text.strip())
@@ -390,6 +406,18 @@ class TextExtractor:
                 return "\n\n".join(pages), max(1, page_count)
         except Exception as e:
             logger.debug(f"PyMuPDF image OCR note: {e}")
+
+        # 3. Pillow fallback with pytesseract if available
+        try:
+            from PIL import Image
+            import pytesseract
+            img = Image.open(io.BytesIO(file_bytes))
+            txt = pytesseract.image_to_string(img)
+            if txt and txt.strip():
+                return txt.strip(), 1
+        except Exception:
+            pass
+
         return "", 1
 
     @classmethod
