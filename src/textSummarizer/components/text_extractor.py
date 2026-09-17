@@ -523,6 +523,11 @@ class TextExtractor:
 
         try:
             raw_img = Image.open(io.BytesIO(file_bytes)).convert("RGB")
+            # Auto-rotate phone camera images according to EXIF metadata
+            try:
+                raw_img = ImageOps.exif_transpose(raw_img)
+            except Exception:
+                pass
 
             # 1. Scale camera snapshots: upscale if small, bound if gigantic
             w, h = raw_img.size
@@ -553,7 +558,7 @@ class TextExtractor:
                 except Exception:
                     img_np = None
 
-        # 1. State-of-the-art: RapidOCR (ONNXRuntime) with layout reconstruction
+        # 1. State-of-the-art: RapidOCR (ONNXRuntime) with layout reconstruction & multi-orientation search
         try:
             from rapidocr_onnxruntime import RapidOCR
             engine = RapidOCR()
@@ -562,14 +567,41 @@ class TextExtractor:
             target_np = img_np if img_np is not None else np.array(Image.open(io.BytesIO(file_bytes)).convert("RGB"))
             ocr_res, _ = engine(target_np)
             
+            best_res = ocr_res
+            best_words = sum(len(box[1].split()) for box in ocr_res) if ocr_res else 0
+
+            # Multi-angle search for sideways phone photos (90°, 180°, 270°)
+            if best_words < 15 or not ocr_res:
+                for k_rot in (1, 2, 3):
+                    rotated_np = np.rot90(target_np, k_rot)
+                    rot_res, _ = engine(rotated_np)
+                    if rot_res:
+                        rot_words = sum(len(box[1].split()) for box in rot_res)
+                        if rot_words > best_words:
+                            best_words = rot_words
+                            best_res = rot_res
+            
             # If low detection on enhanced, retry with raw image
-            if (not ocr_res or len(ocr_res) < 2) and raw_img is not None:
-                raw_ocr_res, _ = engine(np.array(raw_img))
-                if raw_ocr_res and len(raw_ocr_res) > (len(ocr_res) if ocr_res else 0):
-                    ocr_res = raw_ocr_res
+            if (not best_res or best_words < 5) and raw_img is not None:
+                raw_np = np.array(raw_img)
+                raw_ocr_res, _ = engine(raw_np)
+                if raw_ocr_res:
+                    raw_words = sum(len(box[1].split()) for box in raw_ocr_res)
+                    if raw_words > best_words:
+                        best_res = raw_ocr_res
+                        best_words = raw_words
+                if best_words < 15:
+                    for k_rot in (1, 2, 3):
+                        rot_raw_np = np.rot90(raw_np, k_rot)
+                        rot_res, _ = engine(rot_raw_np)
+                        if rot_res:
+                            rot_words = sum(len(box[1].split()) for box in rot_res)
+                            if rot_words > best_words:
+                                best_words = rot_words
+                                best_res = rot_res
                     
-            if ocr_res:
-                reconstructed = TextExtractor._reconstruct_ocr_boxes(ocr_res)
+            if best_res:
+                reconstructed = TextExtractor._reconstruct_ocr_boxes(best_res)
                 if reconstructed and reconstructed.strip():
                     return reconstructed.strip(), 1
         except Exception as ocr_err:
