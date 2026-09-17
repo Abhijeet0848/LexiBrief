@@ -18,11 +18,11 @@ class ExtractiveSummarizer:
         tf: Counter = Counter()
 
         for tokens in sentence_tokens:
-            filtered_unique = set(w for w in tokens if w not in stopwords and len(w) >= 3)
+            filtered_unique = set(w for w in tokens if w not in stopwords and len(w) >= 2)
             for w in filtered_unique:
                 df[w] += 1
             for w in tokens:
-                if w not in stopwords and len(w) >= 3:
+                if w not in stopwords and len(w) >= 2:
                     tf[w] += 1
 
         if not tf:
@@ -135,7 +135,16 @@ class ExtractiveSummarizer:
                     t = it[2].strip()
                     res.append(t if t.startswith(('•', '-', '*')) else f"• {t}")
                 return "\n".join(res)
-            return " ".join(it[2].strip() for it in items)
+            
+            clean_sents = [it[2].strip() for it in items if it[2].strip()]
+            if len(clean_sents) > 5:
+                # Group into balanced 3-sentence narrative paragraphs for readability
+                paragraphs = []
+                for i in range(0, len(clean_sents), 3):
+                    chunk = clean_sents[i:i+3]
+                    paragraphs.append(" ".join(chunk))
+                return "\n\n".join(paragraphs)
+            return " ".join(clean_sents)
 
         if persona_key == "action_items":
             return "\n".join(
