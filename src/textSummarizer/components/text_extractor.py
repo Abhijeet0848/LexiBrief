@@ -410,15 +410,44 @@ class TextExtractor:
 
     @staticmethod
     def extract_from_image(file_bytes: bytes) -> Tuple[str, int]:
-        """Extracts text from images (PNG, JPG, JPEG, WEBP, BMP) using Pillow, RapidOCR, PaddleOCR, PyMuPDF OCR, or pytesseract."""
+        """
+        High-accuracy image OCR engine (Camera photos, document scans, screenshots).
+        Applies adaptive Pillow auto-contrast, Lanczos upscaling, and unsharp sharpening
+        before cascading to RapidOCR (ONNXRuntime), PaddleOCR, PyMuPDF OCR, and pytesseract.
+        """
+        # Image Enhancement Pipeline for camera clicks & blurry photos
+        try:
+            from PIL import Image, ImageOps, ImageEnhance, ImageFilter
+            import numpy as np
+
+            raw_img = Image.open(io.BytesIO(file_bytes)).convert("RGB")
+
+            # 1. Upscale low-res camera snapshots to ensure crisp glyph contours
+            w, h = raw_img.size
+            if max(w, h) < 1800:
+                scale_factor = min(3.0, 2000.0 / max(w, h))
+                raw_img = raw_img.resize((int(w * scale_factor), int(h * scale_factor)), Image.Resampling.LANCZOS)
+
+            # 2. Normalize contrast and boost sharpness for uneven camera lighting
+            enhanced_img = ImageOps.autocontrast(raw_img, cutoff=1)
+            sharp_enhancer = ImageEnhance.Sharpness(enhanced_img)
+            enhanced_img = sharp_enhancer.enhance(1.6)
+
+            # 3. Subtle contrast boost to separate text from noisy backgrounds
+            contrast_enhancer = ImageEnhance.Contrast(enhanced_img)
+            enhanced_img = contrast_enhancer.enhance(1.25)
+            
+            img_np = np.array(enhanced_img)
+        except Exception as e:
+            logger.debug(f"Pillow image preprocessing notice: {e}")
+            enhanced_img = None
+            img_np = None
+
         # 1. State-of-the-art: RapidOCR (ONNXRuntime) for fast neural scene text OCR
         try:
             from rapidocr_onnxruntime import RapidOCR
-            from PIL import Image
-            import numpy as np
-            img = Image.open(io.BytesIO(file_bytes)).convert("RGB")
             engine = RapidOCR()
-            ocr_res, _ = engine(np.array(img))
+            ocr_res, _ = engine(img_np if img_np is not None else np.array(Image.open(io.BytesIO(file_bytes)).convert("RGB")))
             if ocr_res:
                 lines = [item[1] for item in ocr_res if len(item) > 1 and item[1]]
                 if lines:
@@ -426,14 +455,11 @@ class TextExtractor:
         except Exception:
             pass
 
-        # 2. PaddleOCR for deep angle classification & scene text recognition
+        # 2. State-of-the-art: PaddleOCR for deep angle classification & scene text recognition
         try:
             from paddleocr import PaddleOCR
-            from PIL import Image
-            import numpy as np
-            img = Image.open(io.BytesIO(file_bytes)).convert("RGB")
             ocr_engine = PaddleOCR(use_angle_cls=True, lang='en')
-            result = ocr_engine.ocr(np.array(img), cls=True)
+            result = ocr_engine.ocr(img_np if img_np is not None else np.array(Image.open(io.BytesIO(file_bytes)).convert("RGB")), cls=True)
             if result and result[0]:
                 lines = [line[1][0] for line in result[0] if line and len(line) > 1 and line[1]]
                 if lines:
@@ -441,21 +467,29 @@ class TextExtractor:
         except Exception:
             pass
 
-        # 2. PyMuPDF OCR (with English & Hindi Devanagari models)
+        # 3. PyMuPDF OCR (with English & Hindi Devanagari models)
         try:
             import pymupdf
-            doc = pymupdf.open(stream=file_bytes, filetype="png")
+            # Save enhanced image to bytes buffer for PyMuPDF
+            buf = io.BytesIO()
+            if enhanced_img is not None:
+                enhanced_img.save(buf, format="PNG")
+                enhanced_bytes = buf.getvalue()
+            else:
+                enhanced_bytes = file_bytes
+
+            doc = pymupdf.open(stream=enhanced_bytes, filetype="png")
             pages = []
             page_count = len(doc)
             for page in doc:
                 try:
-                    tp = page.get_textpage_ocr(language="eng+hin", dpi=200)
+                    tp = page.get_textpage_ocr(language="eng+hin", dpi=300, full=True)
                     text = page.get_text(textpage=tp)
                     if text and text.strip():
                         pages.append(text.strip())
                 except Exception:
                     try:
-                        tp = page.get_textpage_ocr(language="eng", dpi=200)
+                        tp = page.get_textpage_ocr(language="eng", dpi=300, full=True)
                         text = page.get_text(textpage=tp)
                         if text and text.strip():
                             pages.append(text.strip())

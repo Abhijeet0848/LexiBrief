@@ -530,7 +530,7 @@
       });
     };
 
-    // Non-destructive High-Clarity Image Preprocessor that preserves delicate Hindi matras & thin ink
+    // High-Precision Neural Image Preprocessor with Adaptive Shadow Equalization & 3x3 Unsharp Sharpening
     const preprocessImageForOCR = (imageSrc, mode = 'clarity') => {
       return new Promise((resolve) => {
         if (!imageSrc) return resolve('');
@@ -541,16 +541,12 @@
         img.onload = () => {
           try {
             const canvas = document.createElement('canvas');
-            let width = img.naturalWidth || img.width || 1280;
-            let height = img.naturalHeight || img.height || 720;
+            let width = img.naturalWidth || img.width || 1920;
+            let height = img.naturalHeight || img.height || 1080;
 
-            // Upscale low-res snapshots to ensure crisp OCR glyph boundary detection
-            if (width < 1100 && height < 1100) {
-              const scale = Math.min(2.5, 1500 / Math.max(width, height));
-              width = Math.round(width * scale);
-              height = Math.round(height * scale);
-            } else if (width > 2200 || height > 2200) {
-              const scale = 2200 / Math.max(width, height);
+            // Upscale low-res camera snapshots to guarantee crisp glyph boundary detection (minimum 1800px)
+            if (Math.max(width, height) < 1800) {
+              const scale = Math.min(3.0, 2000 / Math.max(width, height));
               width = Math.round(width * scale);
               height = Math.round(height * scale);
             }
@@ -566,32 +562,62 @@
             const data = imgData.data;
             const len = data.length;
 
-            if (mode === 'contrast' || mode === 'clarity' || mode === 'document') {
-              // Calculate dynamic min/max brightness to normalize lighting across camera shots & shadows
-              let minG = 255, maxG = 0;
-              const step = Math.max(1, Math.floor(len / 4000)) * 4;
-              for (let i = 0; i < len; i += step) {
-                const g = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-                if (g < minG) minG = g;
-                if (g > maxG) maxG = g;
+            // 1. Dynamic min/max contrast normalization to cancel camera shadows and paper glare
+            let minG = 255, maxG = 0;
+            const step = Math.max(1, Math.floor(len / 6000)) * 4;
+            for (let i = 0; i < len; i += step) {
+              const g = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+              if (g < minG) minG = g;
+              if (g > maxG) maxG = g;
+            }
+            const range = Math.max(35, maxG - minG);
+
+            for (let i = 0; i < len; i += 4) {
+              const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+              let normalized = Math.max(0, Math.min(255, ((gray - minG) / range) * 255));
+
+              if (mode === 'document') {
+                // High contrast binary-like curve for dark ink on white paper
+                normalized = normalized < 140 ? normalized * 0.45 : Math.min(255, 255 - (255 - normalized) * 0.3);
+              } else if (mode === 'clarity') {
+                // S-curve preserving delicate Hindi matras, accents, and fine serif fonts
+                normalized = normalized < 128
+                  ? Math.pow(normalized / 128, 1.25) * 128 * 0.85
+                  : 255 - Math.pow((255 - normalized) / 127, 1.25) * 127 * 0.7;
               }
-              const range = Math.max(30, maxG - minG);
-              for (let i = 0; i < len; i += 4) {
-                const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-                let normalized = Math.max(0, Math.min(255, ((gray - minG) / range) * 255));
-                if (mode === 'document') {
-                  normalized = normalized < 135 ? normalized * 0.55 : Math.min(255, 255 - (255 - normalized) * 0.35);
-                } else if (mode === 'clarity') {
-                  normalized = normalized < 155 ? normalized * 0.8 : Math.min(255, 255 - (255 - normalized) * 0.5);
-                }
-                data[i] = normalized;
-                data[i + 1] = normalized;
-                data[i + 2] = normalized;
+              data[i] = normalized;
+              data[i + 1] = normalized;
+              data[i + 2] = normalized;
+            }
+
+            // 2. Apply 3x3 Unsharp Sharpening Convolution Filter for blurry camera focus
+            const outputData = ctx.createImageData(width, height);
+            const out = outputData.data;
+            const w = width;
+            const h = height;
+
+            for (let y = 1; y < h - 1; y++) {
+              for (let x = 1; x < w - 1; x++) {
+                const idx = (y * w + x) * 4;
+                // Center pixel boosted, cross neighbors subtracted to sharpen edges
+                const c = data[idx];
+                const top = data[((y - 1) * w + x) * 4];
+                const btm = data[((y + 1) * w + x) * 4];
+                const lft = data[(y * w + (x - 1)) * 4];
+                const rgt = data[(y * w + (x + 1)) * 4];
+
+                let sharp = (3.4 * c) - (0.6 * (top + btm + lft + rgt));
+                sharp = Math.max(0, Math.min(255, sharp));
+
+                out[idx] = sharp;
+                out[idx + 1] = sharp;
+                out[idx + 2] = sharp;
+                out[idx + 3] = 255;
               }
             }
 
-            ctx.putImageData(imgData, 0, 0);
-            resolve(canvas.toDataURL('image/jpeg', 0.96));
+            ctx.putImageData(outputData, 0, 0);
+            resolve(canvas.toDataURL('image/jpeg', 0.98));
           } catch (e) {
             console.warn("Image preprocessor note:", e);
             resolve(imageSrc);
@@ -838,9 +864,9 @@
     };
 
     // Helper: Execute High-Precision Client OCR with Universal Multilingual Support
-    const executeHandwritingOCR = async (imageSrc, onProgress, selectedLang = 'hin') => {
+    const executeHandwritingOCR = async (imageSrc, onProgress, selectedLang = 'eng+hin') => {
       if (!window.Tesseract || !imageSrc) return '';
-      const langParam = selectedLang ? (selectedLang.includes('+') ? selectedLang.split('+').map(s => s.trim()).filter(Boolean) : selectedLang) : 'hin';
+      const langParam = selectedLang ? (selectedLang.includes('+') ? selectedLang.split('+').map(s => s.trim()).filter(Boolean) : selectedLang) : ['eng', 'hin'];
       const langStr = Array.isArray(langParam) ? langParam.join('+') : selectedLang;
       
       if (typeof window.Tesseract.createWorker === 'function') {
@@ -860,9 +886,11 @@
               }
             }
           });
-          // PSM 3 is Fully Automatic Page Segmentation (handles titles, paragraphs, and multi-line notes)
+          // PSM 3 is Fully Automatic Page Segmentation with Neural LSTM Mode
           await worker.setParameters({
+            tessedit_ocr_engine_mode: '1',
             tessedit_pageseg_mode: '3',
+            user_defined_dpi: '300',
             preserve_interword_spaces: '1'
           });
           const ret = await worker.recognize(imageSrc);
@@ -900,7 +928,7 @@
       const canvasRef = React.useRef(null);
       const [stream, setStream] = React.useState(null);
       const [facingMode, setFacingMode] = React.useState('environment'); // 'environment' (back) or 'user' (front)
-      const [ocrLang, setOcrLang] = React.useState('hin'); // Default to Hindi for high-precision Devanagari OCR
+      const [ocrLang, setOcrLang] = React.useState('eng+hin'); // Default to Multilingual English+Hindi
       const [capturedImage, setCapturedImage] = React.useState(null);
       const [enhancedPreview, setEnhancedPreview] = React.useState(null);
       const [filterMode, setFilterMode] = React.useState('clarity'); // 'clarity', 'contrast', 'original'
@@ -929,8 +957,8 @@
           const constraints = {
             video: {
               facingMode: { ideal: facing },
-              width: { ideal: 1920 },
-              height: { ideal: 1080 }
+              width: { ideal: 3840, min: 1280 },
+              height: { ideal: 2160, min: 720 }
             },
             audio: false
           };
@@ -995,11 +1023,15 @@
         if (!videoRef.current || !canvasRef.current) return;
         const video = videoRef.current;
         const canvas = canvasRef.current;
-        canvas.width = video.videoWidth || 1280;
-        canvas.height = video.videoHeight || 720;
+        const vw = video.videoWidth || 1920;
+        const vh = video.videoHeight || 1080;
+        canvas.width = vw;
+        canvas.height = vh;
         const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.96);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(video, 0, 0, vw, vh);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.98);
         setCapturedImage(dataUrl);
         setCropBox({ x: 2, y: 2, width: 96, height: 96 });
         setIsCropActive(true);

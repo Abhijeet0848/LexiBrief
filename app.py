@@ -343,10 +343,20 @@ async def upload_document(
         # If client provided OCR text (e.g. from live camera photo capture, image upload, or scanned PDF)
         if ocr_text and ocr_text.strip():
             cleaned_ocr = TextExtractor.clean_ocr_text(ocr_text)
-            if not extracted_text or not extracted_text.strip() or len(cleaned_ocr) > len(extracted_text) + 20:
+            if not extracted_text or not extracted_text.strip():
                 extracted_text = cleaned_ocr
-                if (file.filename or '').lower().endswith(('.jpg', '.jpeg', '.png', '.webp', '.bmp')):
-                    detected_format = "IMAGE"
+            else:
+                # Compare word count and richness
+                client_words = len(cleaned_ocr.split())
+                server_words = len(extracted_text.split())
+                if client_words > server_words + 4:
+                    extracted_text = cleaned_ocr
+                elif server_words >= client_words:
+                    pass
+                else:
+                    extracted_text = cleaned_ocr
+            if (file.filename or '').lower().endswith(('.jpg', '.jpeg', '.png', '.webp', '.bmp')):
+                detected_format = "IMAGE"
 
         if not extracted_text or not extracted_text.strip():
             raise HTTPException(
