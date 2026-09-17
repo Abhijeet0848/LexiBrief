@@ -571,7 +571,45 @@ class TextExtractor:
                 except Exception:
                     img_np = None
 
-        # 1. State-of-the-art: RapidOCR (ONNXRuntime) with layout reconstruction & multi-orientation search
+        # 1. State-of-the-art Multi-Engine OCR Matrix
+        candidates = []
+
+        # Engine A: PyMuPDF OCR (Tesseract Neural LSTM with bilingual English + Hindi support)
+        try:
+            import pymupdf
+            buf = io.BytesIO()
+            if enhanced_img is not None:
+                enhanced_img.save(buf, format="PNG")
+                enhanced_bytes = buf.getvalue()
+            else:
+                enhanced_bytes = file_bytes
+
+            doc = pymupdf.open(stream=enhanced_bytes, filetype="png")
+            pages = []
+            page_count = len(doc)
+            for page in doc:
+                try:
+                    tp = page.get_textpage_ocr(language="eng+hin", dpi=300, full=True)
+                    text = page.get_text(textpage=tp)
+                    if text and text.strip():
+                        pages.append(text.strip())
+                except Exception:
+                    try:
+                        tp = page.get_textpage_ocr(language="eng", dpi=300, full=True)
+                        text = page.get_text(textpage=tp)
+                        if text and text.strip():
+                            pages.append(text.strip())
+                    except Exception:
+                        pass
+            doc.close()
+            if pages:
+                pymupdf_text = "\n\n".join(pages).strip()
+                if pymupdf_text:
+                    candidates.append(("pymupdf_ocr", pymupdf_text))
+        except Exception as e:
+            logger.debug(f"PyMuPDF image OCR note: {e}")
+
+        # Engine B: RapidOCR (ONNXRuntime) with layout reconstruction & multi-orientation search
         try:
             from rapidocr_onnxruntime import RapidOCR
             engine = RapidOCR()
@@ -616,11 +654,11 @@ class TextExtractor:
             if best_res:
                 reconstructed = TextExtractor._reconstruct_ocr_boxes(best_res)
                 if reconstructed and reconstructed.strip():
-                    return reconstructed.strip(), 1
+                    candidates.append(("rapidocr_onnx", reconstructed.strip()))
         except Exception as ocr_err:
             logger.debug(f"RapidOCR execution note: {ocr_err}")
 
-        # 2. State-of-the-art: PaddleOCR for deep angle classification & scene text recognition
+        # Engine C: PaddleOCR for deep scene text recognition
         try:
             from paddleocr import PaddleOCR
             ocr_engine = PaddleOCR(use_angle_cls=True, lang='en')
@@ -628,52 +666,37 @@ class TextExtractor:
             if result and result[0]:
                 lines = [line[1][0] for line in result[0] if line and len(line) > 1 and line[1]]
                 if lines:
-                    return "\n".join(lines), 1
+                    candidates.append(("paddleocr", "\n".join(lines)))
         except Exception:
             pass
 
-        # 3. PyMuPDF OCR (with English & Hindi Devanagari models)
-        try:
-            import pymupdf
-            buf = io.BytesIO()
-            if enhanced_img is not None:
-                enhanced_img.save(buf, format="PNG")
-                enhanced_bytes = buf.getvalue()
-            else:
-                enhanced_bytes = file_bytes
-
-            doc = pymupdf.open(stream=enhanced_bytes, filetype="png")
-            pages = []
-            page_count = len(doc)
-            for page in doc:
-                try:
-                    tp = page.get_textpage_ocr(language="eng+hin", dpi=300, full=True)
-                    text = page.get_text(textpage=tp)
-                    if text and text.strip():
-                        pages.append(text.strip())
-                except Exception:
-                    try:
-                        tp = page.get_textpage_ocr(language="eng", dpi=300, full=True)
-                        text = page.get_text(textpage=tp)
-                        if text and text.strip():
-                            pages.append(text.strip())
-                    except Exception:
-                        pass
-            doc.close()
-            if pages:
-                return "\n\n".join(pages), max(1, page_count)
-        except Exception as e:
-            logger.debug(f"PyMuPDF image OCR note: {e}")
-
-        # 4. Pillow fallback with pytesseract if available
+        # Engine D: PyTesseract fallback
         try:
             import pytesseract
             img = Image.open(io.BytesIO(file_bytes))
-            txt = pytesseract.image_to_string(img)
+            txt = pytesseract.image_to_string(img, lang="eng+hin")
             if txt and txt.strip():
-                return txt.strip(), 1
+                candidates.append(("pytesseract", txt.strip()))
         except Exception:
-            pass
+            try:
+                import pytesseract
+                img = Image.open(io.BytesIO(file_bytes))
+                txt = pytesseract.image_to_string(img)
+                if txt and txt.strip():
+                    candidates.append(("pytesseract", txt.strip()))
+            except Exception:
+                pass
+
+        if candidates:
+            # Score candidates: boost candidates with Devanagari script for Indic docs and higher clean word count
+            def score_candidate(cand):
+                _, text = cand
+                devanagari_count = len(re.findall(r'[\u0900-\u097F]', text))
+                word_count = len(text.split())
+                return (devanagari_count * 2.5) + word_count
+
+            best_candidate = max(candidates, key=score_candidate)
+            return best_candidate[1], 1
 
         return "", 1
 

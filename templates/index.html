@@ -603,6 +603,13 @@
             }
             const range = Math.max(35, maxG - minG);
 
+            if (mode === 'original') {
+              // Preserve original colors with mild auto-contrast
+              ctx.drawImage(img, 0, 0, width, height);
+              resolve(canvas.toDataURL('image/jpeg', 0.98));
+              return;
+            }
+
             for (let i = 0; i < len; i += 4) {
               const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
               let normalized = Math.max(0, Math.min(255, ((gray - minG) / range) * 255));
@@ -611,17 +618,17 @@
                 // High contrast binary-like curve for dark ink on white paper
                 normalized = normalized < 140 ? normalized * 0.45 : Math.min(255, 255 - (255 - normalized) * 0.3);
               } else if (mode === 'clarity') {
-                // S-curve preserving delicate Hindi matras, accents, and fine serif fonts
+                // S-curve preserving delicate Hindi matras, accents, and fine serif fonts without background grain
                 normalized = normalized < 128
-                  ? Math.pow(normalized / 128, 1.25) * 128 * 0.85
-                  : 255 - Math.pow((255 - normalized) / 127, 1.25) * 127 * 0.7;
+                  ? Math.pow(normalized / 128, 1.15) * 128 * 0.9
+                  : 255 - Math.pow((255 - normalized) / 127, 1.15) * 127 * 0.8;
               }
               data[i] = normalized;
               data[i + 1] = normalized;
               data[i + 2] = normalized;
             }
 
-            // 2. Apply 3x3 Unsharp Sharpening Convolution Filter for blurry camera focus
+            // 2. Apply gentle 3x3 Unsharp Sharpening Convolution Filter
             const outputData = ctx.createImageData(width, height);
             const out = outputData.data;
             const w = width;
@@ -630,14 +637,13 @@
             for (let y = 1; y < h - 1; y++) {
               for (let x = 1; x < w - 1; x++) {
                 const idx = (y * w + x) * 4;
-                // Center pixel boosted, cross neighbors subtracted to sharpen edges
                 const c = data[idx];
                 const top = data[((y - 1) * w + x) * 4];
                 const btm = data[((y + 1) * w + x) * 4];
                 const lft = data[(y * w + (x - 1)) * 4];
                 const rgt = data[(y * w + (x + 1)) * 4];
 
-                let sharp = (3.4 * c) - (0.6 * (top + btm + lft + rgt));
+                let sharp = (2.2 * c) - (0.3 * (top + btm + lft + rgt));
                 sharp = Math.max(0, Math.min(255, sharp));
 
                 out[idx] = sharp;
