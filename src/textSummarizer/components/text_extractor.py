@@ -27,13 +27,20 @@ class TextExtractor:
         if not text:
             return ""
         
-        # 1. Strip unprintable control codes and replacement characters
+        # 1. Normalize math multiplication symbols (e.g. 1 x 2 x 3 or 1 × 2 × 3)
+        text = re.sub(r'(\d)\s*[\uFFFD\uFEFF×]\s*(\d)', r'\1 x \2', text)
+        
+        # 2. Normalize bullet points and examples onto separate lines
+        text = re.sub(r'(?:^|\n)\s*[\uFFFD\uFEFF•\-\*■▪◆\u2022\u25cf\u25aa\u25b6\u2713\u2714\.]*\s*Example:', r'\n• Example:', text)
+        text = re.sub(r'(?<=\S)\s+(?:[\uFFFD\uFEFF•\-\*■▪◆\u2022\u25cf\u25aa\u25b6\u2713\u2714\.]*\s*Example:)', r'\n• Example:', text)
+
+        # 3. Strip unprintable control codes and remaining replacement characters
         text = re.sub(r'[\uFFFD\uFEFF\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
         
-        # 2. Strip OCR fringe glitches (isolated bars/tildes/glitches) but keep normal punctuation (. , : ; / @ _ - • & % #)
+        # 4. Strip OCR fringe glitches (isolated bars/tildes/glitches) but keep normal punctuation (. , : ; / @ _ - • & % #)
         text = re.sub(r'[|~¬¢§±µ¿¡]+', ' ', text)
         
-        # 3. Heal English OCR digit-in-word confusions (e.g., 'm0del' -> 'model', 'w1th' -> 'with')
+        # 5. Heal English OCR digit-in-word confusions (e.g., 'm0del' -> 'model', 'w1th' -> 'with')
         def _heal_word(w: str) -> str:
             if not w:
                 return ""
@@ -50,7 +57,7 @@ class TextExtractor:
                     w = re.sub(r'(?<=[a-zA-Z])5(?=[a-zA-Z])', 's', w)
             return w
 
-        # 4. Filter line by line and eliminate isolated single-character Latin noise
+        # 6. Filter line by line and eliminate isolated single-character Latin noise
         clean_lines = []
         for line in text.split('\n'):
             line_str = line.strip()
