@@ -884,13 +884,17 @@
       });
 
       // 6. Heal common OCR phrase and Devanagari ligature distortions
-      clean = clean.replace(/\bWEALTH\s+FACILITY\b/gi, 'HEALTH FACILITY');
-      clean = clean.replace(/\b(?:on\s*9\s*)?DEL\s*Hi\b/gi, 'DELHI');
-      clean = clean.replace(/\bNEW\s+DEL\s*HI\b/gi, 'NEW DELHI');
+      clean = clean.replace(/\bINTENTION[ \t]+OF[ \t]+Avan[^\r\n]*/gi, 'INTENTION OF AVAILING');
+      clean = clean.replace(/\bWEALTH[ \t]+FACILITY\b/gi, 'HEALTH FACILITY');
+      clean = clean.replace(/\bWALL[ \t]+INVITE\b/gi, 'WILL INVITE');
+      clean = clean.replace(/\bDISCIPLIMARY\b/gi, 'DISCIPLINARY');
+      clean = clean.replace(/[—–\-~_]*[ \t]*[0oO][ \t]*DELHI[\s\-]*(?=\d{6})/gi, 'NEW DELHI-');
+      clean = clean.replace(/\b(?:on[ \t]*9[ \t]*)?DEL[ \t]*Hi\b/gi, 'DELHI');
+      clean = clean.replace(/\bNEW[ \t]+DEL[ \t]*HI\b/gi, 'NEW DELHI');
       clean = clean.replace(/दिश्वडिसालय/g, 'विश्वविद्यालय');
       clean = clean.replace(/विरवविद्यांसय/g, 'विश्वविद्यालय');
       clean = clean.replace(/कंन्ट्र\b/g, 'केन्द्र');
-      clean = clean.replace(/नई\s+fa\s*(?=\d{6})/g, 'नई दिल्ली-');
+      clean = clean.replace(/नई[ \t]+fa[ \t]*(?=\d{6})/g, 'नई दिल्ली-');
 
       // 7. Ensure each bullet point is on a discrete new line
       clean = clean.replace(/[ \t]*([•\u2022\u25cf\u25aa\u25b8\u2219\u2023\u2043\u204c\u204d\u2218\u25cb\u25e6\u25ab])[ \t]*/g, '\n• ');
@@ -1010,7 +1014,7 @@
       const [capturedImage, setCapturedImage] = React.useState(null);
       const [enhancedPreview, setEnhancedPreview] = React.useState(null);
       const [filterMode, setFilterMode] = React.useState('clarity');
-      const [cropBox, setCropBox] = React.useState({ x: 2, y: 2, width: 96, height: 96 });
+      const [cropBox, setCropBox] = React.useState({ x: 0, y: 0, width: 100, height: 100 });
       const [isCropActive, setIsCropActive] = React.useState(true);
       const [cameraError, setCameraError] = React.useState(null);
       const [isInitializing, setIsInitializing] = React.useState(true);
@@ -1107,7 +1111,7 @@
         setCapturedImage(null);
         setEnhancedPreview(null);
         setExtractedTextPreview(null);
-        setCropBox({ x: 2, y: 2, width: 96, height: 96 });
+        setCropBox({ x: 0, y: 0, width: 100, height: 100 });
         setIsOcrProcessing(false);
         onClose();
       };
@@ -1130,7 +1134,7 @@
         ctx.drawImage(video, 0, 0, vw, vh);
         const dataUrl = canvas.toDataURL('image/jpeg', 0.98);
         setCapturedImage(dataUrl);
-        setCropBox({ x: 2, y: 2, width: 96, height: 96 });
+        setCropBox({ x: 0, y: 0, width: 100, height: 100 });
         setIsCropActive(true);
 
         if (stream) {
@@ -1143,7 +1147,7 @@
         setCapturedImage(null);
         setEnhancedPreview(null);
         setExtractedTextPreview(null);
-        setCropBox({ x: 2, y: 2, width: 96, height: 96 });
+        setCropBox({ x: 0, y: 0, width: 100, height: 100 });
         setIsOcrProcessing(false);
         setOcrProgress({ status: '', percent: 0 });
         startCamera(facingMode);
@@ -1212,7 +1216,7 @@
         const reader = new FileReader();
         reader.onload = (ev) => {
           setCapturedImage(ev.target.result);
-          setCropBox({ x: 2, y: 2, width: 96, height: 96 });
+          setCropBox({ x: 0, y: 0, width: 100, height: 100 });
           setIsCropActive(true);
           if (stream) {
             stream.getTracks().forEach(track => track.stop());
