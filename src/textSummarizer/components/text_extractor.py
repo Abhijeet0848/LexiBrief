@@ -32,17 +32,28 @@ class TextExtractor:
         # 1. Normalize math multiplication symbols (e.g. 1 x 2 x 3 or 1 × 2 × 3)
         text = re.sub(r'(\d)\s*[\uFFFD\uFEFF×]\s*(\d)', r'\1 x \2', text)
 
-        # 2. Normalize arrows (e.g. "last in -> first out" or "last in —> first out")
-        text = re.sub(r'\s*(?:->|-->|→|—>)\s*', ' → ', text)
+        # 2. Normalize sub-items with leading arrows onto separate indented lines
+        text = re.sub(r'(?<=\S)[ \t]+(?:->|-->)[ \t]+', r'\n  -> ', text)
+        text = re.sub(r'(?:^|\n)\s*(?:->|-->)\s+', r'\n  -> ', text)
 
-        # 3. Heal misclassified bullet glyphs (e.g. '+' or '*' or '-' or Hindi numerals '१.' / '५' / '५०' / '०' before English words)
+        # 3. Normalize internal inline arrows (e.g. "grows/shrinks naturally" or "last in -> first out")
+        text = re.sub(r'(?<=\w)\s*(?:->|-->|→|—>)\s*(?=\w)', ' → ', text)
+
+        # 4. Heal function/method list items (e.g. "push() to insert...", "size() returns...")
+        text = re.sub(r'(?:^|\n)\s*([a-zA-Z_][a-zA-Z0-9_]*\(\)\s+(?:to|returns|Returns|is|checks|removes|inserts)\b)', r'\n• \1', text)
+
+        # 5. Heal misclassified bullet glyphs (e.g. '+' or '*' or '-' or Hindi numerals '१.' / '५' / '५०' / '०' before English words)
         text = re.sub(r'(?:^|\n)\s*[१२३४५६७८९०\u0966-\u096F]+[\.\s:o°\-_*~]*(?=[A-Za-z])', r'\n• ', text)
         text = re.sub(r'(?:^|\n)\s*[\+\*]\s+(?=[A-Za-z0-9])', r'\n• ', text)
         text = re.sub(r'(?:^|\n)\s*-\s+(?=[A-Z])', r'\n• ', text)
+
+        # 6. Normalize section breaks around Note: and Example: and headers
+        text = re.sub(r'(?<=\S)[ \t]+(Note:|Example:)', r'\n\n\1', text)
+        text = re.sub(r'(?:^|\n)\s*•\s*(Example:|Note:)', r'\n\n\1', text)
         
-        # 4. Normalize bullet points and examples onto separate lines
-        text = re.sub(r'(?:^|\n)\s*[\uFFFD\uFEFF•\-\*■▪◆\u2022\u25cf\u25aa\u25b6\u2713\u2714\.]*\s*Example:', r'\n• Example:', text)
-        text = re.sub(r'(?<=\S)\s+(?:[\uFFFD\uFEFF•\-\*■▪◆\u2022\u25cf\u25aa\u25b6\u2713\u2714\.]*\s*Example:)', r'\n• Example:', text)
+        # 7. Normalize bullet points and examples onto separate lines
+        text = re.sub(r'(?:^|\n)\s*[\uFFFD\uFEFF•\-\*■▪◆\u2022\u25cf\u25aa\u25b6\u2713\u2714\.]*\s*Example:', r'\nExample:', text)
+        text = re.sub(r'(?<=\S)\s+(?:[\uFFFD\uFEFF•\-\*■▪◆\u2022\u25cf\u25aa\u25b6\u2713\u2714\.]*\s*Example:)', r'\nExample:', text)
 
         # 5. Strip unprintable control codes and remaining replacement characters
         text = re.sub(r'[\uFFFD\uFEFF\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
@@ -509,23 +520,30 @@ class TextExtractor:
 
         # Format bullets and paragraphs ensuring separate lines
         formatted = []
-        bullet_marker_pattern = re.compile(r'^(?:[•\-\*■▪◆\u2022\u25cf\u25aa\u25b6\u2713\u2714]|\d+[\.\)]|[a-zA-Z][\.\)])\s*')
+        bullet_marker_pattern = re.compile(r'^(?:[•\-\*■▪◆\u2022\u25cf\u25aa\u25b6\u2713\u2714]|->|-->|\d+[\.\)]|[a-zA-Z][\.\)])\s*')
         for line in lines:
             line_str = line.strip()
             if not line_str:
                 continue
-            # Check for multiple bullets joined on one line
-            sub_items = re.split(r'(?<=\S)\s+([•\-\*■▪◆\u2022\u25cf\u25aa\u25b6\u2713\u2714]|\d+\.|\([0-9a-zA-Z]\))\s+', line_str)
+            # Check for multiple bullets or arrow sub-items joined on one line
+            sub_items = re.split(r'(?<=\S)\s+([•\-\*■▪◆\u2022\u25cf\u25aa\u25b6\u2713\u2714]|->|-->|\d+\.|\([0-9a-zA-Z]\))\s+', line_str)
             if len(sub_items) > 1:
                 head = sub_items[0].strip()
                 if head:
                     formatted.append(head)
                 for i in range(1, len(sub_items), 2):
+                    marker = sub_items[i].strip()
                     b_text = sub_items[i+1].strip() if i+1 < len(sub_items) else ""
-                    formatted.append(f"• {b_text}")
+                    if marker in ["->", "-->"]:
+                        formatted.append(f"  -> {b_text}")
+                    else:
+                        formatted.append(f"• {b_text}")
             else:
                 if bullet_marker_pattern.match(line_str):
-                    norm = re.sub(r'^[•\-\*■▪◆\u2022\u25cf\u25aa\u25b6\u2713\u2714]\s*', '• ', line_str)
+                    if line_str.startswith("->") or line_str.startswith("-->"):
+                        norm = re.sub(r'^(?:->|-->)\s*', '  -> ', line_str)
+                    else:
+                        norm = re.sub(r'^[•\-\*■▪◆\u2022\u25cf\u25aa\u25b6\u2713\u2714]\s*', '• ', line_str)
                     formatted.append(norm)
                 else:
                     formatted.append(line_str)

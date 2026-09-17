@@ -866,17 +866,28 @@
       // 1. Normalize math multiplication symbols (e.g. 1 x 2 x 3 or 1 × 2 × 3)
       let clean = text.replace(/(\d)\s*[\uFFFD\uFEFF×]\s*(\d)/g, '$1 x $2');
 
-      // 2. Normalize arrows (e.g. "last in -> first out" or "last in —> first out")
-      clean = clean.replace(/\s*(?:->|-->|→|—>)\s*/g, ' → ');
+      // 2. Normalize sub-items with leading arrows onto separate indented lines
+      clean = clean.replace(/(?<=\S)[ \t]+(?:->|-->)[ \t]+/g, '\n  -> ');
+      clean = clean.replace(/(?:^|\n)\s*(?:->|-->)\s+/g, '\n  -> ');
 
-      // 3. Heal misclassified bullet glyphs (e.g. '+' or '*' or '-' or Hindi numerals '१.' / '५' / '५०' / '०' before English words)
+      // 3. Normalize internal inline arrows (e.g. "grows/shrinks naturally" or "last in -> first out")
+      clean = clean.replace(/(?<=\w)\s*(?:->|-->|→|—>)\s*(?=\w)/g, ' → ');
+
+      // 4. Heal function/method list items (e.g. "push() to insert...", "size() returns...")
+      clean = clean.replace(/(?:^|\n)\s*([a-zA-Z_][a-zA-Z0-9_]*\(\)\s+(?:to|returns|Returns|is|checks|removes|inserts)\b)/g, '\n• $1');
+
+      // 5. Heal misclassified bullet glyphs (e.g. '+' or '*' or '-' or Hindi numerals '१.' / '५' / '५०' / '०' before English words)
       clean = clean.replace(/(?:^|\n)\s*[१२३४५६७८९०\u0966-\u096F]+[\.\s:o°\-_*~]*(?=[A-Za-z])/g, '\n• ');
       clean = clean.replace(/(?:^|\n)\s*[\+\*]\s+(?=[A-Za-z0-9])/g, '\n• ');
       clean = clean.replace(/(?:^|\n)\s*-\s+(?=[A-Z])/g, '\n• ');
 
-      // 4. Normalize bullet points and examples onto separate lines
-      clean = clean.replace(/(?:^|\n)\s*[\uFFFD\uFEFF•\-\*■▪◆\u2022\u25cf\u25aa\u25b6\u2713\u2714\.]*\s*Example:/g, '\n• Example:');
-      clean = clean.replace(/(?<=\S)\s+(?:[\uFFFD\uFEFF•\-\*■▪◆\u2022\u25cf\u25aa\u25b6\u2713\u2714\.]*\s*Example:)/g, '\n• Example:');
+      // 6. Normalize section breaks around Note: and Example: and headers
+      clean = clean.replace(/(?<=\S)[ \t]+(Note:|Example:)/g, '\n\n$1');
+      clean = clean.replace(/(?:^|\n)\s*•\s*(Example:|Note:)/g, '\n\n$1');
+
+      // 7. Normalize bullet points and examples onto separate lines
+      clean = clean.replace(/(?:^|\n)\s*[\uFFFD\uFEFF•\-\*■▪◆\u2022\u25cf\u25aa\u25b6\u2713\u2714\.]*\s*Example:/g, '\nExample:');
+      clean = clean.replace(/(?<=\S)\s+(?:[\uFFFD\uFEFF•\-\*■▪◆\u2022\u25cf\u25aa\u25b6\u2713\u2714\.]*\s*Example:)/g, '\nExample:');
 
       // 5. Strip non-printable control codes while preserving valid letters, numbers, and Indic/Arabic/CJK punctuation
       clean = clean.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F\uFFFD\uFEFF]/g, '');
