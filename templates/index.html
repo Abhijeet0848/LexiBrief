@@ -294,8 +294,8 @@
   <script type="text/babel">
     const { useState, useEffect, useMemo, useRef } = React;
 
-    // Modern Top Drop Box Alert Notification (Disappears in 4 seconds)
-    function Toast({ message, type, duration = 4000, onClose }) {
+    // Modern Top Drop Box Alert Notification (Disappears in 3 seconds)
+    function Toast({ message, type, duration = 3000, onClose }) {
       useEffect(() => {
         const timer = setTimeout(onClose, duration);
         return () => clearTimeout(timer);
@@ -1618,7 +1618,7 @@
         }
       }, [uploadedDocInfo]);
 
-      const showToast = (msg, type = 'info', duration = 4500) => setToast({ message: msg, type, duration });
+      const showToast = (msg, type = 'info', duration = 3000) => setToast({ message: msg, type, duration });
 
       useEffect(() => {
         fetchSummaries();
