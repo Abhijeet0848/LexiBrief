@@ -373,3 +373,31 @@ def test_ocr_endpoint_and_image_extraction():
     assert res_del.status_code == 200
     assert not os.path.exists(save_data["saved_image_path"])
 
+
+def test_pasted_screenshot_ocr():
+    """Verify pasting screenshot base64 data to /api/ocr extracts text and returns words and saved path."""
+    from PIL import Image, ImageDraw
+    import io
+    import base64
+
+    img = Image.new('RGB', (500, 120), color=(255, 255, 255))
+    draw = ImageDraw.Draw(img)
+    draw.text((20, 30), "Executive Summary Report", fill=(0, 0, 0))
+    draw.text((20, 60), "Key Finding: Quarterly revenue increased by 25 percent.", fill=(0, 0, 0))
+
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    img_bytes = buf.getvalue()
+    b64_str = f"data:image/png;base64,{base64.b64encode(img_bytes).decode('utf-8')}"
+
+    # Test base64 JSON payload mimicking pasted screenshot
+    res = client.post("/api/ocr", json={"image": b64_str, "lang": "auto"})
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success"] is True
+    assert "Executive" in data["text"] or "Summary" in data["text"] or "revenue" in data["text"]
+    assert data["words"] > 0
+    assert "saved_image_path" in data
+    assert os.path.exists(data["saved_image_path"])
+
+

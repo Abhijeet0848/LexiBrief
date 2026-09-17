@@ -480,26 +480,52 @@ class OCRRequest(BaseModel):
 @app.post("/api/ocr", tags=["Text Extraction & MongoDB"])
 @app.post("/api/ocr-image", tags=["Text Extraction & MongoDB"], include_in_schema=False)
 async def ocr_image_endpoint(
-    file: Optional[UploadFile] = File(None),
-    body: Optional[OCRRequest] = None
+    request: Request,
+    file: Optional[UploadFile] = File(None)
 ):
     """
     High-speed, neural OCR text extraction endpoint.
-    Accepts image file upload or base64 data URI and returns accurate extracted text with preserved bullet layout.
+    Accepts image file upload (multipart) or JSON base64 data URI (pasted screenshot/camera capture)
+    and returns accurate extracted text with preserved bullet layout.
     Automatically saves the input image/photo into the dedicated 'artifacts/captured_images' project folder.
     """
     try:
         content_bytes = None
         orig_filename = None
-        if file is not None:
+        content_type = request.headers.get("content-type", "")
+
+        # 1. Parse JSON payload (e.g. pasted screenshot or base64 image data URI)
+        if "application/json" in content_type:
+            try:
+                body_json = await request.json()
+                if isinstance(body_json, dict) and body_json.get("image"):
+                    raw_str = str(body_json["image"]).strip()
+                    if "," in raw_str:
+                        raw_str = raw_str.split(",", 1)[1]
+                    content_bytes = base64.b64decode(raw_str)
+                    orig_filename = body_json.get("filename", "screenshot_capture.png")
+            except Exception as parse_err:
+                logger.warning(f"Error parsing JSON OCR payload: {parse_err}")
+
+        # 2. Parse Multipart File upload
+        if not content_bytes and file is not None:
             orig_filename = file.filename
             content_bytes = await file.read(MAX_UPLOAD_SIZE + 1)
-        elif body is not None and body.image:
-            raw_str = body.image.strip()
-            if "," in raw_str:
-                raw_str = raw_str.split(",", 1)[1]
-            content_bytes = base64.b64decode(raw_str)
-            orig_filename = "camera_capture.jpg"
+        elif not content_bytes and "multipart/form-data" in content_type:
+            try:
+                form = await request.form()
+                form_file = form.get("file")
+                if form_file and hasattr(form_file, "read"):
+                    orig_filename = getattr(form_file, "filename", "upload.jpg")
+                    content_bytes = await form_file.read(MAX_UPLOAD_SIZE + 1)
+                elif "image" in form:
+                    raw_str = str(form.get("image")).strip()
+                    if "," in raw_str:
+                        raw_str = raw_str.split(",", 1)[1]
+                    content_bytes = base64.b64decode(raw_str)
+                    orig_filename = form.get("filename", "camera_capture.jpg")
+            except Exception as form_err:
+                logger.warning(f"Error parsing multipart form for OCR: {form_err}")
         
         if not content_bytes:
             raise HTTPException(status_code=400, detail="No image data provided for OCR.")

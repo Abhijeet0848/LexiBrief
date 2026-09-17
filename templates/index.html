@@ -1010,7 +1010,7 @@
     };
 
     // High-Precision Real-Time Camera Scanner & OCR Modal
-    function CameraCaptureModal({ isOpen, onClose, onCapturedFile, showToast, capturedImagesList = [], onRefreshImages }) {
+    function CameraCaptureModal({ isOpen, onClose, onCapturedFile, showToast, capturedImagesList = [], onRefreshImages, initialImage = null }) {
       if (!isOpen) return null;
 
       const videoRef = React.useRef(null);
@@ -1025,13 +1025,13 @@
       const [zoomLevel, setZoomLevel] = React.useState(1.0);
       const [zoomCapabilities, setZoomCapabilities] = React.useState(null);
       const [ocrLang, setOcrLang] = React.useState('auto');
-      const [capturedImage, setCapturedImage] = React.useState(null);
-      const [enhancedPreview, setEnhancedPreview] = React.useState(null);
+      const [capturedImage, setCapturedImage] = React.useState(initialImage || null);
+      const [enhancedPreview, setEnhancedPreview] = React.useState(initialImage || null);
       const [filterMode, setFilterMode] = React.useState('original');
       const [cropBox, setCropBox] = React.useState({ x: 0, y: 0, width: 100, height: 100 });
       const [isCropActive, setIsCropActive] = React.useState(false);
       const [cameraError, setCameraError] = React.useState(null);
-      const [isInitializing, setIsInitializing] = React.useState(true);
+      const [isInitializing, setIsInitializing] = React.useState(!initialImage);
       const [isOcrProcessing, setIsOcrProcessing] = React.useState(false);
       const [ocrProgress, setOcrProgress] = React.useState({ status: '', percent: 0 });
       const [extractedTextPreview, setExtractedTextPreview] = React.useState(null);
@@ -1189,7 +1189,12 @@
       };
 
       React.useEffect(() => {
-        if (!capturedImage) {
+        if (initialImage) {
+          setCapturedImage(initialImage);
+          setEnhancedPreview(initialImage);
+          setIsInitializing(false);
+          setCameraError(null);
+        } else if (!capturedImage) {
           startCamera(facingMode, selectedDeviceId);
         }
         return () => {
@@ -1197,7 +1202,7 @@
             stream.getTracks().forEach(track => track.stop());
           }
         };
-      }, [facingMode, selectedDeviceId]);
+      }, [facingMode, selectedDeviceId, initialImage]);
 
       // Apply zoom level (hardware or fallback)
       const handleZoomChange = async (targetZoom) => {
@@ -2123,6 +2128,13 @@
       const audioRef = useRef(null);
       const textareaRef = useRef(null);
 
+      // Attached / Pasted Screenshot State
+      const [attachedImage, setAttachedImage] = useState(null);
+      const [isPastingImage, setIsPastingImage] = useState(false);
+      const [pastedImageProgress, setPastedImageProgress] = useState({ percent: 0, status: '' });
+      const [isTextareaDraggingOver, setIsTextareaDraggingOver] = useState(false);
+      const [initialStudioImage, setInitialStudioImage] = useState(null);
+
       // Auto-resize input textarea dynamically as content grows
       useEffect(() => {
         if (textareaRef.current) {
@@ -2736,6 +2748,157 @@
         const file = e.dataTransfer?.files?.[0];
         if (!file) return;
         await uploadFileObject(file);
+      };
+
+      // Pasted Screenshot & Dropped Image Processing Handler
+      const handleProcessPastedImage = async (fileOrDataUrl, nameHint = 'screenshot.png') => {
+        setIsPastingImage(true);
+        setPastedImageProgress({ percent: 15, status: 'Ingesting pasted screenshot...' });
+        
+        try {
+          let dataUrl = '';
+          let sizeFormatted = '0 KB';
+          let filename = nameHint;
+
+          if (typeof fileOrDataUrl === 'string') {
+            dataUrl = fileOrDataUrl;
+            const approxBytes = Math.round((dataUrl.length * 3) / 4);
+            sizeFormatted = approxBytes >= 1024 * 1024 ? `${(approxBytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.round(approxBytes / 1024)} KB`;
+          } else if (fileOrDataUrl instanceof Blob || fileOrDataUrl instanceof File) {
+            filename = fileOrDataUrl.name || nameHint;
+            const bytes = fileOrDataUrl.size;
+            sizeFormatted = bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+            dataUrl = await new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result);
+              reader.onerror = reject;
+              reader.readAsDataURL(fileOrDataUrl);
+            });
+          }
+
+          if (!dataUrl) throw new Error("Could not read screenshot data.");
+
+          setPastedImageProgress({ percent: 35, status: 'Enhancing image clarity for Neural OCR...' });
+          
+          let enhancedDataUrl = dataUrl;
+          try {
+            enhancedDataUrl = await preprocessImageForOCR(dataUrl, 'document');
+          } catch (e) {}
+
+          setPastedImageProgress({ percent: 55, status: 'Extracting text layout with Deep Vision OCR...' });
+
+          const extractedText = await executeHandwritingOCR(enhancedDataUrl, (pct, statusText) => {
+            setPastedImageProgress({
+              percent: pct !== null ? Math.max(35, Math.min(95, pct)) : 65,
+              status: statusText || 'Extracting text layout...'
+            });
+          }, 'auto');
+
+          const cleanText = (extractedText || '').trim();
+          const wordCount = cleanText ? cleanText.split(/\s+/).filter(Boolean).length : 0;
+
+          setAttachedImage({
+            dataUrl,
+            enhancedDataUrl,
+            filename,
+            sizeFormatted,
+            words: wordCount,
+            extractedText: cleanText,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          });
+
+          if (cleanText) {
+            setInputText(prev => {
+              const prevTrimmed = prev.trim();
+              return prevTrimmed ? `${prevTrimmed}\n\n${cleanText}` : cleanText;
+            });
+            showToast(`📸 Extracted ${wordCount.toLocaleString()} words from pasted screenshot!`, "success");
+          } else {
+            showToast("📸 Screenshot attached, but no text was recognized in the image.", "info");
+          }
+
+          fetchCapturedImages();
+        } catch (err) {
+          console.error("Paste image processing error:", err);
+          showToast(err.message || "Failed to extract text from pasted image.", "error");
+        } finally {
+          setIsPastingImage(false);
+          setPastedImageProgress({ percent: 0, status: '' });
+        }
+      };
+
+      const handleTextareaPaste = async (e) => {
+        const clipboardItems = e.clipboardData?.items;
+        if (!clipboardItems) return;
+
+        let imageItem = null;
+        for (let i = 0; i < clipboardItems.length; i++) {
+          const item = clipboardItems[i];
+          if (item.type && item.type.startsWith('image/')) {
+            imageItem = item;
+            break;
+          }
+        }
+
+        if (imageItem) {
+          e.preventDefault();
+          const file = imageItem.getAsFile();
+          if (file) {
+            const timeStr = new Date().toISOString().slice(11, 19).replace(/:/g, '');
+            const ext = file.type.includes('png') ? 'png' : file.type.includes('jpeg') ? 'jpg' : 'png';
+            handleProcessPastedImage(file, `screenshot_${timeStr}.${ext}`);
+          }
+        }
+      };
+
+      const handleTextareaDragOver = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.dataTransfer?.types?.includes('Files')) {
+          setIsTextareaDraggingOver(true);
+        }
+      };
+
+      const handleTextareaDragLeave = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsTextareaDraggingOver(false);
+      };
+
+      const handleTextareaDrop = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsTextareaDraggingOver(false);
+        const files = e.dataTransfer?.files;
+        if (files && files.length > 0) {
+          const file = files[0];
+          if (file.type.startsWith('image/')) {
+            handleProcessPastedImage(file, file.name || 'dropped_screenshot.png');
+          }
+        }
+      };
+
+      const handlePasteScreenshotClick = async () => {
+        if (navigator.clipboard && navigator.clipboard.read) {
+          try {
+            const items = await navigator.clipboard.read();
+            for (const item of items) {
+              const imageType = item.types.find(t => t.startsWith('image/'));
+              if (imageType) {
+                const blob = await item.getType(imageType);
+                const ext = imageType.includes('png') ? 'png' : 'jpg';
+                const timeStr = new Date().toISOString().slice(11, 19).replace(/:/g, '');
+                handleProcessPastedImage(blob, `screenshot_${timeStr}.${ext}`);
+                return;
+              }
+            }
+            showToast("No screenshot found in clipboard. Copy or capture an image (Win+Shift+S or PrtSc) first!", "info");
+          } catch (e) {
+            showToast("Click inside the text box and press Ctrl+V to paste your screenshot directly!", "info");
+          }
+        } else {
+          showToast("Click inside the text box and press Ctrl+V to paste your screenshot directly!", "info");
+        }
       };
 
       // Ingested Documents Statistics
@@ -3850,6 +4013,132 @@
                         </div>
                       )}
 
+                      {/* Real-Time Screenshot OCR Ingestion Progress */}
+                      {isPastingImage && (
+                        <div className="mb-3.5 p-3.5 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white border border-indigo-500/40 shadow-lg shadow-indigo-950/20 animate-fadeIn flex items-center justify-between gap-3 relative overflow-hidden">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-8 h-8 rounded-xl bg-indigo-500/20 border border-indigo-400/40 text-indigo-300 flex items-center justify-center font-bold text-xs flex-shrink-0 animate-pulse">
+                              <span className="w-4 h-4 border-2 border-indigo-300/30 border-t-indigo-400 rounded-full animate-spin"></span>
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="text-xs font-extrabold text-white tracking-wide flex items-center gap-1.5">
+                                  <span>📸</span> Pasted Screenshot Detected
+                                </p>
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/30 text-indigo-200 border border-indigo-400/30 font-mono">
+                                  RapidOCR ONNX
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-300 mt-0.5 font-medium flex items-center gap-2">
+                                <span>{pastedImageProgress.status || 'Extracting text layout & characters...'}</span>
+                                <span className="font-mono text-indigo-300 font-bold">{pastedImageProgress.percent}%</span>
+                              </p>
+                            </div>
+                          </div>
+                          {/* Animated scanning bar */}
+                          <div 
+                            className="absolute bottom-0 left-0 h-[2.5px] bg-gradient-to-r from-indigo-500 via-sky-400 to-emerald-400 transition-all duration-300 rounded-full" 
+                            style={{ width: `${Math.max(12, pastedImageProgress.percent)}%` }}
+                          />
+                        </div>
+                      )}
+
+                      {/* Attached Pasted Screenshot Dock */}
+                      {attachedImage && !isPastingImage && (
+                        <div className="mb-3.5 p-3 px-3.5 rounded-2xl bg-white border border-indigo-200/90 shadow-sm shadow-indigo-500/5 animate-fadeIn flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative">
+                          <div className="flex items-center gap-3 min-w-0">
+                            {/* Interactive Thumbnail */}
+                            <div 
+                              onClick={() => setPreviewImageModal({ 
+                                filename: attachedImage.filename, 
+                                path: attachedImage.dataUrl, 
+                                url: attachedImage.dataUrl, 
+                                size_formatted: attachedImage.sizeFormatted, 
+                                created_at: attachedImage.timestamp 
+                              })}
+                              className="relative group/thumb w-12 h-12 sm:w-13 sm:h-13 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 flex-shrink-0 cursor-pointer shadow-2xs hover:ring-2 hover:ring-indigo-500 transition"
+                              title="Click to view full screenshot lightbox"
+                            >
+                              <img src={attachedImage.dataUrl} alt="Pasted Screenshot" className="w-full h-full object-cover group-hover/thumb:scale-110 transition duration-200" />
+                              <div className="absolute inset-0 bg-slate-900/50 opacity-0 group-hover/thumb:opacity-100 flex items-center justify-center text-white text-[10px] font-bold transition">
+                                🔍 Zoom
+                              </div>
+                            </div>
+
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-extrabold text-slate-900 truncate max-w-[180px] sm:max-w-xs" title={attachedImage.filename}>
+                                  📸 {attachedImage.filename}
+                                </span>
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 border border-indigo-100 text-indigo-700 font-mono">
+                                  {attachedImage.sizeFormatted}
+                                </span>
+                                {attachedImage.words > 0 && (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 border border-emerald-200 text-emerald-700">
+                                    ✓ {attachedImage.words} words
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5">
+                                <span className="text-emerald-600 font-semibold">Extracted to editor</span>
+                                <span>•</span>
+                                <span className="text-slate-400 font-mono">{attachedImage.timestamp}</span>
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Quick Action Buttons for Attached Image */}
+                          <div className="flex items-center gap-1.5 self-end sm:self-center flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setInitialStudioImage(attachedImage.dataUrl);
+                                setShowCameraModal(true);
+                              }}
+                              className="px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs border border-indigo-200/80 transition flex items-center gap-1 cursor-pointer select-none"
+                              title="Open in OCR Studio to crop or apply contrast filters"
+                            >
+                              <span>✂️ Crop / Studio</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleProcessPastedImage(attachedImage.dataUrl, attachedImage.filename)}
+                              className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs border border-slate-200 transition flex items-center gap-1 cursor-pointer select-none"
+                              title="Re-run neural OCR extraction"
+                            >
+                              <span>🔄 Re-OCR</span>
+                            </button>
+
+                            {attachedImage.extractedText && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setInputText(prev => {
+                                    const prevTrimmed = prev.trim();
+                                    return prevTrimmed ? `${prevTrimmed}\n\n${attachedImage.extractedText}` : attachedImage.extractedText;
+                                  });
+                                  showToast("Appended screenshot text to editor!", "success");
+                                }}
+                                className="px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs border border-emerald-200 transition flex items-center gap-1 cursor-pointer select-none"
+                                title="Append screenshot text to current text"
+                              >
+                                <span>➕ Re-Insert</span>
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => setAttachedImage(null)}
+                              className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-rose-50 text-slate-400 hover:text-rose-600 text-xs flex items-center justify-center transition cursor-pointer border border-transparent hover:border-rose-200"
+                              title="Remove screenshot"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Source Text View Switcher Header (when summary has attribution) */}
                       {summaryResult?.attribution?.source_sentences?.length > 0 && (
                         <div className="flex items-center justify-between mb-2 px-1 text-xs">
@@ -3899,18 +4188,50 @@
                           })}
                         </div>
                       ) : (
-                        <textarea
-                          ref={textareaRef}
-                          value={inputText}
-                          onChange={(e) => {
-                            setInputText(e.target.value);
-                            e.target.style.height = 'auto';
-                            e.target.style.height = `${Math.max(380, e.target.scrollHeight)}px`;
-                          }}
-                          placeholder="Paste or type text to summarize here, or use the URL / File upload tabs above..."
-                          className="w-full min-h-[380px] h-auto p-4 sm:p-5 rounded-2xl recessed-workspace text-slate-800 text-sm leading-relaxed placeholder-slate-400 focus:outline-none resize-y transition-all duration-200 font-sans"
-                          rows={12}
-                        />
+                        <div className="relative group/box">
+                          <textarea
+                            ref={textareaRef}
+                            value={inputText}
+                            onChange={(e) => {
+                              setInputText(e.target.value);
+                              e.target.style.height = 'auto';
+                              e.target.style.height = `${Math.max(380, e.target.scrollHeight)}px`;
+                            }}
+                            onPaste={handleTextareaPaste}
+                            onDragOver={handleTextareaDragOver}
+                            onDragLeave={handleTextareaDragLeave}
+                            onDrop={handleTextareaDrop}
+                            placeholder="Type or paste text to summarize here, or paste a screenshot (Ctrl+V) / drop an image to extract text..."
+                            className={`w-full min-h-[380px] h-auto p-4 sm:p-5 rounded-2xl recessed-workspace text-slate-800 text-sm leading-relaxed placeholder-slate-400 focus:outline-none resize-y transition-all duration-200 font-sans ${
+                              isTextareaDraggingOver ? 'ring-4 ring-indigo-500/40 border-indigo-500 bg-indigo-50/50' : ''
+                            }`}
+                            rows={12}
+                          />
+
+                          {/* Drag-over overlay feedback */}
+                          {isTextareaDraggingOver && (
+                            <div className="absolute inset-0 z-20 rounded-2xl bg-indigo-900/80 backdrop-blur-xs flex flex-col items-center justify-center text-white border-2 border-dashed border-indigo-400 pointer-events-none animate-fadeIn">
+                              <div className="w-12 h-12 rounded-2xl bg-indigo-500/30 text-white flex items-center justify-center text-2xl mb-2 animate-bounce">
+                                📸
+                              </div>
+                              <p className="text-sm font-extrabold text-white">Drop Screenshot or Image Here</p>
+                              <p className="text-xs text-indigo-200 mt-0.5">RapidOCR will extract and format the text automatically</p>
+                            </div>
+                          )}
+
+                          {/* Paste Screenshot Shortcut Pill */}
+                          <div className="absolute bottom-3 right-3 flex items-center gap-1.5 opacity-70 hover:opacity-100 transition z-10">
+                            <button
+                              type="button"
+                              onClick={handlePasteScreenshotClick}
+                              className="px-2.5 py-1 rounded-lg bg-white/90 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 text-[11px] font-bold border border-slate-200/80 hover:border-indigo-300 transition flex items-center gap-1.5 shadow-xs cursor-pointer select-none"
+                              title="Paste screenshot directly from clipboard (or press Ctrl+V inside the text box)"
+                            >
+                              <span>📸 Paste Screenshot</span>
+                              <span className="text-[9px] bg-slate-100 px-1 py-0.2 rounded font-mono font-bold text-slate-600 border border-slate-200">Ctrl+V</span>
+                            </button>
+                          </div>
+                        </div>
                       )}
                     </div>
 
@@ -5557,11 +5878,15 @@
           {/* Live Camera Capture & OCR Scanner Modal */}
           <CameraCaptureModal
             isOpen={showCameraModal}
-            onClose={() => setShowCameraModal(false)}
+            onClose={() => {
+              setShowCameraModal(false);
+              setInitialStudioImage(null);
+            }}
             onCapturedFile={handleCameraCapturedFile}
             showToast={showToast}
             capturedImagesList={capturedImagesList}
             onRefreshImages={fetchCapturedImages}
+            initialImage={initialStudioImage}
           />
 
           {/* High-Resolution Captured Image Lightbox Modal */}
