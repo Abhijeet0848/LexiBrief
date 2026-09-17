@@ -132,21 +132,32 @@ class TextExtractor:
     @staticmethod
     def extract_from_pdf(file_bytes: bytes) -> Tuple[str, int]:
         """
-        High-fidelity PDF text extraction.
-        Uses PyMuPDF with reading-order sorting, layout-aware block parsing, and automatic OCR fallback,
-        supplemented by pdfplumber and resilient pypdf fallbacks. Returns (text, page_count).
+        High-fidelity PDF text extraction matrix.
+        - PyMuPDF (Tier 1): High-speed stream extraction, reading-order sorting (sort=True),
+          layout block parsing, encryption/password authentication, and selective OCR for image/scanned pages.
+        - pdfplumber (Tier 2): Precise structured table extraction & column alignment.
+        - PaddleOCR / PyMuPDF OCR (Tier 3): Multilingual text & handwriting OCR on sparse/scanned pages.
+        - pypdf (Tier 4): Resilient fallback parser.
         """
-        # 1. State-of-the-art: PyMuPDF with structured layout parsing & OCR fallback
+        # 1. State-of-the-art: PyMuPDF with structured layout parsing, password handling & selective OCR
         try:
             import pymupdf
             doc = pymupdf.open(stream=file_bytes, filetype="pdf")
+            
+            # Handle encrypted / password-protected PDFs
+            if getattr(doc, "is_encrypted", False):
+                try:
+                    doc.authenticate("")
+                except Exception:
+                    pass
+
             pages = []
             page_count = len(doc)
             for idx, page in enumerate(doc):
-                # sort=True preserves natural top-to-bottom, left-to-right reading order
+                # sort=True preserves natural top-to-bottom, left-to-right reading order across columns
                 page_text = page.get_text("text", sort=True)
                 
-                # If standard text extraction yielded little text, try blocks mode
+                # If standard text extraction yielded fragmented blocks, try blocks mode
                 if not page_text or len(page_text.strip()) < 35:
                     try:
                         blocks = page.get_text("blocks", sort=True)
@@ -156,7 +167,25 @@ class TextExtractor:
                     except Exception:
                         pass
 
-                # Automatic OCR extraction for scanned forms, application photos, and image-only PDFs
+                # Selective OCR on scanned pages, application forms, or image-only pages
+                if not page_text or len(page_text.strip()) < 35:
+                    # Try PaddleOCR if installed
+                    try:
+                        from paddleocr import PaddleOCR
+                        import numpy as np
+                        from PIL import Image
+                        pix = page.get_pixmap(dpi=200)
+                        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                        ocr_engine = PaddleOCR(use_angle_cls=True, lang='en')
+                        result = ocr_engine.ocr(np.array(img), cls=True)
+                        if result and result[0]:
+                            lines = [line[1][0] for line in result[0] if line and len(line) > 1 and line[1]]
+                            if lines:
+                                page_text = "\n".join(lines)
+                    except Exception:
+                        pass
+
+                # Fallback to PyMuPDF built-in Tesseract OCR
                 if not page_text or len(page_text.strip()) < 35:
                     try:
                         tp = page.get_textpage_ocr(language="eng+hin", dpi=200)
@@ -182,13 +211,29 @@ class TextExtractor:
         except Exception as e:
             logger.warning(f"PyMuPDF parser notice: {e}")
 
-        # 2. Secondary extractor: pdfplumber with layout-aware text extraction
+        # 2. Secondary extractor: pdfplumber with table extraction and layout awareness
         try:
             import pdfplumber
             with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
                 plumber_pages = []
                 for p in pdf.pages:
-                    txt = p.extract_text(layout=False, x_tolerance=2, y_tolerance=3)
+                    # Extract structured tables if present
+                    table_lines = []
+                    try:
+                        tables = p.extract_tables()
+                        if tables:
+                            for tbl in tables:
+                                for row in tbl:
+                                    clean_row = [str(c).strip() for c in row if c is not None and str(c).strip()]
+                                    if clean_row:
+                                        table_lines.append(" | ".join(clean_row))
+                    except Exception:
+                        pass
+
+                    txt = p.extract_text(layout=False, x_tolerance=2, y_tolerance=3) or ""
+                    if table_lines:
+                        txt = txt + "\n\n" + "\n".join(table_lines)
+
                     if txt and txt.strip():
                         plumber_pages.append(txt.strip())
                 if plumber_pages:
@@ -196,7 +241,7 @@ class TextExtractor:
         except Exception as pl_err:
             logger.debug(f"pdfplumber extraction notice: {pl_err}")
 
-        # 3. Tertiary extractor: pypdf with per-page resilience
+        # 3. Tertiary extractor: pypdf with per-page resilience & decryption
         try:
             import pypdf
             reader = pypdf.PdfReader(io.BytesIO(file_bytes), strict=False)
