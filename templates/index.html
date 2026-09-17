@@ -1851,7 +1851,33 @@
               if (uploadCancelledRef.current) return;
               const page = await pdfDoc.getPage(pageNum);
               const textContent = await page.getTextContent();
-              const textItems = (textContent.items || []).map(it => it.str).join(' ').trim();
+              
+              // Reconstruct multi-line layout and bullet structure using Y-coordinates and hasEOL
+              let lastY = null;
+              let pageLines = [];
+              let currentLine = "";
+
+              for (const it of (textContent.items || [])) {
+                const str = it.str || "";
+                const y = it.transform ? it.transform[5] : null;
+                
+                if (lastY !== null && y !== null && Math.abs(y - lastY) > 5) {
+                  if (currentLine.trim()) pageLines.push(currentLine.trim());
+                  currentLine = str;
+                } else {
+                  currentLine = currentLine ? `${currentLine} ${str}` : str;
+                }
+                
+                if (it.hasEOL) {
+                  if (currentLine.trim()) pageLines.push(currentLine.trim());
+                  currentLine = "";
+                  lastY = null;
+                  continue;
+                }
+                lastY = y;
+              }
+              if (currentLine.trim()) pageLines.push(currentLine.trim());
+              const textItems = pageLines.join('\n').trim();
               const hasText = textItems.length >= 35;
               if (!hasText) neededOcrCount++;
               pageInfoList.push({ pageNum, page, textItems, hasText });

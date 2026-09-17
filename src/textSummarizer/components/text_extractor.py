@@ -71,7 +71,7 @@ class TextExtractor:
 
     @staticmethod
     def clean_text(text: str) -> str:
-        """Cleans and normalizes extracted text with compiled regex patterns and auto-strips timestamps and OCR noise."""
+        """Cleans, normalizes, and properly formats extracted text ensuring every bullet point is on a separate new line."""
         if not text:
             return ""
         # Strip repetitive OCR artifact characters
@@ -83,9 +83,21 @@ class TextExtractor:
         text = re.sub(r'^\s*\[?\d{1,2}:\d{2}(?::\d{2})?\]?\s*$', '', text, flags=re.MULTILINE)
         # Strip inline timestamp prefixes (e.g. "0:15 - Hello" or "[0:15] Hello")
         text = re.sub(r'\[?\d{1,2}:\d{2}(?::\d{2})?\]?\s*[-–—:]?\s*', '', text)
-        text = _RE_MULTILINES.sub('\n\n', text)
+        
         # Remove non-printable control characters while preserving valid punctuation & whitespace
-        return "".join(ch for ch in text if ch.isprintable() or ch in '\n\t').strip()
+        text = "".join(ch for ch in text if ch.isprintable() or ch in '\n\t').strip()
+
+        # Fix OCR / PDF mid-sentence split artifacts across bullet symbols (e.g., "QR • code" -> "QR code")
+        text = re.sub(r'(\b[A-Za-z0-9]+)\s*[•\u2022\u25cf\u25aa\u25b8\u2219\u2023\u2043\u204c\u204d\u2218\u25cb\u25e6\u25ab]\s*([a-z]{2,}\b)', r'\1 \2', text)
+
+        # Standardize all bullet points so each bullet point starts on its own new line
+        bullet_chars = r'[•\u2022\u25cf\u25aa\u25b8\u2219\u2023\u2043\u204c\u204d\u2218\u25cb\u25e6\u25ab]'
+        text = re.sub(rf'(?<!\n)[ \t]*({bullet_chars})[ \t]*', r'\n• ', text)
+        text = re.sub(rf'^[ \t]*({bullet_chars})[ \t]*', r'• ', text, flags=re.MULTILINE)
+
+        # Clean multiple blank lines
+        text = _RE_MULTILINES.sub('\n\n', text)
+        return text.strip()
 
     @staticmethod
     def extract_from_docx(file_bytes: bytes) -> str:
@@ -121,8 +133,8 @@ class TextExtractor:
     def extract_from_pdf(file_bytes: bytes) -> Tuple[str, int]:
         """
         High-fidelity PDF text extraction.
-        Uses PyMuPDF (fitz) with automatic OCR fallback for scanned forms and image PDFs,
-        with resilient pypdf and raw text stream fallbacks. Returns (text, page_count).
+        Uses PyMuPDF with reading-order sorting, layout-aware block parsing, and automatic OCR fallback,
+        supplemented by pdfplumber and resilient pypdf fallbacks. Returns (text, page_count).
         """
         # 1. State-of-the-art: PyMuPDF with structured layout parsing & OCR fallback
         try:
@@ -131,18 +143,37 @@ class TextExtractor:
             pages = []
             page_count = len(doc)
             for idx, page in enumerate(doc):
-                page_text = page.get_text("text")
-                if page_text and page_text.strip():
-                    pages.append(page_text.strip())
-                else:
-                    # Automatic OCR extraction for scanned forms, application photos, and image-only PDFs
+                # sort=True preserves natural top-to-bottom, left-to-right reading order
+                page_text = page.get_text("text", sort=True)
+                
+                # If standard text extraction yielded little text, try blocks mode
+                if not page_text or len(page_text.strip()) < 35:
                     try:
-                        tp = page.get_textpage_ocr(language="eng", dpi=150)
-                        ocr_text = page.get_text(textpage=tp)
-                        if ocr_text and ocr_text.strip():
-                            pages.append(ocr_text.strip())
+                        blocks = page.get_text("blocks", sort=True)
+                        b_texts = [b[4].strip() for b in blocks if len(b) > 4 and b[4].strip()]
+                        if b_texts and len("\n\n".join(b_texts)) > len(page_text or ""):
+                            page_text = "\n\n".join(b_texts)
                     except Exception:
                         pass
+
+                # Automatic OCR extraction for scanned forms, application photos, and image-only PDFs
+                if not page_text or len(page_text.strip()) < 35:
+                    try:
+                        tp = page.get_textpage_ocr(language="eng+hin", dpi=200)
+                        ocr_text = page.get_text(textpage=tp)
+                        if ocr_text and ocr_text.strip():
+                            page_text = ocr_text.strip()
+                    except Exception:
+                        try:
+                            tp = page.get_textpage_ocr(language="eng", dpi=200)
+                            ocr_text = page.get_text(textpage=tp)
+                            if ocr_text and ocr_text.strip():
+                                page_text = ocr_text.strip()
+                        except Exception:
+                            pass
+
+                if page_text and page_text.strip():
+                    pages.append(page_text.strip())
             doc.close()
             if pages:
                 return "\n\n".join(pages), max(1, page_count)
@@ -151,7 +182,21 @@ class TextExtractor:
         except Exception as e:
             logger.warning(f"PyMuPDF parser notice: {e}")
 
-        # 2. Secondary extractor: pypdf with per-page resilience
+        # 2. Secondary extractor: pdfplumber with layout-aware text extraction
+        try:
+            import pdfplumber
+            with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+                plumber_pages = []
+                for p in pdf.pages:
+                    txt = p.extract_text(layout=False, x_tolerance=2, y_tolerance=3)
+                    if txt and txt.strip():
+                        plumber_pages.append(txt.strip())
+                if plumber_pages:
+                    return "\n\n".join(plumber_pages), len(pdf.pages)
+        except Exception as pl_err:
+            logger.debug(f"pdfplumber extraction notice: {pl_err}")
+
+        # 3. Tertiary extractor: pypdf with per-page resilience
         try:
             import pypdf
             reader = pypdf.PdfReader(io.BytesIO(file_bytes), strict=False)
