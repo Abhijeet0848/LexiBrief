@@ -117,7 +117,11 @@ class NLPProcessor:
         if arabic_count > 10:
             return "ur", "Urdu"
 
-        # 2. General statistical detection with langdetect
+        # 2. Pure ASCII check for short text / titles / signatures to prevent langdetect hallucinations
+        if clean.isascii() and (len(clean.split()) < 6 or re.search(r'\b(?:the|is|and|of|in|to|with|for|a|an|sign|signature)\b', clean.lower())):
+            return "en", "English"
+
+        # 3. General statistical detection with langdetect for multi-sentence passages
         try:
             from langdetect import detect
             code = detect(clean)
