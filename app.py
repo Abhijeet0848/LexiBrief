@@ -136,14 +136,32 @@ class VercelPathFixMiddleware:
 
 app.add_middleware(VercelPathFixMiddleware)
 
+import tempfile
+
 ARTIFACTS_DIR = os.path.join(BASE_DIR, "artifacts")
-os.makedirs(os.path.join(ARTIFACTS_DIR, "captured_images"), exist_ok=True)
+CAPTURED_IMAGES_DIR = os.path.join(ARTIFACTS_DIR, "captured_images")
+
+# Safely initialize captured_images directory without crashing on read-only serverless environments (Vercel/Lambda)
+try:
+    os.makedirs(CAPTURED_IMAGES_DIR, exist_ok=True)
+except (OSError, PermissionError):
+    CAPTURED_IMAGES_DIR = os.path.join(tempfile.gettempdir(), "lexibrief_captured_images")
+    try:
+        os.makedirs(CAPTURED_IMAGES_DIR, exist_ok=True)
+    except Exception:
+        pass
 
 if os.path.exists(STATIC_DIR):
-    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    try:
+        app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    except Exception as e:
+        logger.warning(f"Could not mount /static directory: {e}")
 
 if os.path.exists(ARTIFACTS_DIR):
-    app.mount("/artifacts", StaticFiles(directory=ARTIFACTS_DIR), name="artifacts")
+    try:
+        app.mount("/artifacts", StaticFiles(directory=ARTIFACTS_DIR), name="artifacts")
+    except Exception as e:
+        logger.warning(f"Could not mount /artifacts directory: {e}")
 
 # Lazy-loaded prediction pipeline & database manager
 prediction_pipeline = None
@@ -315,6 +333,36 @@ async def serve_static_file(file_path: str):
     raise HTTPException(status_code=404, detail=f"Static file '{file_path}' not found")
 
 
+@app.get("/artifacts/{file_path:path}", include_in_schema=False)
+async def serve_artifact_file(file_path: str):
+    import mimetypes
+    clean_path = file_path.lstrip("/\\")
+    filename = os.path.basename(clean_path)
+    candidate_paths = [
+        os.path.join(ARTIFACTS_DIR, clean_path),
+        os.path.join(CAPTURED_IMAGES_DIR, filename),
+        os.path.join(BASE_DIR, "artifacts", clean_path),
+        os.path.join(tempfile.gettempdir(), "lexibrief_captured_images", filename),
+        f"/var/task/artifacts/{clean_path}",
+        f"artifacts/{clean_path}"
+    ]
+    for p in candidate_paths:
+        if os.path.exists(p) and os.path.isfile(p):
+            try:
+                mime_type, _ = mimetypes.guess_type(p)
+                if not mime_type:
+                    mime_type = "image/jpeg" if p.lower().endswith((".jpg", ".jpeg")) else "application/octet-stream"
+                with open(p, "rb") as f:
+                    return Response(
+                        content=f.read(),
+                        media_type=mime_type,
+                        headers={"Cache-Control": "public, max-age=86400"}
+                    )
+            except Exception:
+                pass
+    raise HTTPException(status_code=404, detail=f"Artifact file '{file_path}' not found")
+
+
 @app.get("/api/health", tags=["System"])
 async def health_check():
     db_status = db_manager.get_database_status()
@@ -325,11 +373,6 @@ async def health_check():
         "python_version": sys.version.split()[0],
         "database": db_status
     }
-
-
-
-
-CAPTURED_IMAGES_DIR = os.path.join(BASE_DIR, "artifacts", "captured_images")
 
 
 def save_captured_image(content_bytes: bytes, filename: Optional[str] = None) -> Optional[str]:
@@ -480,44 +523,60 @@ async def save_captured_image_endpoint(body: SaveImageRequest):
 
 @app.get("/api/captured-images", tags=["Text Extraction & MongoDB"])
 async def list_captured_images():
-    """Lists all user-uploaded and captured camera photos stored in artifacts/captured_images."""
-    target_dir = CAPTURED_IMAGES_DIR
-    if not os.path.exists(target_dir):
-        return {"images": [], "count": 0, "directory": "artifacts/captured_images"}
-    
+    """Lists all user-uploaded and captured camera photos stored in artifacts/captured_images or serverless temp storage."""
+    search_dirs = [
+        CAPTURED_IMAGES_DIR,
+        os.path.join(tempfile.gettempdir(), "lexibrief_captured_images")
+    ]
+    seen_filenames = set()
     files = []
-    try:
-        for f in os.listdir(target_dir):
-            if f.lower().endswith(('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff', '.gif')):
-                fp = os.path.join(target_dir, f)
-                stat = os.stat(fp)
-                rel_path = os.path.relpath(fp, BASE_DIR).replace("\\", "/")
-                size_formatted = f"{max(1, round(stat.st_size / 1024))} KB" if stat.st_size < 1024*1024 else f"{(stat.st_size / (1024*1024)):.2f} MB"
-                files.append({
-                    "filename": f,
-                    "path": rel_path,
-                    "url": f"/{rel_path}",
-                    "size_bytes": stat.st_size,
-                    "size_formatted": size_formatted,
-                    "created_at": datetime.fromtimestamp(stat.st_mtime, timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-                })
-        files.sort(key=lambda x: x["created_at"], reverse=True)
-    except Exception as err:
-        logger.warning(f"Error listing captured images: {err}")
+    
+    for target_dir in search_dirs:
+        if not target_dir or not os.path.exists(target_dir):
+            continue
+        try:
+            for f in os.listdir(target_dir):
+                if f in seen_filenames:
+                    continue
+                if f.lower().endswith(('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff', '.gif')):
+                    seen_filenames.add(f)
+                    fp = os.path.join(target_dir, f)
+                    stat = os.stat(fp)
+                    rel_path = f"artifacts/captured_images/{f}"
+                    size_formatted = f"{max(1, round(stat.st_size / 1024))} KB" if stat.st_size < 1024*1024 else f"{(stat.st_size / (1024*1024)):.2f} MB"
+                    files.append({
+                        "filename": f,
+                        "path": rel_path,
+                        "url": f"/{rel_path}",
+                        "size_bytes": stat.st_size,
+                        "size_formatted": size_formatted,
+                        "created_at": datetime.fromtimestamp(stat.st_mtime, timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+                    })
+        except Exception as err:
+            logger.warning(f"Error scanning captured images in {target_dir}: {err}")
+            
+    files.sort(key=lambda x: x["created_at"], reverse=True)
     return {"images": files, "count": len(files), "directory": "artifacts/captured_images"}
 
 
 @app.delete("/api/captured-images/{filename}", tags=["Text Extraction & MongoDB"])
 async def delete_captured_image(filename: str):
-    """Deletes a captured image from artifacts/captured_images."""
+    """Deletes a captured image from artifacts/captured_images or serverless temp storage."""
     sanitized = os.path.basename(filename)
-    fp = os.path.join(CAPTURED_IMAGES_DIR, sanitized)
-    if os.path.exists(fp) and os.path.isfile(fp):
-        try:
-            os.remove(fp)
-            return {"success": True, "message": f"Deleted {sanitized}"}
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Could not delete file: {str(e)}")
+    search_paths = [
+        os.path.join(CAPTURED_IMAGES_DIR, sanitized),
+        os.path.join(tempfile.gettempdir(), "lexibrief_captured_images", sanitized)
+    ]
+    deleted = False
+    for fp in search_paths:
+        if os.path.exists(fp) and os.path.isfile(fp):
+            try:
+                os.remove(fp)
+                deleted = True
+            except Exception as e:
+                logger.warning(f"Could not delete {fp}: {e}")
+    if deleted:
+        return {"success": True, "message": f"Deleted {sanitized}"}
     raise HTTPException(status_code=404, detail="Captured image not found.")
 
 
