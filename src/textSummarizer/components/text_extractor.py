@@ -101,7 +101,28 @@ class TextExtractor:
 
     @staticmethod
     def extract_from_docx(file_bytes: bytes) -> str:
-        """Extracts text from DOCX files using standard library zipfile and XML parsing."""
+        """Extracts text from DOCX files using python-docx with table parsing and fallback to standard library zipfile and XML parsing."""
+        # 1. State-of-the-art: python-docx with full table & paragraph extraction
+        try:
+            import docx
+            doc = docx.Document(io.BytesIO(file_bytes))
+            docx_blocks = []
+            for p in doc.paragraphs:
+                if p.text and p.text.strip():
+                    docx_blocks.append(p.text.strip())
+            for tbl in doc.tables:
+                for row in tbl.rows:
+                    row_txt = [c.text.strip() for c in row.cells if c.text.strip()]
+                    if row_txt:
+                        docx_blocks.append(" | ".join(row_txt))
+            if docx_blocks:
+                return "\n\n".join(docx_blocks)
+        except ImportError:
+            pass
+        except Exception as e:
+            logger.debug(f"python-docx parsing notice: {e}")
+
+        # 2. Resilient OpenXML Zip Archive parser
         try:
             with zipfile.ZipFile(io.BytesIO(file_bytes)) as docx_zip:
                 # Security: Check uncompressed XML size to prevent Zip Bomb / memory exhaustion
@@ -169,7 +190,24 @@ class TextExtractor:
 
                 # Selective OCR on scanned pages, application forms, or image-only pages
                 if not page_text or len(page_text.strip()) < 35:
-                    # Try PaddleOCR if installed
+                    # Try RapidOCR (ONNXRuntime) if installed (fastest zero-dependency neural OCR)
+                    try:
+                        from rapidocr_onnxruntime import RapidOCR
+                        import numpy as np
+                        from PIL import Image
+                        pix = page.get_pixmap(dpi=200)
+                        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                        engine = RapidOCR()
+                        ocr_res, _ = engine(np.array(img))
+                        if ocr_res:
+                            lines = [item[1] for item in ocr_res if len(item) > 1 and item[1]]
+                            if lines:
+                                page_text = "\n".join(lines)
+                    except Exception:
+                        pass
+
+                # Try PaddleOCR if installed
+                if not page_text or len(page_text.strip()) < 35:
                     try:
                         from paddleocr import PaddleOCR
                         import numpy as np
@@ -365,8 +403,23 @@ class TextExtractor:
 
     @staticmethod
     def extract_from_image(file_bytes: bytes) -> Tuple[str, int]:
-        """Extracts text from images (PNG, JPG, JPEG, WEBP, BMP) using Pillow, PaddleOCR, PyMuPDF OCR, or pytesseract."""
-        # 1. State-of-the-art: PaddleOCR for deep angle classification & scene text recognition
+        """Extracts text from images (PNG, JPG, JPEG, WEBP, BMP) using Pillow, RapidOCR, PaddleOCR, PyMuPDF OCR, or pytesseract."""
+        # 1. State-of-the-art: RapidOCR (ONNXRuntime) for fast neural scene text OCR
+        try:
+            from rapidocr_onnxruntime import RapidOCR
+            from PIL import Image
+            import numpy as np
+            img = Image.open(io.BytesIO(file_bytes)).convert("RGB")
+            engine = RapidOCR()
+            ocr_res, _ = engine(np.array(img))
+            if ocr_res:
+                lines = [item[1] for item in ocr_res if len(item) > 1 and item[1]]
+                if lines:
+                    return "\n".join(lines), 1
+        except Exception:
+            pass
+
+        # 2. PaddleOCR for deep angle classification & scene text recognition
         try:
             from paddleocr import PaddleOCR
             from PIL import Image
