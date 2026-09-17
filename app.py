@@ -136,8 +136,14 @@ class VercelPathFixMiddleware:
 
 app.add_middleware(VercelPathFixMiddleware)
 
+ARTIFACTS_DIR = os.path.join(BASE_DIR, "artifacts")
+os.makedirs(os.path.join(ARTIFACTS_DIR, "captured_images"), exist_ok=True)
+
 if os.path.exists(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+if os.path.exists(ARTIFACTS_DIR):
+    app.mount("/artifacts", StaticFiles(directory=ARTIFACTS_DIR), name="artifacts")
 
 # Lazy-loaded prediction pipeline & database manager
 prediction_pipeline = None
@@ -437,6 +443,41 @@ async def ocr_image_endpoint(
         raise HTTPException(status_code=500, detail=f"OCR processing failed: {str(e)}")
 
 
+class SaveImageRequest(BaseModel):
+    image: str = Field(..., description="Base64-encoded image or Data URL")
+    filename: Optional[str] = Field("camera_capture.jpg", description="Optional original filename")
+
+
+@app.post("/api/save-captured-image", tags=["Text Extraction & MongoDB"])
+async def save_captured_image_endpoint(body: SaveImageRequest):
+    """Saves a snapped camera photo or uploaded image directly into artifacts/captured_images."""
+    try:
+        raw_str = body.image.strip()
+        if "," in raw_str:
+            raw_str = raw_str.split(",", 1)[1]
+        content_bytes = base64.b64decode(raw_str)
+        if len(content_bytes) > MAX_UPLOAD_SIZE:
+            raise HTTPException(status_code=413, detail="Image size exceeds 50MB limit.")
+        
+        saved_path = save_captured_image(content_bytes, filename=body.filename or "camera_capture.jpg")
+        if not saved_path:
+            raise HTTPException(status_code=500, detail="Failed to save image to disk.")
+        
+        filename = os.path.basename(saved_path)
+        return {
+            "success": True,
+            "filename": filename,
+            "saved_image_path": saved_path,
+            "url": f"/{saved_path}",
+            "size_bytes": len(content_bytes)
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"Error saving captured image: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to save image: {str(e)}")
+
+
 @app.get("/api/captured-images", tags=["Text Extraction & MongoDB"])
 async def list_captured_images():
     """Lists all user-uploaded and captured camera photos stored in artifacts/captured_images."""
@@ -450,16 +491,34 @@ async def list_captured_images():
             if f.lower().endswith(('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff', '.gif')):
                 fp = os.path.join(target_dir, f)
                 stat = os.stat(fp)
+                rel_path = os.path.relpath(fp, BASE_DIR).replace("\\", "/")
+                size_formatted = f"{max(1, round(stat.st_size / 1024))} KB" if stat.st_size < 1024*1024 else f"{(stat.st_size / (1024*1024)):.2f} MB"
                 files.append({
                     "filename": f,
-                    "path": os.path.relpath(fp, BASE_DIR).replace("\\", "/"),
+                    "path": rel_path,
+                    "url": f"/{rel_path}",
                     "size_bytes": stat.st_size,
+                    "size_formatted": size_formatted,
                     "created_at": datetime.fromtimestamp(stat.st_mtime, timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
                 })
         files.sort(key=lambda x: x["created_at"], reverse=True)
     except Exception as err:
         logger.warning(f"Error listing captured images: {err}")
     return {"images": files, "count": len(files), "directory": "artifacts/captured_images"}
+
+
+@app.delete("/api/captured-images/{filename}", tags=["Text Extraction & MongoDB"])
+async def delete_captured_image(filename: str):
+    """Deletes a captured image from artifacts/captured_images."""
+    sanitized = os.path.basename(filename)
+    fp = os.path.join(CAPTURED_IMAGES_DIR, sanitized)
+    if os.path.exists(fp) and os.path.isfile(fp):
+        try:
+            os.remove(fp)
+            return {"success": True, "message": f"Deleted {sanitized}"}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Could not delete file: {str(e)}")
+    raise HTTPException(status_code=404, detail="Captured image not found.")
 
 
 @app.post("/api/upload", tags=["Text Extraction & MongoDB"])

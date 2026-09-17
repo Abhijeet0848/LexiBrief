@@ -987,11 +987,7 @@
           const raw = ret?.data?.text || '';
           return cleanOCRText(raw);
         } catch (workerErr) {
-          console.warn("Worker OCR fallback to standard recognize:", workerErr);
-        }
-      }
-
-      // Fallback: standard recognize with selected language
+        // Fallback: standard recognize with selected language
       try {
         const ret = await window.Tesseract.recognize(imageSrc, langStr, {
           langPath: 'https://tessdata.projectnaptha.com/4.0.0',
@@ -1010,7 +1006,7 @@
     };
 
     // High-Precision Real-Time Camera Scanner & OCR Modal
-    function CameraCaptureModal({ isOpen, onClose, onCapturedFile, showToast }) {
+    function CameraCaptureModal({ isOpen, onClose, onCapturedFile, showToast, capturedImagesList = [], onRefreshImages }) {
       if (!isOpen) return null;
 
       const videoRef = React.useRef(null);
@@ -1018,13 +1014,18 @@
       const fileInputRef = React.useRef(null);
       const cameraInputRef = React.useRef(null);
       const [stream, setStream] = React.useState(null);
+      const [activeTrack, setActiveTrack] = React.useState(null);
       const [facingMode, setFacingMode] = React.useState('environment');
+      const [videoDevices, setVideoDevices] = React.useState([]);
+      const [selectedDeviceId, setSelectedDeviceId] = React.useState(null);
+      const [zoomLevel, setZoomLevel] = React.useState(1.0);
+      const [zoomCapabilities, setZoomCapabilities] = React.useState(null);
       const [ocrLang, setOcrLang] = React.useState('auto');
       const [capturedImage, setCapturedImage] = React.useState(null);
       const [enhancedPreview, setEnhancedPreview] = React.useState(null);
-      const [filterMode, setFilterMode] = React.useState('clarity');
+      const [filterMode, setFilterMode] = React.useState('original');
       const [cropBox, setCropBox] = React.useState({ x: 0, y: 0, width: 100, height: 100 });
-      const [isCropActive, setIsCropActive] = React.useState(true);
+      const [isCropActive, setIsCropActive] = React.useState(false);
       const [cameraError, setCameraError] = React.useState(null);
       const [isInitializing, setIsInitializing] = React.useState(true);
       const [isOcrProcessing, setIsOcrProcessing] = React.useState(false);
@@ -1032,13 +1033,62 @@
       const [extractedTextPreview, setExtractedTextPreview] = React.useState(null);
       const [copiedToast, setCopiedToast] = React.useState(false);
       const [isDraggingOver, setIsDraggingOver] = React.useState(false);
+      const [localSavedPath, setLocalSavedPath] = React.useState(null);
 
-      const startCamera = async (facing) => {
+      // Enumerate and label camera devices intelligently (categorizing 1x Main, 0.5x Ultra-wide, Telephoto, Front)
+      const enumerateCameras = async () => {
+        try {
+          if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return [];
+          const allDevs = await navigator.mediaDevices.enumerateDevices();
+          const videoInputs = allDevs.filter(d => d.kind === 'videoinput');
+
+          const classified = videoInputs.map((dev, idx) => {
+            const label = dev.label || `Camera ${idx + 1}`;
+            const lower = label.toLowerCase();
+            let lensType = 'main';
+            let displayName = label;
+
+            if (lower.includes('front') || lower.includes('user') || lower.includes('selfie') || lower.includes('facetime')) {
+              lensType = 'front';
+              displayName = `🤳 Front Camera`;
+            } else if (lower.includes('ultra') || lower.includes('0.5') || lower.includes('wide-angle') || lower.includes('wide angle')) {
+              lensType = 'ultrawide';
+              displayName = `🌐 0.5x Ultra-Wide Lens`;
+            } else if (lower.includes('tele') || lower.includes('zoom') || lower.includes('2x') || lower.includes('3x') || lower.includes('5x')) {
+              lensType = 'telephoto';
+              displayName = `🔍 Telephoto Lens`;
+            } else if (lower.includes('back') || lower.includes('rear') || lower.includes('environment') || lower.includes('main') || lower.includes('camera2 0')) {
+              lensType = 'main';
+              displayName = `📷 1x Standard Main Lens`;
+            } else {
+              displayName = `📷 Camera ${idx + 1} (${label})`;
+            }
+
+            return {
+              deviceId: dev.deviceId,
+              label: dev.label || `Camera ${idx + 1}`,
+              displayName,
+              lensType,
+              isBack: lensType !== 'front'
+            };
+          });
+
+          setVideoDevices(classified);
+          return classified;
+        } catch (e) {
+          console.warn("Could not enumerate camera devices:", e);
+          return [];
+        }
+      };
+
+      const startCamera = async (targetFacing = facingMode, targetDeviceId = selectedDeviceId) => {
         setIsInitializing(true);
         setCameraError(null);
 
         if (stream) {
           stream.getTracks().forEach(track => track.stop());
+          setStream(null);
+          setActiveTrack(null);
         }
 
         try {
@@ -1046,20 +1096,86 @@
             throw new Error("Live camera streaming is not accessible in this browser context (HTTPS or localhost is required).");
           }
 
-          const constraints = {
-            video: {
-              facingMode: { ideal: facing },
-              width: { ideal: 3840, min: 1280 },
-              height: { ideal: 2160, min: 720 }
-            },
-            audio: false
+          // Prioritize standard 4:3 document scanning resolution
+          const videoConstraints = {
+            width: { ideal: 2560, min: 1280 },
+            height: { ideal: 1920, min: 720 },
+            aspectRatio: { ideal: 4 / 3 }
           };
 
-          const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+          if (targetDeviceId) {
+            videoConstraints.deviceId = { exact: targetDeviceId };
+          } else {
+            videoConstraints.facingMode = { ideal: targetFacing };
+          }
+
+          const mediaStream = await navigator.mediaDevices.getUserMedia({
+            video: videoConstraints,
+            audio: false
+          });
+
           setStream(mediaStream);
           if (videoRef.current) {
             videoRef.current.srcObject = mediaStream;
           }
+
+          const track = mediaStream.getVideoTracks()[0];
+          if (track) {
+            setActiveTrack(track);
+
+            // Check hardware zoom capability (smoothly supported on Android Chrome / modern iOS)
+            if (typeof track.getCapabilities === 'function') {
+              const caps = track.getCapabilities();
+              if (caps && caps.zoom) {
+                setZoomCapabilities(caps.zoom);
+                const initZoom = Math.max(caps.zoom.min || 1, 1.0);
+                setZoomLevel(initZoom);
+                try {
+                  await track.applyConstraints({ advanced: [{ zoom: initZoom }] });
+                } catch (_) {}
+              } else {
+                setZoomCapabilities(null);
+                setZoomLevel(1.0);
+              }
+            } else {
+              setZoomCapabilities(null);
+              setZoomLevel(1.0);
+            }
+          }
+
+          // Discover and populate camera device labels now that permission is granted
+          const devs = await enumerateCameras();
+          
+          // Auto-select standard 1x main camera if multiple back cameras exist and we were assigned ultra-wide by default
+          if (!targetDeviceId && targetFacing === 'environment' && devs.length > 1) {
+            const currentTrackSettings = track ? track.getSettings() : {};
+            const currentDevId = currentTrackSettings.deviceId;
+            const currentDev = devs.find(d => d.deviceId === currentDevId);
+            
+            if (currentDev && currentDev.lensType === 'ultrawide') {
+              const mainLens = devs.find(d => d.lensType === 'main' && d.deviceId !== currentDevId);
+              if (mainLens) {
+                console.log("Switching from default ultra-wide to 1x Main Lens:", mainLens.displayName);
+                setSelectedDeviceId(mainLens.deviceId);
+                // Restart with main lens
+                const mainStream = await navigator.mediaDevices.getUserMedia({
+                  video: {
+                    deviceId: { exact: mainLens.deviceId },
+                    width: { ideal: 2560, min: 1280 },
+                    height: { ideal: 1920, min: 720 },
+                    aspectRatio: { ideal: 4 / 3 }
+                  },
+                  audio: false
+                });
+                mediaStream.getTracks().forEach(t => t.stop());
+                setStream(mainStream);
+                if (videoRef.current) videoRef.current.srcObject = mainStream;
+                const mTrack = mainStream.getVideoTracks()[0];
+                setActiveTrack(mTrack);
+              }
+            }
+          }
+
           setIsInitializing(false);
         } catch (err) {
           console.warn("Camera access note:", err);
@@ -1070,14 +1186,53 @@
 
       React.useEffect(() => {
         if (!capturedImage) {
-          startCamera(facingMode);
+          startCamera(facingMode, selectedDeviceId);
         }
         return () => {
           if (stream) {
             stream.getTracks().forEach(track => track.stop());
           }
         };
-      }, [facingMode]);
+      }, [facingMode, selectedDeviceId]);
+
+      // Apply zoom level (hardware or fallback)
+      const handleZoomChange = async (targetZoom) => {
+        const minZ = zoomCapabilities?.min || 1.0;
+        const maxZ = zoomCapabilities?.max || 5.0;
+        const clamped = Math.max(minZ, Math.min(targetZoom, maxZ));
+        setZoomLevel(clamped);
+
+        if (activeTrack && zoomCapabilities) {
+          try {
+            await activeTrack.applyConstraints({ advanced: [{ zoom: clamped }] });
+          } catch (e) {
+            console.warn("Could not apply hardware zoom:", e);
+          }
+        }
+      };
+
+      // Switch to a specific camera device
+      const selectCameraDevice = (devId) => {
+        setSelectedDeviceId(devId);
+        const dev = videoDevices.find(d => d.deviceId === devId);
+        if (dev) {
+          setFacingMode(dev.lensType === 'front' ? 'user' : 'environment');
+        }
+      };
+
+      // Toggle camera to next available device
+      const toggleCamera = () => {
+        if (videoDevices.length > 1) {
+          const currentIndex = videoDevices.findIndex(d => d.deviceId === selectedDeviceId);
+          const nextIndex = (currentIndex + 1) % videoDevices.length;
+          const nextDev = videoDevices[nextIndex];
+          setSelectedDeviceId(nextDev.deviceId);
+          setFacingMode(nextDev.lensType === 'front' ? 'user' : 'environment');
+        } else {
+          setSelectedDeviceId(null);
+          setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
+        }
+      };
 
       // Global Clipboard Paste (Ctrl+V) listener
       React.useEffect(() => {
@@ -1103,9 +1258,13 @@
       // Enhanced preview on filter/crop change
       React.useEffect(() => {
         if (capturedImage) {
-          preprocessImageForOCR(capturedImage, filterMode).then(res => {
-            setEnhancedPreview(res);
-          });
+          if (filterMode === 'original') {
+            setEnhancedPreview(capturedImage);
+          } else {
+            preprocessImageForOCR(capturedImage, filterMode).then(res => {
+              setEnhancedPreview(res || capturedImage);
+            });
+          }
         } else {
           setEnhancedPreview(null);
           setExtractedTextPreview(null);
@@ -1117,39 +1276,80 @@
           stream.getTracks().forEach(track => track.stop());
         }
         setStream(null);
+        setActiveTrack(null);
         setCapturedImage(null);
         setEnhancedPreview(null);
         setExtractedTextPreview(null);
         setCropBox({ x: 0, y: 0, width: 100, height: 100 });
+        setIsCropActive(false);
         setIsOcrProcessing(false);
+        setLocalSavedPath(null);
+        setZoomLevel(1.0);
         onClose();
       };
 
-      const toggleCamera = () => {
-        setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
+      const autoPersistImage = async (dataUrl, filenameHint = 'camera_capture.jpg') => {
+        try {
+          const res = await fetch('/api/save-captured-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: dataUrl, filename: filenameHint })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.saved_image_path) {
+              setLocalSavedPath(data.saved_image_path);
+              showToast(`📸 Photo clicked & saved to artifacts/captured_images/!`, "success", 2500);
+              if (onRefreshImages) onRefreshImages();
+            }
+          }
+        } catch (err) {
+          console.warn("Background image persist notice:", err);
+        }
       };
 
       const snapPhoto = () => {
         if (!videoRef.current || !canvasRef.current) return;
         const video = videoRef.current;
         const canvas = canvasRef.current;
-        const vw = video.videoWidth || 1920;
-        const vh = video.videoHeight || 1080;
-        canvas.width = vw;
-        canvas.height = vh;
-        const ctx = canvas.getContext('2d');
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(video, 0, 0, vw, vh);
+        const vw = (video.videoWidth && video.videoWidth > 0) ? video.videoWidth : 1920;
+        const vh = (video.videoHeight && video.videoHeight > 0) ? video.videoHeight : 1080;
+
+        // If digital zoom applied without hardware zoom, crop center to eliminate wide-angle distortion
+        if (!zoomCapabilities && zoomLevel > 1.0) {
+          const cropW = Math.round(vw / zoomLevel);
+          const cropH = Math.round(vh / zoomLevel);
+          const cropX = Math.round((vw - cropW) / 2);
+          const cropY = Math.round((vh - cropH) / 2);
+          canvas.width = cropW;
+          canvas.height = cropH;
+          const ctx = canvas.getContext('2d');
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+        } else {
+          canvas.width = vw;
+          canvas.height = vh;
+          const ctx = canvas.getContext('2d');
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(video, 0, 0, vw, vh);
+        }
+
         const dataUrl = canvas.toDataURL('image/jpeg', 0.98);
         setCapturedImage(dataUrl);
+        setEnhancedPreview(dataUrl);
         setCropBox({ x: 0, y: 0, width: 100, height: 100 });
-        setIsCropActive(true);
+        setIsCropActive(false);
 
         if (stream) {
           stream.getTracks().forEach(track => track.stop());
           setStream(null);
+          setActiveTrack(null);
         }
+
+        // Instantly persist the clicked photo to artifacts/captured_images/ folder
+        autoPersistImage(dataUrl, 'camera_capture.jpg');
       };
 
       const retakePhoto = () => {
@@ -1157,9 +1357,11 @@
         setEnhancedPreview(null);
         setExtractedTextPreview(null);
         setCropBox({ x: 0, y: 0, width: 100, height: 100 });
+        setIsCropActive(false);
         setIsOcrProcessing(false);
+        setLocalSavedPath(null);
         setOcrProgress({ status: '', percent: 0 });
-        startCamera(facingMode);
+        startCamera(facingMode, selectedDeviceId);
       };
 
       const runExtractHandwriting = async () => {
@@ -1175,7 +1377,9 @@
             baseImageToOcr = await cropImageToDataUrl(capturedImage, cropBox);
           }
 
-          const enhancedForOcr = await preprocessImageForOCR(baseImageToOcr, filterMode);
+          const enhancedForOcr = (filterMode === 'original')
+            ? baseImageToOcr 
+            : await preprocessImageForOCR(baseImageToOcr, filterMode);
 
           const recognizedText = await executeHandwritingOCR(enhancedForOcr, (pct, statusText) => {
             setOcrProgress({
@@ -1224,13 +1428,17 @@
         if (!file) return;
         const reader = new FileReader();
         reader.onload = (ev) => {
-          setCapturedImage(ev.target.result);
+          const dataUrl = ev.target.result;
+          setCapturedImage(dataUrl);
+          setEnhancedPreview(dataUrl);
           setCropBox({ x: 0, y: 0, width: 100, height: 100 });
-          setIsCropActive(true);
+          setIsCropActive(false);
           if (stream) {
             stream.getTracks().forEach(track => track.stop());
             setStream(null);
+            setActiveTrack(null);
           }
+          autoPersistImage(dataUrl, file.name || 'uploaded_image.jpg');
         };
         reader.readAsDataURL(file);
       };
@@ -1263,6 +1471,7 @@
         if (!capturedImage) return;
         const nextRotated = await rotateImageDataUrl(capturedImage, 90);
         setCapturedImage(nextRotated);
+        setEnhancedPreview(nextRotated);
         setCropBox({ x: 0, y: 0, width: 100, height: 100 });
         setIsCropActive(false);
       };
@@ -1274,14 +1483,16 @@
           if (isCropActive && (cropBox.width < 98 || cropBox.height < 98 || cropBox.x > 2 || cropBox.y > 2)) {
             imageToSave = await cropImageToDataUrl(capturedImage, cropBox);
           }
-          const res = await fetch('/api/ocr', {
+          const res = await fetch('/api/save-captured-image', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ image: imageToSave, lang: ocrLang })
+            body: JSON.stringify({ image: imageToSave, filename: 'manual_save.jpg' })
           });
           const data = await res.json();
           if (data && data.saved_image_path) {
-            showToast(`📸 Photo saved in project: ${data.saved_image_path}`, "success");
+            setLocalSavedPath(data.saved_image_path);
+            showToast(`📸 Photo saved to: ${data.saved_image_path}`, "success");
+            if (onRefreshImages) onRefreshImages();
           } else {
             showToast("📸 Photo successfully saved to artifacts/captured_images/!", "success");
           }
@@ -1290,12 +1501,27 @@
         }
       };
 
+      const loadCapturedImageItem = (imgItem) => {
+        const url = imgItem.url || imgItem.path;
+        setCapturedImage(url);
+        setEnhancedPreview(url);
+        setCropBox({ x: 0, y: 0, width: 100, height: 100 });
+        setIsCropActive(false);
+        setLocalSavedPath(imgItem.path);
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+          setStream(null);
+          setActiveTrack(null);
+        }
+        showToast(`Loaded ${imgItem.filename}`, "info", 2000);
+      };
+
       return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] transition-all">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] transition-all">
             
             {/* Header */}
-            <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900">
+            <div className="px-4 sm:px-5 py-3.5 border-b border-slate-800 flex items-center justify-between bg-slate-900 flex-wrap gap-2">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center font-bold text-sm">
                   📷
@@ -1305,12 +1531,28 @@
                     {extractedTextPreview !== null ? 'Review Extracted Text' : capturedImage ? 'Crop & Enhance Image' : 'Document Scanner & OCR'}
                   </h3>
                   <p className="text-xs text-slate-400">
-                    {extractedTextPreview !== null ? 'Verify text before summarizing' : capturedImage ? 'Adjust frame or filter for best OCR results' : 'Capture photo, upload image, or paste screenshot'}
+                    {extractedTextPreview !== null ? 'Verify text before summarizing' : capturedImage ? (localSavedPath ? `Saved in ${localSavedPath}` : 'Adjust frame or filter for best OCR results') : 'Capture photo with 1x main camera, upload image, or paste screenshot'}
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
+                {/* Camera / Lens Switcher Dropdown (when multiple cameras detected) */}
+                {!capturedImage && !cameraError && videoDevices.length > 1 && (
+                  <select
+                    value={selectedDeviceId || ''}
+                    onChange={(e) => selectCameraDevice(e.target.value)}
+                    className="bg-slate-800 text-indigo-300 border border-slate-700 rounded-lg px-2.5 py-1 text-xs font-semibold focus:outline-none focus:border-indigo-500 cursor-pointer max-w-[150px] truncate"
+                    title="Select Camera Lens"
+                  >
+                    {videoDevices.map(d => (
+                      <option key={d.deviceId} value={d.deviceId} className="bg-slate-900 text-white">
+                        {d.displayName}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
                 {/* Language selector */}
                 <select
                   value={ocrLang}
@@ -1330,10 +1572,11 @@
                   <button
                     type="button"
                     onClick={toggleCamera}
-                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer border border-slate-700 text-xs"
-                    title="Switch camera"
+                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer border border-slate-700 text-xs flex items-center gap-1 font-semibold"
+                    title="Switch camera / lens"
                   >
-                    🔄
+                    <span>🔄</span>
+                    <span className="hidden sm:inline text-[11px]">Switch</span>
                   </button>
                 )}
 
@@ -1370,23 +1613,34 @@
                         : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
                     }`}
                   >
-                    <span>✂️ Crop Area</span>
+                    <span>✂️ {isCropActive ? 'Crop Active' : 'Crop Area'}</span>
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCropBox({ x: 0, y: 0, width: 100, height: 100 });
-                      setIsCropActive(false);
-                    }}
-                    className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 transition cursor-pointer border border-slate-700"
-                  >
-                    Full Image
-                  </button>
+                  {isCropActive && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCropBox({ x: 0, y: 0, width: 100, height: 100 });
+                        setIsCropActive(false);
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 transition cursor-pointer border border-slate-700"
+                    >
+                      Reset Frame
+                    </button>
+                  )}
 
                   <div className="h-4 w-px bg-slate-800 mx-1"></div>
 
                   <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded-lg border border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setFilterMode('original')}
+                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition cursor-pointer ${
+                        filterMode === 'original' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      Original Photo
+                    </button>
                     <button
                       type="button"
                       onClick={() => setFilterMode('clarity')}
@@ -1394,7 +1648,7 @@
                         filterMode === 'clarity' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
-                      Clarity
+                      Clarity (B&W)
                     </button>
                     <button
                       type="button"
@@ -1405,26 +1659,19 @@
                     >
                       High Contrast
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setFilterMode('original')}
-                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition cursor-pointer ${
-                        filterMode === 'original' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      Original
-                    </button>
                   </div>
                 </div>
 
-                <span className="text-[11px] text-slate-400 hidden sm:inline">
-                  Drag box to select text area
-                </span>
+                {localSavedPath && (
+                  <span className="text-[11px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-mono">
+                    ✓ Saved
+                  </span>
+                )}
               </div>
             )}
 
             {/* Main Viewport */}
-            <div className="relative flex-1 bg-slate-950 min-h-[300px] sm:min-h-[380px] flex items-center justify-center overflow-hidden">
+            <div className="relative flex-1 bg-slate-950 min-h-[320px] sm:min-h-[400px] flex items-center justify-center overflow-hidden">
               <canvas ref={canvasRef} className="hidden" />
 
               <input
@@ -1477,9 +1724,9 @@
                 /* State 1: Live Camera Stream OR Clean Upload Dropzone */
                 <>
                   {isInitializing && !cameraError && (
-                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-slate-950/90 text-white">
+                    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-slate-950/90 text-white">
                       <div className="w-8 h-8 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
-                      <p className="text-xs text-slate-400">Starting camera...</p>
+                      <p className="text-xs text-slate-400 font-medium">Opening standard 1x camera...</p>
                     </div>
                   )}
 
@@ -1505,17 +1752,17 @@
                             Select or Capture Document Photo
                           </h4>
                           <p className="text-slate-400 text-xs max-w-xs">
-                            Take a photo, browse files, or paste screenshot (Ctrl+V)
+                            Take a photo using native high-res camera, browse files, or paste screenshot (Ctrl+V)
                           </p>
                         </div>
 
-                        <div className="flex items-center gap-3 pt-1">
+                        <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
                           <button
                             type="button"
                             onClick={() => cameraInputRef.current?.click()}
                             className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition cursor-pointer shadow-sm"
                           >
-                            <span>📸 Take Photo</span>
+                            <span>📸 Native Camera (1x)</span>
                           </button>
 
                           <button
@@ -1537,37 +1784,72 @@
                         <span>•</span>
                         <button
                           type="button"
-                          onClick={() => startCamera(facingMode)}
+                          onClick={() => startCamera(facingMode, selectedDeviceId)}
                           className="text-indigo-400 hover:text-indigo-300 underline cursor-pointer"
                         >
-                          Retry Webcam
+                          Retry Live Viewfinder
                         </button>
                       </div>
                     </div>
                   ) : (
-                    /* Live Camera Viewfinder */
-                    <div className="relative w-full h-full flex items-center justify-center bg-black">
+                    /* Live Camera Viewfinder with Natural 4:3 Document Framing & Zoom Controls */
+                    <div className="relative w-full h-full flex items-center justify-center bg-black overflow-hidden select-none">
                       <video
                         ref={videoRef}
                         autoPlay
                         playsInline
                         muted
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain max-h-[60vh] transition-transform duration-150"
+                        style={{
+                          transform: (!zoomCapabilities && zoomLevel > 1.0) ? `scale(${zoomLevel})` : undefined
+                        }}
                       />
 
-                      <div className="absolute inset-8 pointer-events-none border border-white/20 rounded-xl"></div>
+                      {/* Document Framing Box & Subtle Corner Guides */}
+                      <div className="absolute inset-6 sm:inset-10 pointer-events-none border border-white/25 rounded-2xl shadow-inner flex flex-col justify-between p-3">
+                        <div className="flex justify-between">
+                          <div className="w-5 h-5 border-t-2 border-l-2 border-indigo-400 rounded-tl"></div>
+                          <div className="w-5 h-5 border-t-2 border-r-2 border-indigo-400 rounded-tr"></div>
+                        </div>
+                        <div className="flex justify-between">
+                          <div className="w-5 h-5 border-b-2 border-l-2 border-indigo-400 rounded-bl"></div>
+                          <div className="w-5 h-5 border-b-2 border-r-2 border-indigo-400 rounded-br"></div>
+                        </div>
+                      </div>
 
-                      <div className="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-slate-900/80 backdrop-blur-md border border-slate-700 text-xs text-slate-300 pointer-events-none">
-                        Align document inside frame
+                      {/* Header alignment guide badge */}
+                      <div className="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-slate-900/80 backdrop-blur-md border border-slate-700/80 text-[11px] text-slate-200 pointer-events-none flex items-center gap-1.5 shadow-md">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span>Align document inside frame</span>
+                      </div>
+
+                      {/* Floating Zoom Controls (1x, 1.5x, 2x, 3x) to effortlessly cancel wide-angle distortion */}
+                      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-slate-900/85 backdrop-blur-md px-3 py-1.5 rounded-full border border-slate-700 shadow-xl z-10">
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mr-1">Zoom</span>
+                        {[1.0, 1.5, 2.0, 3.0].map((zVal) => (
+                          <button
+                            key={zVal}
+                            type="button"
+                            onClick={() => handleZoomChange(zVal)}
+                            className={`px-2.5 py-0.5 rounded-full text-xs font-bold transition cursor-pointer ${
+                              Math.abs(zoomLevel - zVal) < 0.15
+                                ? 'bg-indigo-600 text-white shadow-sm'
+                                : 'bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700'
+                            }`}
+                            title={`Set zoom to ${zVal}x`}
+                          >
+                            {zVal}x
+                          </button>
+                        ))}
                       </div>
                     </div>
                   )}
                 </>
               ) : (
-                /* State 2: Captured Photo Cropper */
+                /* State 2: Captured Photo Cropper & Viewer */
                 <div className="relative w-full h-full flex items-center justify-center bg-slate-950 p-2">
                   <InteractiveImageCropper
-                    imageSrc={enhancedPreview || capturedImage}
+                    imageSrc={filterMode === 'original' ? capturedImage : (enhancedPreview || capturedImage)}
                     cropBox={cropBox}
                     setCropBox={setCropBox}
                     isCropActive={isCropActive}
@@ -1585,6 +1867,34 @@
                 </div>
               )}
             </div>
+
+            {/* Recent Captures Thumbnail Strip (when in viewfinder mode and captures exist) */}
+            {!capturedImage && capturedImagesList.length > 0 && (
+              <div className="px-4 py-2.5 bg-slate-950/90 border-t border-slate-800/80 flex items-center gap-2 overflow-x-auto no-scrollbar">
+                <span className="text-[11px] font-bold text-slate-400 whitespace-nowrap flex items-center gap-1">
+                  <span>📸</span> Recent:
+                </span>
+                {capturedImagesList.slice(0, 8).map((imgItem, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => loadCapturedImageItem(imgItem)}
+                    className="group relative w-12 h-12 rounded-lg overflow-hidden border border-slate-700 hover:border-indigo-500 flex-shrink-0 transition-all cursor-pointer shadow-sm hover:scale-105"
+                    title={`Click to load ${imgItem.filename}`}
+                  >
+                    <img
+                      src={imgItem.url || imgItem.path}
+                      alt={imgItem.filename}
+                      className="w-full h-full object-cover"
+                      onError={(e) => { e.target.style.display = 'none'; }}
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-[10px] text-white font-bold transition-opacity">
+                      Load
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Bottom Actions Bar */}
             <div className="px-5 py-3.5 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-3">
@@ -1604,7 +1914,7 @@
                     type="button"
                     onClick={submitExtractedText}
                     disabled={isOcrProcessing || !extractedTextPreview.trim()}
-                    className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-md shadow-indigo-600/30"
                   >
                     <span>✓</span>
                     <span>Use Extracted Text</span>
@@ -1626,22 +1936,36 @@
                 ) : (
                   /* Live Camera State */
                   <>
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="text-xs font-semibold text-slate-400 hover:text-white transition cursor-pointer px-3 py-1.5 rounded-lg hover:bg-slate-800"
-                    >
-                      📁 Browse File
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => cameraInputRef.current?.click()}
+                        className="text-xs font-semibold text-indigo-300 hover:text-white transition cursor-pointer px-2.5 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-800 border border-slate-700 flex items-center gap-1.5"
+                        title="Open phone's native camera app for full optical quality"
+                      >
+                        <span>📱</span>
+                        <span className="hidden sm:inline">Native Cam (1x)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="text-xs font-semibold text-slate-400 hover:text-white transition cursor-pointer px-2.5 py-1.5 rounded-lg hover:bg-slate-800"
+                      >
+                        📁 File
+                      </button>
+                    </div>
 
                     <button
                       type="button"
                       onClick={snapPhoto}
                       disabled={isInitializing}
-                      className="w-12 h-12 rounded-full bg-white text-slate-950 flex items-center justify-center hover:scale-105 active:scale-95 transition cursor-pointer shadow-md"
-                      title="Snap Photo"
+                      className="w-13 h-13 rounded-full bg-white text-slate-950 flex items-center justify-center hover:scale-105 active:scale-95 transition cursor-pointer shadow-lg ring-4 ring-indigo-500/20"
+                      title="Snap Photo (1x High Quality)"
                     >
-                      <div className="w-10 h-10 rounded-full border-2 border-slate-950 bg-indigo-600"></div>
+                      <div className="w-10 h-10 rounded-full border-2 border-slate-950 bg-indigo-600 flex items-center justify-center text-white text-xs">
+                        📸
+                      </div>
                     </button>
 
                     <button
@@ -1767,6 +2091,8 @@
       // Lists & Search
       const [summariesList, setSummariesList] = useState([]);
       const [documentsList, setDocumentsList] = useState([]);
+      const [capturedImagesList, setCapturedImagesList] = useState([]);
+      const [previewImageModal, setPreviewImageModal] = useState(null);
       const [historySearch, setHistorySearch] = useState('');
 
       // Documents Tab Advanced States
@@ -1817,6 +2143,7 @@
       useEffect(() => {
         fetchSummaries();
         fetchDocuments();
+        fetchCapturedImages();
 
         // Populate fallback TTS voices
         const loadVoices = () => {
@@ -1858,6 +2185,76 @@
             setDocumentsList(d.documents || []);
           }
         } catch (e) {}
+      };
+
+      const fetchCapturedImages = async () => {
+        try {
+          const res = await fetch('/api/captured-images');
+          if (res.ok) {
+            const d = await res.json();
+            setCapturedImagesList(d.images || []);
+          }
+        } catch (e) {}
+      };
+
+      const handleDeleteCapturedImage = async (filename, e) => {
+        e?.stopPropagation();
+        if (!confirm(`Are you sure you want to delete "${filename}"?`)) return;
+        try {
+          const res = await fetch(`/api/captured-images/${encodeURIComponent(filename)}`, {
+            method: 'DELETE'
+          });
+          if (res.ok) {
+            showToast(`Deleted ${filename}`, "info");
+            fetchCapturedImages();
+          }
+        } catch (err) {
+          showToast("Failed to delete image", "error");
+        }
+      };
+
+      const handleOcrCapturedImage = async (imageItem, e) => {
+        e?.stopPropagation();
+        showToast(`Loading & extracting text from ${imageItem.filename}...`, "info");
+        try {
+          // Send image url or base64 to /api/ocr
+          const imgUrl = imageItem.url || imageItem.path;
+          let imgDataForOcr = imgUrl;
+          try {
+            const fetchImg = await fetch(imgUrl);
+            const blob = await fetchImg.blob();
+            const reader = new FileReader();
+            imgDataForOcr = await new Promise((res, rej) => {
+              reader.onload = () => res(reader.result);
+              reader.onerror = rej;
+              reader.readAsDataURL(blob);
+            });
+          } catch (fetchErr) {}
+
+          const res = await fetch('/api/ocr', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: imgDataForOcr, lang: 'auto' })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.text) {
+              setInputText(data.text);
+              setUploadedDocInfo({
+                filename: imageItem.filename,
+                format: 'IMAGE',
+                pages: 1,
+                words: data.words || data.text.split(/\s+/).filter(Boolean).length
+              });
+              setActiveTab('summarize');
+              showToast(`✓ Extracted ${(data.words || 0).toLocaleString()} words from ${imageItem.filename}!`, "success");
+            } else {
+              showToast("No readable text detected in this photo.", "info");
+            }
+          }
+        } catch (err) {
+          showToast("Failed to extract text from image", "error");
+        }
       };
 
       // Document Helpers
@@ -3167,7 +3564,7 @@
                               <span className="text-base">📸</span> Live Camera Document Scanner & AI OCR
                             </span>
                             <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-bold">
-                              Ready to Scan
+                              {capturedImagesList.length} Photos Stored
                             </span>
                           </div>
                           <p className="text-xs text-slate-600 leading-relaxed">
@@ -3186,6 +3583,36 @@
                               <input type="file" accept="image/*,.pdf,.docx,.doc,.txt" onChange={handleFileUpload} disabled={uploadLoading} className="hidden" />
                             </label>
                           </div>
+
+                          {/* Recent Captured Images Quick Selector Strip */}
+                          {capturedImagesList.length > 0 && (
+                            <div className="pt-2 border-t border-indigo-100/80 space-y-1.5">
+                              <div className="flex items-center justify-between text-[11px] font-bold text-indigo-900">
+                                <span>Recent Camera Captures:</span>
+                                <span className="text-[10px] text-slate-400">Click photo to extract & summarize</span>
+                              </div>
+                              <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+                                {capturedImagesList.slice(0, 6).map((imgItem, idx) => (
+                                  <div
+                                    key={idx}
+                                    onClick={(e) => handleOcrCapturedImage(imgItem, e)}
+                                    className="group relative w-14 h-14 rounded-xl overflow-hidden border border-indigo-200 hover:border-indigo-600 cursor-pointer shadow-xs hover:shadow-md transition flex-shrink-0 bg-white"
+                                    title={`Click to extract & summarize ${imgItem.filename}`}
+                                  >
+                                    <img
+                                      src={imgItem.url || imgItem.path}
+                                      alt={imgItem.filename}
+                                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-200"
+                                      onError={(e) => { e.target.style.display = 'none'; }}
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 flex items-end p-1 transition-opacity">
+                                      <span className="text-[8px] text-white font-bold truncate">⚡ OCR</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -4182,7 +4609,8 @@
                     {/* Format Filter Chips */}
                     <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl border border-slate-200/60 text-xs overflow-x-auto max-w-full no-scrollbar flex-1 sm:flex-initial">
                       {[
-                        { id: 'ALL', label: `All (${docStats.total})` },
+                        { id: 'ALL', label: `All (${docStats.total + capturedImagesList.length})` },
+                        { id: 'CAPTURED', label: `📸 Photos (${capturedImagesList.length})` },
                         { id: 'PDF', label: `PDF (${docStats.pdf})` },
                         { id: 'DOCX', label: `DOCX (${docStats.docx})` },
                         { id: 'PPTX', label: `PPTX (${docStats.pptx})` },
@@ -4227,8 +4655,130 @@
 
                 </div>
 
+                {/* Section: Dedicated Captured Photos & Camera Scans Gallery (Shown when ALL or CAPTURED) */}
+                {(docFormatFilter === 'ALL' || docFormatFilter === 'CAPTURED') && capturedImagesList.length > 0 && !docSearch && (
+                  <div className="bg-white rounded-2xl border border-indigo-100 p-5 space-y-4 shadow-xs">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">📸</span>
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-900 font-heading">
+                            Captured Camera Photos & Scans ({capturedImagesList.length})
+                          </h3>
+                          <p className="text-[11px] text-slate-500">
+                            Saved locally in <code className="bg-slate-100 text-indigo-700 px-1 py-0.5 rounded font-mono">artifacts/captured_images/</code>
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowCameraModal(true)}
+                        className="btn-3d-primary px-3 py-1.5 rounded-xl text-xs font-bold text-white flex items-center gap-1.5 cursor-pointer shadow-xs"
+                      >
+                        <span>📷 Take New Photo</span>
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
+                      {capturedImagesList.map((imgItem, idx) => (
+                        <div
+                          key={idx}
+                          className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden hover:border-indigo-400 hover:shadow-md transition flex flex-col justify-between group"
+                        >
+                          {/* Image Thumbnail with Overlay */}
+                          <div 
+                            className="relative aspect-video sm:aspect-square bg-slate-950 overflow-hidden cursor-pointer"
+                            onClick={() => setPreviewImageModal(imgItem)}
+                          >
+                            <img
+                              src={imgItem.url || imgItem.path}
+                              alt={imgItem.filename}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              onError={(e) => { e.target.style.display = 'none'; }}
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                              <span className="text-xs bg-white text-slate-900 px-2.5 py-1 rounded-lg font-bold shadow-md">
+                                👁️ View Full
+                              </span>
+                            </div>
+                            <span className="absolute top-2 left-2 bg-slate-900/80 backdrop-blur-md text-white text-[10px] px-2 py-0.5 rounded-md font-mono border border-slate-700">
+                              {imgItem.size_formatted}
+                            </span>
+                          </div>
+
+                          {/* Image Metadata */}
+                          <div className="p-3 space-y-2 flex-1 flex flex-col justify-between">
+                            <div>
+                              <h4 className="text-xs font-bold text-slate-800 truncate" title={imgItem.filename}>
+                                {imgItem.filename}
+                              </h4>
+                              <span className="text-[10px] text-slate-400 block mt-0.5">
+                                📅 {imgItem.created_at}
+                              </span>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between gap-1.5">
+                              <button
+                                type="button"
+                                onClick={(e) => handleOcrCapturedImage(imgItem, e)}
+                                className="flex-1 py-1.5 px-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition shadow-xs flex items-center justify-center gap-1"
+                                title="Run OCR text extraction and open in Summarizer"
+                              >
+                                <span>⚡ OCR</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setPreviewImageModal(imgItem)}
+                                className="p-1.5 bg-white hover:bg-slate-200 text-slate-700 rounded-lg text-xs border border-slate-200 transition"
+                                title="View Image"
+                              >
+                                👁️
+                              </button>
+                              <a
+                                href={imgItem.url || imgItem.path}
+                                download={imgItem.filename}
+                                className="p-1.5 bg-white hover:bg-slate-200 text-slate-700 rounded-lg text-xs border border-slate-200 transition flex items-center justify-center"
+                                title="Download Image"
+                              >
+                                📥
+                              </a>
+                              <button
+                                type="button"
+                                onClick={(e) => handleDeleteCapturedImage(imgItem.filename, e)}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                                title="Delete Photo"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* If filtered to CAPTURED only and empty */}
+                {docFormatFilter === 'CAPTURED' && capturedImagesList.length === 0 && (
+                  <div className="bg-white border border-slate-200/80 rounded-2xl p-12 text-center text-slate-500 card-shadow">
+                    <div className="text-3xl mb-2">📸</div>
+                    <h3 className="text-sm font-bold text-slate-800 font-heading">No captured photos found</h3>
+                    <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1 mb-4">
+                      Snap photos using the Live Camera viewfinder or upload document images to automatically save them to <code className="bg-slate-100 text-indigo-700 px-1 py-0.5 rounded font-mono">artifacts/captured_images/</code>.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowCameraModal(true)}
+                      className="btn-3d-primary px-4 py-2 rounded-xl text-xs font-bold text-white inline-flex items-center gap-1.5"
+                    >
+                      <span>📸 Open Camera</span>
+                    </button>
+                  </div>
+                )}
+
                 {/* Document Items List */}
-                {filteredDocuments.length === 0 ? (
+                {docFormatFilter !== 'CAPTURED' && (filteredDocuments.length === 0 ? (
                   <div className="bg-white border border-slate-200/80 rounded-2xl p-12 text-center text-slate-500 card-shadow">
                     <div className="text-3xl mb-2">📄</div>
                     <h3 className="text-sm font-bold text-slate-800 font-heading">
@@ -5016,7 +5566,49 @@
             onClose={() => setShowCameraModal(false)}
             onCapturedFile={handleCameraCapturedFile}
             showToast={showToast}
+            capturedImagesList={capturedImagesList}
+            onRefreshImages={fetchCapturedImages}
           />
+
+          {/* High-Resolution Captured Image Lightbox Modal */}
+          {previewImageModal && (
+            <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn" onClick={() => setPreviewImageModal(null)}>
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-base">📷</span>
+                    <div>
+                      <h4 className="text-sm font-bold text-white line-clamp-1">{previewImageModal.filename}</h4>
+                      <p className="text-[11px] text-slate-400 font-mono">{previewImageModal.path} • {previewImageModal.size_formatted} • {previewImageModal.created_at}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setPreviewImageModal(null)} className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-sm transition cursor-pointer">
+                    ✕
+                  </button>
+                </div>
+                <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-slate-950">
+                  <img src={previewImageModal.url || previewImageModal.path} alt={previewImageModal.filename} className="max-h-[65vh] w-auto object-contain rounded-xl shadow-lg border border-slate-800" />
+                </div>
+                <div className="p-3.5 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-3">
+                  <a href={previewImageModal.url || previewImageModal.path} download={previewImageModal.filename} className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 transition flex items-center gap-1.5">
+                    <span>📥 Download Photo</span>
+                  </a>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => {
+                        const target = previewImageModal;
+                        setPreviewImageModal(null);
+                        handleOcrCapturedImage(target, e);
+                      }}
+                      className="btn-3d-primary px-4 py-2 rounded-xl text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <span>⚡ Run OCR & Summarize</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Toast Notification */}
           {toast && (

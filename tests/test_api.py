@@ -324,6 +324,7 @@ def test_ocr_endpoint_and_image_extraction():
     """Verify /api/ocr endpoint and RapidOCR text extraction with layout preservation."""
     from PIL import Image, ImageDraw
     import io
+    import base64
     
     img = Image.new('RGB', (600, 150), color=(255, 255, 255))
     draw = ImageDraw.Draw(img)
@@ -352,4 +353,23 @@ def test_ocr_endpoint_and_image_extraction():
     list_data = res_list.json()
     assert "images" in list_data
     assert list_data["count"] >= 1
+    assert "url" in list_data["images"][0]
+
+    # 3. Test /api/save-captured-image endpoint
+    b64_img = base64.b64encode(img_bytes).decode("utf-8")
+    res_save = client.post("/api/save-captured-image", json={"image": f"data:image/jpeg;base64,{b64_img}", "filename": "camera_snap.jpg"})
+    assert res_save.status_code == 200
+    save_data = res_save.json()
+    assert save_data["success"] is True
+    assert "camera_snap" in save_data["filename"]
+    assert os.path.exists(save_data["saved_image_path"])
+
+    # 4. Test serving static /artifacts file
+    res_static = client.get(save_data["url"])
+    assert res_static.status_code == 200
+
+    # 5. Test deleting a captured image
+    res_del = client.delete(f"/api/captured-images/{save_data['filename']}")
+    assert res_del.status_code == 200
+    assert not os.path.exists(save_data["saved_image_path"])
 
