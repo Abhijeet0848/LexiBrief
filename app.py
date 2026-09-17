@@ -709,10 +709,15 @@ async def upload_document(
             saved_img_path = save_captured_image(content_bytes, filename=file.filename)
 
         if not extracted_text or not extracted_text.strip():
-            raise HTTPException(
-                status_code=400, 
-                detail="Could not extract readable text or words from uploaded photo/document. Please ensure good lighting and clear handwriting/print."
-            )
+            if detected_format == "IMAGE" or saved_img_path:
+                # Provide a graceful handwritten/signature transcription placeholder so the user is not blocked
+                doc_title = os.path.splitext(file.filename or "image.jpg")[0].replace('_', ' ').replace('-', ' ').title()
+                extracted_text = f"[Signature / Handwritten Document: {file.filename or 'image.jpg'}]\n\n{doc_title}"
+            else:
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Could not extract readable text or words from uploaded photo/document. Please ensure good lighting and clear handwriting/print."
+                )
             
         stats = NLPProcessor.compute_stats(extracted_text)
         stats["pages"] = pages_count
