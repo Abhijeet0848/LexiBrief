@@ -647,6 +647,28 @@ async def list_captured_images():
     return {"images": files, "count": len(files), "directory": "artifacts/captured_images"}
 
 
+@app.delete("/api/captured-images", tags=["Text Extraction & MongoDB"])
+async def delete_all_captured_images():
+    """Deletes all captured images from artifacts/captured_images and MongoDB storage."""
+    deleted_mongo_count = db_manager.delete_all_captured_images()
+    deleted_disk_count = 0
+    search_dirs = [
+        CAPTURED_IMAGES_DIR,
+        os.path.join(tempfile.gettempdir(), "lexibrief_captured_images")
+    ]
+    for target_dir in search_dirs:
+        if os.path.exists(target_dir) and os.path.isdir(target_dir):
+            for f in os.listdir(target_dir):
+                if f.lower().endswith(('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff', '.gif')):
+                    try:
+                        os.remove(os.path.join(target_dir, f))
+                        deleted_disk_count += 1
+                    except Exception as e:
+                        logger.warning(f"Could not delete image file {f}: {e}")
+    total_deleted = max(deleted_mongo_count, deleted_disk_count)
+    return {"success": True, "message": f"Deleted all captured images ({total_deleted} items)", "deleted_count": total_deleted}
+
+
 @app.delete("/api/captured-images/{filename}", tags=["Text Extraction & MongoDB"])
 async def delete_captured_image(filename: str):
     """Deletes a captured image from artifacts/captured_images and MongoDB storage."""
