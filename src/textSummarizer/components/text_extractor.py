@@ -76,24 +76,31 @@ class TextExtractor:
             return ""
         # Strip repetitive OCR artifact characters
         text = re.sub(r'([|~_^\/\\<>{}\[\]*+=#`¬¢§±µ¿¡])\s*\1{2,}', ' ', text)
-        # Normalize whitespace and line breaks
+        # Normalize line breaks
         text = _RE_CRLF.sub('\n', text)
-        text = _RE_SPACES.sub(' ', text)
+        
         # Strip standalone timestamp lines (e.g. "0:15", "01:23", "[02:45]")
         text = re.sub(r'^\s*\[?\d{1,2}:\d{2}(?::\d{2})?\]?\s*$', '', text, flags=re.MULTILINE)
         # Strip inline timestamp prefixes (e.g. "0:15 - Hello" or "[0:15] Hello")
         text = re.sub(r'\[?\d{1,2}:\d{2}(?::\d{2})?\]?\s*[-–—:]?\s*', '', text)
-        
-        # Remove non-printable control characters while preserving valid punctuation & whitespace
-        text = "".join(ch for ch in text if ch.isprintable() or ch in '\n\t').strip()
-
-        # Fix OCR / PDF mid-sentence split artifacts across bullet symbols (e.g., "QR • code" -> "QR code")
-        text = re.sub(r'(\b[A-Za-z0-9]+)\s*[•\u2022\u25cf\u25aa\u25b8\u2219\u2023\u2043\u204c\u204d\u2218\u25cb\u25e6\u25ab]\s*([a-z]{2,}\b)', r'\1 \2', text)
 
         # Standardize all bullet points so each bullet point starts on its own new line
         bullet_chars = r'[•\u2022\u25cf\u25aa\u25b8\u2219\u2023\u2043\u204c\u204d\u2218\u25cb\u25e6\u25ab]'
-        text = re.sub(rf'(?<!\n)[ \t]*({bullet_chars})[ \t]*', r'\n• ', text)
-        text = re.sub(rf'^[ \t]*({bullet_chars})[ \t]*', r'• ', text, flags=re.MULTILINE)
+        text = re.sub(rf'[ \t]*({bullet_chars})[ \t]*', r'\n• ', text)
+        text = re.sub(r'\n{2,}• ', r'\n• ', text)
+
+        # Normalize line spacing while preserving bullet lines
+        raw_lines = text.split('\n')
+        clean_lines = []
+        for l in raw_lines:
+            s_line = _RE_SPACES.sub(' ', l).strip()
+            if s_line:
+                clean_lines.append(s_line)
+
+        text = "\n".join(clean_lines)
+
+        # Remove non-printable control characters while preserving valid punctuation & whitespace
+        text = "".join(ch for ch in text if ch.isprintable() or ch in '\n\t').strip()
 
         # Clean multiple blank lines
         text = _RE_MULTILINES.sub('\n\n', text)

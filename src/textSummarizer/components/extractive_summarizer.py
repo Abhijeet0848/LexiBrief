@@ -125,17 +125,32 @@ class ExtractiveSummarizer:
         # Restore chronological order for narrative flow
         chronological = sorted(top_ranked, key=lambda item: item[0])
 
+        # Check if sentences are bulleted
+        has_bullets = any(item[2].strip().startswith(('•', '-', '*')) for item in chronological)
+
+        def _join_sentences(items):
+            if has_bullets:
+                res = []
+                for it in items:
+                    t = it[2].strip()
+                    res.append(t if t.startswith(('•', '-', '*')) else f"• {t}")
+                return "\n".join(res)
+            return " ".join(it[2].strip() for it in items)
+
         if persona_key == "action_items":
-            return "\n".join(f"• {item[2].strip()}" for item in chronological)
+            return "\n".join(
+                item[2].strip() if item[2].strip().startswith(('•', '-', '*')) else f"• {item[2].strip()}"
+                for item in chronological
+            )
         elif persona_key == "executive":
-            body = " ".join(item[2].strip() for item in chronological)
+            body = _join_sentences(chronological)
             return f"📌 Executive Summary:\n{body}"
         elif persona_key == "technical":
-            body = " ".join(item[2].strip() for item in chronological)
+            body = _join_sentences(chronological)
             return f"⚙️ Technical Architecture & Specs:\n{body}"
         elif persona_key == "eli5":
-            body = " ".join(item[2].strip() for item in chronological)
+            body = _join_sentences(chronological)
             return f"💡 Plain-English Concept:\n{body}"
         
-        return " ".join(item[2] for item in chronological)
+        return _join_sentences(chronological)
 

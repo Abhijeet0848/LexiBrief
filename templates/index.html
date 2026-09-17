@@ -1520,6 +1520,15 @@
     }
 
     function App() {
+      // Bullets-to-newline Normalization Helper
+      const normalizeBullets = (str) => {
+        if (!str) return '';
+        return str
+          .replace(/[ \t]*([•\u2022\u25cf\u25aa\u25b8\u2219\u2023\u2043\u204c\u204d\u2218\u25cb\u25e6\u25ab])[ \t]*/g, '\n• ')
+          .replace(/\n{2,}• /g, '\n• ')
+          .trim();
+      };
+
       // Navigation
       const [activeTab, setActiveTab] = useState('summarize');
       const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -3485,6 +3494,8 @@
                                   const isHovered = hoveredSummarySentenceIdx === idx;
                                   const isSelected = selectedSummarySentenceIdx === idx;
                                   const isActive = isHovered || isSelected;
+                                  const trimmed = (item.summary_sentence || '').trim();
+                                  const isBullet = trimmed.startsWith('•') || trimmed.startsWith('-') || trimmed.startsWith('*') || /^\d+[\.\)]\s/.test(trimmed);
 
                                   return (
                                     <span
@@ -3498,14 +3509,14 @@
                                         setSelectedSummarySentenceIdx(isSelected ? null : idx);
                                         setSourceViewMode('traceability');
                                       }}
-                                      className={`inline cursor-pointer rounded px-1.5 py-0.5 transition-all duration-150 mr-1 ${
+                                      className={`${isBullet ? 'block my-1.5' : 'inline mr-1'} cursor-pointer rounded px-1.5 py-0.5 transition-all duration-150 ${
                                         isActive
                                           ? 'bg-amber-200 text-amber-950 font-medium underline decoration-amber-500 decoration-2 shadow-2xs'
                                           : 'hover:bg-indigo-100 hover:text-indigo-900'
                                       }`}
                                       title={`Click or hover to highlight source sentence in editor (Confidence: ${item.confidence}%)`}
                                     >
-                                      {item.summary_sentence}{' '}
+                                      {item.summary_sentence}{isBullet ? '' : ' '}
                                     </span>
                                   );
                                 })}
@@ -4111,7 +4122,7 @@
 
                             {/* Text Preview Snippet (Scrollable) */}
                             <div className="p-3 rounded-xl bg-slate-50/80 border-l-2 border-indigo-400 border-t border-r border-b border-slate-200 text-xs text-slate-600 leading-relaxed font-sans max-h-32 overflow-y-auto whitespace-pre-wrap select-text">
-                              {doc.text_content || doc.text_snippet || "Document content extracted and ready for summarization."}
+                              {normalizeBullets(doc.text_content || doc.text_snippet || "Document content extracted and ready for summarization.")}
                             </div>
                           </div>
 
@@ -4124,7 +4135,7 @@
                                 try {
                                   const res = await fetch(`/api/documents/${doc._id}`);
                                   const full = await res.json();
-                                  setInputText(full.text_content || full.text_snippet || '');
+                                  setInputText(normalizeBullets(full.text_content || full.text_snippet || ''));
                                   setActiveTab('summarize');
                                   showToast(`Loaded ${doc.filename} into active editor!`, "info");
                                 } catch (e) {}
@@ -4204,7 +4215,7 @@
 
                           {/* Row 2: Text Preview (Scrollable) */}
                           <div className="p-3.5 rounded-xl bg-slate-50/80 border-l-2 border-indigo-400 border-t border-r border-b border-slate-200 text-xs text-slate-700 leading-relaxed font-sans max-h-40 overflow-y-auto whitespace-pre-wrap select-text">
-                            {doc.text_content || doc.text_snippet || "Document content extracted and ready for summarization."}
+                            {normalizeBullets(doc.text_content || doc.text_snippet || "Document content extracted and ready for summarization.")}
                           </div>
 
                           {/* Row 3: Stats & Actions */}
