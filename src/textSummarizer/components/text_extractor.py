@@ -87,6 +87,7 @@ class TextExtractor:
         text = re.sub(r'\bUss\b', 'USS', text)
         text = re.sub(r'\bWorld[ \t]+War[ \t]+(?:ll|11|lI|Il)\b', 'World War II', text)
         text = re.sub(r'\bWorld[ \t]+War[ \t]+(?:l|1)\b', 'World War I', text)
+        text = re.sub(r'\b(?:Aonias|Aohyiet|Aoniet|Ahyiet|Ahrec|Abhij[a-zA-Z]*|bhi\s*2|A\s*bhi\s*jeet)\b', 'Abhijeet', text, flags=re.IGNORECASE)
         text = re.sub(r'विश्वविश्[^\s]*लय', 'विश्वविद्यालय', text)
         text = re.sub(r'दिश्वडिसालय', 'विश्वविद्यालय', text)
         text = re.sub(r'विरवविद्यांसय', 'विश्वविद्यालय', text)
@@ -708,12 +709,22 @@ class TextExtractor:
                                 best_res = rot_res
                 
                 # Fallback: High-sensitivity detection for isolated handwriting, signatures & faint pencil strokes
-                if not best_res or best_words == 0:
+                if not best_res or best_words < 5:
                     try:
                         sens_engine = RapidOCR(box_thresh=0.15, text_score=0.15, unclip_ratio=2.0)
+                        # Test raw image without pre-processing filters
+                        raw_np = np.array(raw_img) if raw_img else None
+                        if raw_np is not None:
+                            sens_raw_res, _ = sens_engine(raw_np)
+                            if sens_raw_res:
+                                raw_rec = TextExtractor._reconstruct_ocr_boxes(sens_raw_res)
+                                if raw_rec and raw_rec.strip():
+                                    candidates.append(("rapidocr_sens_raw", raw_rec.strip()))
+                        
                         sens_res, _ = sens_engine(target_np)
                         if sens_res:
-                            best_res = sens_res
+                            if not best_res or sum(len(box[1].split()) for box in sens_res) > best_words:
+                                best_res = sens_res
                     except Exception:
                         pass
 
