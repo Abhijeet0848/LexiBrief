@@ -20,22 +20,25 @@ class TextExtractor:
     @staticmethod
     def clean_ocr_text(text: str) -> str:
         """
-        Cleans OCR artifacts, removes confusing non-alphanumeric/non-word symbols, 
-        and heals digit-in-word confusions resulting from handwritten text recognition
-        while preserving all international Unicode characters and Indic punctuation (e.g., Hindi danda).
+        Cleans OCR artifacts, removes confusing glitch/non-printable symbols,
+        and heals digit-in-word confusions while preserving emails, domains, URLs,
+        bullets, all international Unicode characters, and Indic/Arabic/CJK punctuation.
         """
         if not text:
             return ""
         
-        # 1. Strip glitch symbols while preserving valid letters, numbers, and Indic/CJK/Arabic punctuation
-        text = re.sub(r'[|~_^\/\\<>{}\[\]*+=#`¬¢§±µ¿¡@$%&~]+', ' ', text)
+        # 1. Strip unprintable control codes and replacement characters
+        text = re.sub(r'[\uFFFD\uFEFF\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
         
-        # 2. Fix English OCR digit-in-word confusions (e.g., 'm0del' -> 'model', 'w1th' -> 'with')
+        # 2. Strip OCR fringe glitches (isolated bars/tildes/glitches) but keep normal punctuation (. , : ; / @ _ - • & % #)
+        text = re.sub(r'[|~¬¢§±µ¿¡]+', ' ', text)
+        
+        # 3. Heal English OCR digit-in-word confusions (e.g., 'm0del' -> 'model', 'w1th' -> 'with')
         def _heal_word(w: str) -> str:
             if not w:
                 return ""
-            # If word is a standard number or date, keep it intact
-            if w.isdigit() or re.match(r'^\d+[a-zA-Z]{1,2}$', w):
+            # Keep numbers, dates, emails, domains, codes intact
+            if w.isdigit() or re.match(r'^\d+[a-zA-Z]{1,2}$', w) or '@' in w or '.' in w or '/' in w or '_' in w:
                 return w
             # Only apply Latin letter heuristic if word is pure ASCII alphanumeric
             if re.match(r'^[a-zA-Z0-9]+$', w):
@@ -47,7 +50,7 @@ class TextExtractor:
                     w = re.sub(r'(?<=[a-zA-Z])5(?=[a-zA-Z])', 's', w)
             return w
 
-        # 3. Filter line by line and eliminate isolated single-character Latin noise
+        # 4. Filter line by line and eliminate isolated single-character Latin noise
         clean_lines = []
         for line in text.split('\n'):
             line_str = line.strip()
@@ -409,51 +412,160 @@ class TextExtractor:
             return file_bytes.decode('utf-8', errors='ignore'), 1
 
     @staticmethod
+    def _reconstruct_ocr_boxes(ocr_res) -> str:
+        """
+        Sorts and groups 2D spatial OCR bounding boxes into natural reading-order lines.
+        Maintains paragraph flow, joins inline words left-to-right, and guarantees that
+        every bullet point and enumerated list item starts on its own discrete line.
+        """
+        if not ocr_res:
+            return ""
+
+        import numpy as np
+        boxes_data = []
+        for item in ocr_res:
+            if len(item) < 2 or not item[1] or not str(item[1]).strip():
+                continue
+            box = np.array(item[0])
+            text = str(item[1]).strip()
+            # Clean glyph glitches like replacement chars or isolated orphan symbols
+            text = re.sub(r'[\uFFFD\uFEFF\x00-\x08\x0b\x0c\x0e-\x1f]', '', text)
+            text = re.sub(r'^[|~¬¢§±µ¿¡\.]\s*', '', text)
+            if not text:
+                continue
+            min_x = float(np.min(box[:, 0]))
+            max_x = float(np.max(box[:, 0]))
+            min_y = float(np.min(box[:, 1]))
+            max_y = float(np.max(box[:, 1]))
+            center_y = (min_y + max_y) / 2.0
+            height = max(1.0, max_y - min_y)
+            boxes_data.append({
+                "text": text,
+                "min_x": min_x,
+                "max_x": max_x,
+                "min_y": min_y,
+                "max_y": max_y,
+                "center_y": center_y,
+                "height": height
+            })
+
+        if not boxes_data:
+            return ""
+
+        # Sort primarily top-to-bottom
+        boxes_data.sort(key=lambda b: (b["min_y"], b["min_x"]))
+
+        lines = []
+        current_line = [boxes_data[0]]
+
+        for b in boxes_data[1:]:
+            line_avg_y = sum(x["center_y"] for x in current_line) / len(current_line)
+            line_avg_h = sum(x["height"] for x in current_line) / len(current_line)
+            threshold = max(6.0, line_avg_h * 0.48)
+
+            if abs(b["center_y"] - line_avg_y) <= threshold:
+                current_line.append(b)
+            else:
+                current_line.sort(key=lambda x: x["min_x"])
+                lines.append(" ".join(x["text"] for x in current_line))
+                current_line = [b]
+
+        if current_line:
+            current_line.sort(key=lambda x: x["min_x"])
+            lines.append(" ".join(x["text"] for x in current_line))
+
+        # Format bullets and paragraphs ensuring separate lines
+        formatted = []
+        bullet_marker_pattern = re.compile(r'^(?:[•\-\*■▪◆\u2022\u25cf\u25aa\u25b6\u2713\u2714]|\d+[\.\)]|[a-zA-Z][\.\)])\s*')
+        for line in lines:
+            line_str = line.strip()
+            if not line_str:
+                continue
+            # Check for multiple bullets joined on one line
+            sub_items = re.split(r'(?<=\S)\s+([•\-\*■▪◆\u2022\u25cf\u25aa\u25b6\u2713\u2714]|\d+\.|\([0-9a-zA-Z]\))\s+', line_str)
+            if len(sub_items) > 1:
+                head = sub_items[0].strip()
+                if head:
+                    formatted.append(head)
+                for i in range(1, len(sub_items), 2):
+                    b_text = sub_items[i+1].strip() if i+1 < len(sub_items) else ""
+                    formatted.append(f"• {b_text}")
+            else:
+                if bullet_marker_pattern.match(line_str):
+                    norm = re.sub(r'^[•\-\*■▪◆\u2022\u25cf\u25aa\u25b6\u2713\u2714]\s*', '• ', line_str)
+                    formatted.append(norm)
+                else:
+                    formatted.append(line_str)
+
+        return "\n".join(formatted)
+
+    @staticmethod
     def extract_from_image(file_bytes: bytes) -> Tuple[str, int]:
         """
-        High-accuracy image OCR engine (Camera photos, document scans, screenshots).
+        High-accuracy image OCR engine (Camera photos, document scans, certificates, screenshots).
         Applies adaptive Pillow auto-contrast, Lanczos upscaling, and unsharp sharpening
-        before cascading to RapidOCR (ONNXRuntime), PaddleOCR, PyMuPDF OCR, and pytesseract.
+        with RapidOCR (ONNXRuntime), PaddleOCR, PyMuPDF OCR, and pytesseract.
         """
-        # Image Enhancement Pipeline for camera clicks & blurry photos
-        try:
-            from PIL import Image, ImageOps, ImageEnhance, ImageFilter
-            import numpy as np
+        from PIL import Image, ImageOps, ImageEnhance
+        import numpy as np
 
+        raw_img = None
+        img_np = None
+        enhanced_img = None
+
+        try:
             raw_img = Image.open(io.BytesIO(file_bytes)).convert("RGB")
 
-            # 1. Upscale low-res camera snapshots to ensure crisp glyph contours
+            # 1. Scale camera snapshots: upscale if small, bound if gigantic
             w, h = raw_img.size
-            if max(w, h) < 1800:
-                scale_factor = min(3.0, 2000.0 / max(w, h))
-                raw_img = raw_img.resize((int(w * scale_factor), int(h * scale_factor)), Image.Resampling.LANCZOS)
+            if max(w, h) < 1600:
+                scale_factor = min(2.5, 1800.0 / max(w, h))
+                working_img = raw_img.resize((int(w * scale_factor), int(h * scale_factor)), Image.Resampling.LANCZOS)
+            elif max(w, h) > 3500:
+                scale_factor = 2500.0 / max(w, h)
+                working_img = raw_img.resize((int(w * scale_factor), int(h * scale_factor)), Image.Resampling.BILINEAR)
+            else:
+                working_img = raw_img
 
             # 2. Normalize contrast and boost sharpness for uneven camera lighting
-            enhanced_img = ImageOps.autocontrast(raw_img, cutoff=1)
+            enhanced_img = ImageOps.autocontrast(working_img, cutoff=1)
             sharp_enhancer = ImageEnhance.Sharpness(enhanced_img)
-            enhanced_img = sharp_enhancer.enhance(1.6)
+            enhanced_img = sharp_enhancer.enhance(1.4)
 
-            # 3. Subtle contrast boost to separate text from noisy backgrounds
+            # 3. Subtle contrast boost
             contrast_enhancer = ImageEnhance.Contrast(enhanced_img)
-            enhanced_img = contrast_enhancer.enhance(1.25)
+            enhanced_img = contrast_enhancer.enhance(1.15)
             
             img_np = np.array(enhanced_img)
         except Exception as e:
             logger.debug(f"Pillow image preprocessing notice: {e}")
-            enhanced_img = None
-            img_np = None
+            if raw_img is not None:
+                try:
+                    img_np = np.array(raw_img)
+                except Exception:
+                    img_np = None
 
-        # 1. State-of-the-art: RapidOCR (ONNXRuntime) for fast neural scene text OCR
+        # 1. State-of-the-art: RapidOCR (ONNXRuntime) with layout reconstruction
         try:
             from rapidocr_onnxruntime import RapidOCR
             engine = RapidOCR()
-            ocr_res, _ = engine(img_np if img_np is not None else np.array(Image.open(io.BytesIO(file_bytes)).convert("RGB")))
+            
+            # Primary pass on enhanced image
+            target_np = img_np if img_np is not None else np.array(Image.open(io.BytesIO(file_bytes)).convert("RGB"))
+            ocr_res, _ = engine(target_np)
+            
+            # If low detection on enhanced, retry with raw image
+            if (not ocr_res or len(ocr_res) < 2) and raw_img is not None:
+                raw_ocr_res, _ = engine(np.array(raw_img))
+                if raw_ocr_res and len(raw_ocr_res) > (len(ocr_res) if ocr_res else 0):
+                    ocr_res = raw_ocr_res
+                    
             if ocr_res:
-                lines = [item[1] for item in ocr_res if len(item) > 1 and item[1]]
-                if lines:
-                    return "\n".join(lines), 1
-        except Exception:
-            pass
+                reconstructed = TextExtractor._reconstruct_ocr_boxes(ocr_res)
+                if reconstructed and reconstructed.strip():
+                    return reconstructed.strip(), 1
+        except Exception as ocr_err:
+            logger.debug(f"RapidOCR execution note: {ocr_err}")
 
         # 2. State-of-the-art: PaddleOCR for deep angle classification & scene text recognition
         try:
@@ -470,7 +582,6 @@ class TextExtractor:
         # 3. PyMuPDF OCR (with English & Hindi Devanagari models)
         try:
             import pymupdf
-            # Save enhanced image to bytes buffer for PyMuPDF
             buf = io.BytesIO()
             if enhanced_img is not None:
                 enhanced_img.save(buf, format="PNG")
@@ -501,9 +612,8 @@ class TextExtractor:
         except Exception as e:
             logger.debug(f"PyMuPDF image OCR note: {e}")
 
-        # 3. Pillow fallback with pytesseract if available
+        # 4. Pillow fallback with pytesseract if available
         try:
-            from PIL import Image
             import pytesseract
             img = Image.open(io.BytesIO(file_bytes))
             txt = pytesseract.image_to_string(img)

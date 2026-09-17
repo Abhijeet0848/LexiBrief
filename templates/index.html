@@ -822,18 +822,19 @@
       { code: 'eng+hin+spa+fra+deu', label: '🌍 Global Multi-Script (All)', short: 'Global Multi' }
     ];
 
-    // Smart OCR Text Cleanser: Preserves all International Scripts (Hindi, Indic, Arabic, CJK, Cyrillic, Latin)
+    // Smart OCR Text Cleanser: Preserves all International Scripts (Hindi, Indic, Arabic, CJK, Cyrillic, Latin) and structural formatting
     const cleanOCRText = (text) => {
       if (!text) return '';
-      // 1. Strip non-printable control codes while preserving valid Unicode letters, numbers, and Indic/Arabic/CJK punctuation
-      let clean = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
-      clean = clean.replace(/[|~_^\/\\<>{}\[\]*+=#`¬¢§±µ¿¡@$%&~]+/g, ' ');
+      // 1. Strip non-printable control codes while preserving valid letters, numbers, and Indic/Arabic/CJK punctuation
+      let clean = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F\uFFFD\uFEFF]/g, '');
+      // 2. Strip OCR fringe glitches (| ~ ¬ ¢ § ± µ ¿ ¡) but keep valid punctuation (@ / _ - • . , : ; + = & % #)
+      clean = clean.replace(/[|~¬¢§±µ¿¡]+/g, ' ');
       
-      // 2. Fix English OCR digit-in-word substitutions (e.g. m0del -> model) only for Latin words
+      // 3. Heal English OCR digit-in-word substitutions only for pure ASCII words without special symbols
       clean = clean.replace(/\b([a-zA-Z0-9]+)\b/g, (match) => {
         if (/^\d+$/.test(match) || /^\d+[a-zA-Z]{1,2}$/.test(match)) return match;
         const alphas = (match.match(/[a-zA-Z]/g) || []).length;
-        if (alphas >= 2) {
+        if (alphas >= 2 && !/[@\._\/\-]/.test(match)) {
           return match
             .replace(/(?<=[a-zA-Z])0(?=[a-zA-Z])/g, 'o')
             .replace(/(?<=[a-zA-Z])1(?=[a-zA-Z])/g, 'l')
@@ -843,7 +844,11 @@
         return match;
       });
 
-      // 3. Clean line by line and eliminate isolated single-character Latin noise without touching Unicode
+      // 4. Ensure each bullet point is on a discrete new line
+      clean = clean.replace(/[ \t]*([•\u2022\u25cf\u25aa\u25b8\u2219\u2023\u2043\u204c\u204d\u2218\u25cb\u25e6\u25ab])[ \t]*/g, '\n• ');
+      clean = clean.replace(/\n{2,}• /g, '\n• ');
+
+      // 5. Clean line by line and eliminate isolated single-character Latin noise
       const lines = clean.split('\n');
       const validLines = [];
       for (let line of lines) {
@@ -863,9 +868,32 @@
       return res || text.trim();
     };
 
-    // Helper: Execute High-Precision Client OCR with Universal Multilingual Support
+    // Helper: Execute High-Precision Neural OCR (Server RapidOCR First, Client Tesseract Fallback)
     const executeHandwritingOCR = async (imageSrc, onProgress, selectedLang = 'eng+hin') => {
-      if (!window.Tesseract || !imageSrc) return '';
+      if (!imageSrc) return '';
+
+      if (onProgress) onProgress(25, 'Connecting to LexiBrief Deep Neural OCR...');
+
+      // 1. Primary: Server-side Deep Learning RapidOCR with ONNX Runtime
+      try {
+        const response = await fetch('/api/ocr', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: imageSrc, lang: selectedLang })
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.text && data.text.trim()) {
+            if (onProgress) onProgress(100, 'Neural OCR extraction complete!');
+            return cleanOCRText(data.text);
+          }
+        }
+      } catch (serverErr) {
+        console.warn("Server-side OCR notice, falling back to client engine:", serverErr);
+      }
+
+      // 2. Secondary Fallback: Client-Side Tesseract.js (WASM)
+      if (!window.Tesseract) return '';
       const langParam = selectedLang ? (selectedLang.includes('+') ? selectedLang.split('+').map(s => s.trim()).filter(Boolean) : selectedLang) : ['eng', 'hin'];
       const langStr = Array.isArray(langParam) ? langParam.join('+') : selectedLang;
       
@@ -916,7 +944,7 @@
         return cleanOCRText(ret?.data?.text || '');
       } catch (err) {
         console.error("Tesseract recognize error:", err);
-        throw err;
+        return '';
       }
     };
 

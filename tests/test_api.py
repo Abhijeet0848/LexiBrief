@@ -319,3 +319,27 @@ def test_multilingual_ocr_cleansing():
     assert "|" not in cleaned
     assert "~" not in cleaned
 
+
+def test_ocr_endpoint_and_image_extraction():
+    """Verify /api/ocr endpoint and RapidOCR text extraction with layout preservation."""
+    from PIL import Image, ImageDraw
+    import io
+    
+    img = Image.new('RGB', (600, 150), color=(255, 255, 255))
+    draw = ImageDraw.Draw(img)
+    draw.text((20, 20), "Domain Ownership Certificate", fill=(0, 0, 0))
+    draw.text((20, 60), "Domain Name: example.com", fill=(0, 0, 0))
+    draw.text((20, 100), "• Bullet item 1", fill=(0, 0, 0))
+    
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG")
+    img_bytes = buf.getvalue()
+    
+    # 1. Test multipart upload to /api/ocr
+    res = client.post("/api/ocr", files={"file": ("test_doc.jpg", io.BytesIO(img_bytes), "image/jpeg")})
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success"] is True
+    assert "Certificate" in data["text"] or "Domain" in data["text"]
+    assert data["words"] > 0
+

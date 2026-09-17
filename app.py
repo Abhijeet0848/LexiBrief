@@ -322,6 +322,56 @@ async def health_check():
 
 
 
+class OCRRequest(BaseModel):
+    image: Optional[str] = Field(None, description="Base64-encoded image or Data URL")
+    lang: Optional[str] = Field("auto", description="Language hint")
+
+
+@app.post("/api/ocr", tags=["Text Extraction & MongoDB"])
+@app.post("/api/ocr-image", tags=["Text Extraction & MongoDB"], include_in_schema=False)
+async def ocr_image_endpoint(
+    file: Optional[UploadFile] = File(None),
+    body: Optional[OCRRequest] = None
+):
+    """
+    High-speed, neural OCR text extraction endpoint.
+    Accepts image file upload or base64 data URI and returns accurate extracted text with preserved bullet layout.
+    """
+    try:
+        content_bytes = None
+        if file is not None:
+            content_bytes = await file.read(MAX_UPLOAD_SIZE + 1)
+        elif body is not None and body.image:
+            raw_str = body.image.strip()
+            if "," in raw_str:
+                raw_str = raw_str.split(",", 1)[1]
+            content_bytes = base64.b64decode(raw_str)
+        
+        if not content_bytes:
+            raise HTTPException(status_code=400, detail="No image data provided for OCR.")
+
+        if len(content_bytes) > MAX_UPLOAD_SIZE:
+            raise HTTPException(status_code=413, detail="Image size exceeds maximum 50 MB limit.")
+
+        extracted_text, pages_count = TextExtractor.extract_from_image(content_bytes)
+        cleaned_text = TextExtractor.clean_ocr_text(extracted_text) if extracted_text else ""
+        words = len(cleaned_text.split()) if cleaned_text else 0
+
+        return {
+            "success": True,
+            "text": cleaned_text,
+            "raw_text": extracted_text,
+            "words": words,
+            "pages": pages_count,
+            "engine": "rapidocr_onnx"
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"OCR image endpoint error: {e}")
+        raise HTTPException(status_code=500, detail=f"OCR processing failed: {str(e)}")
+
+
 @app.post("/api/upload", tags=["Text Extraction & MongoDB"])
 @app.post("/upload", tags=["Text Extraction & MongoDB"], include_in_schema=False)
 async def upload_document(
@@ -340,20 +390,18 @@ async def upload_document(
         
         extracted_text, detected_format, pages_count = TextExtractor.extract(file.filename or "document.txt", content_bytes)
         
-        # If client provided OCR text (e.g. from live camera photo capture, image upload, or scanned PDF)
+        # If client provided OCR text (e.g. from live camera photo review or manual edit)
         if ocr_text and ocr_text.strip():
             cleaned_ocr = TextExtractor.clean_ocr_text(ocr_text)
             if not extracted_text or not extracted_text.strip():
                 extracted_text = cleaned_ocr
             else:
-                # Compare word count and richness
-                client_words = len(cleaned_ocr.split())
                 server_words = len(extracted_text.split())
-                if client_words > server_words + 4:
+                client_words = len(cleaned_ocr.split())
+                # Prioritize server neural OCR unless client text has distinctly more content
+                if server_words < 3 and client_words >= 3:
                     extracted_text = cleaned_ocr
-                elif server_words >= client_words:
-                    pass
-                else:
+                elif client_words > server_words * 1.6 and client_words > 10:
                     extracted_text = cleaned_ocr
             if (file.filename or '').lower().endswith(('.jpg', '.jpeg', '.png', '.webp', '.bmp')):
                 detected_format = "IMAGE"
