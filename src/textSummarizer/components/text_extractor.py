@@ -707,6 +707,16 @@ class TextExtractor:
                                 best_words = rot_words
                                 best_res = rot_res
                 
+                # Fallback: High-sensitivity detection for isolated handwriting, signatures & faint pencil strokes
+                if not best_res or best_words == 0:
+                    try:
+                        sens_engine = RapidOCR(box_thresh=0.15, text_score=0.15, unclip_ratio=2.0)
+                        sens_res, _ = sens_engine(target_np)
+                        if sens_res:
+                            best_res = sens_res
+                    except Exception:
+                        pass
+
                 if best_res:
                     reconstructed = TextExtractor._reconstruct_ocr_boxes(best_res)
                     if reconstructed and reconstructed.strip():
