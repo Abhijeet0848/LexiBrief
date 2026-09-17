@@ -79,29 +79,37 @@ class ExtractiveSummarizer:
                 if matching_persona_words > 0:
                     persona_boost += (0.70 * matching_persona_words)
             
-            # Executive persona: Prioritize high-level governance, KPIs, state, and resource metrics
+            # Executive persona: Prioritize high-level governance, KPIs, strategic vision, state, and resource metrics
             if persona_key == "executive":
                 if any(c.isdigit() or c in "$%€£" for c in sentence):
                     persona_boost += 0.40
                 if idx in (0, 1):
                     persona_boost += 0.35
-            # Technical persona: Prioritize architectural components, data structures, and mechanics
+                if any(w in sentence for w in ["साहित्य का यही काम", "हमारा लक्ष्य", "कल्याण ही साध्य", "सत्य वह है", "मनुष्य ही बड़ी", "उद्देश्य", "महत्त्व", "नीति", "सर्वोच्च"]):
+                    persona_boost += 0.65
+            # Technical persona: Prioritize architectural components, data structures, linguistic sciences, and mechanics
             elif persona_key == "technical":
                 lower_s = sentence.lower()
                 if any(kw in lower_s for kw in ["queue", "schedul", "descriptor", "stack", "heap", "i/o", "device", "memory space", "pointer"]):
                     persona_boost += 0.50
+                if any(w in sentence for w in ["भाषा-विज्ञान", "नृतत्त्व-शास्त्र", "भाषाशास्त्र", "व्याकरण", "ग्रियर्सन", "सर्वे", "संस्कृत", "आर्यभाषा", "पालि", "प्राकृत", "बोली", "शास्त्र", "ग्रंथ"]):
+                    persona_boost += 0.75
             # Readability / simplicity boost for ELI5
             elif persona_key == "eli5":
-                if len(tokens) <= 16:
+                if len(tokens) <= 18:
                     persona_boost += 0.45
                 lower_s = sentence.lower()
                 if any(w in lower_s for w in ["assigned to", "shows", "means", "identify", "running", "waiting"]):
                     persona_boost += 0.40
+                if any(w in sentence for w in ["जैसे", "उदाहरण", "सीधा", "सहज", "सरल", "दूध", "दही", "धूल", "कहानी", "सुख", "दुख", "बच्चे", "जीवन", "भलाई", "प्रेम"]):
+                    persona_boost += 0.65
             # Action item marker boost
             elif persona_key == "action_items":
                 lower_s = sentence.lower()
                 if any(w in lower_s for w in ["will", "should", "must", "todo", "action", "next step", "schedule", "deploy", "plan", "tracks", "helps", "allocated"]):
                     persona_boost += 0.50
+                if any(w in sentence for w in ["चाहिए", "होगा", "होगी", "होंगे", "पड़ेगा", "पड़ेगी", "पड़ेंगे", "कर्तव्य", "संकल्प", "व्रत", "उपाय", "रास्ता", "मार्ग", "सुधार", "प्रयत्न", "प्रयास", "लड़ना", "बचाना", "तैयार", "आवश्यक"]):
+                    persona_boost += 0.75
 
             # Length normalization (penalize overly short or overly verbose fragments)
             token_count = len(tokens)

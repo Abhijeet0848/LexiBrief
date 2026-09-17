@@ -458,25 +458,39 @@ class NLPProcessor:
 
     PERSONA_KEYWORDS = {
         "executive": {
+            # English
             "revenue", "profit", "loss", "growth", "margin", "cost", "q1", "q2", "q3", "q4",
             "million", "billion", "percent", "%", "$", "increased", "decreased", "roi", "kpi",
             "market", "strategic", "decision", "ebitda", "guidance", "target", "outcome", "earnings", "quarter", "annual",
-            "status", "state", "summary", "overview", "impact", "tracking", "account", "accounting", "governance", "unique", "resource", "usage", "identify", "identification", "pid"
+            "status", "state", "summary", "overview", "impact", "tracking", "account", "accounting", "governance", "unique", "resource", "usage", "identify", "identification", "pid",
+            # Hindi (शासन, उद्देश्य, लक्ष्य, नीति, राष्ट्र, समाज, कल्याण, महत्व)
+            "लक्ष्य", "उद्देश्य", "नीति", "राष्ट्र", "समाज", "कल्याण", "महत्व", "महत्त्व", "परिणाम", "प्रभाव",
+            "शासन", "निर्णय", "साध्य", "विकास", "ऐतिहासिक", "राजनीतिक", "आर्थिक", "व्यवस्था", "प्रमुख", "मुख्य", "सत्य", "मानव"
         },
         "technical": {
+            # English
             "api", "architecture", "framework", "database", "pipeline", "model", "transformer",
             "latency", "throughput", "algorithm", "neural", "gpu", "docker", "server", "code",
             "function", "memory", "cpu", "scale", "performance", "deployment", "protocol", "parameter", "embedding", "loss", "accuracy",
-            "scheduling", "queue", "queues", "descriptor", "descriptors", "devices", "device", "stack", "heap", "structure", "layout", "network", "allocated", "hardware", "i/o", "io", "pointers"
+            "scheduling", "queue", "queues", "descriptor", "descriptors", "devices", "device", "stack", "heap", "structure", "layout", "network", "allocated", "hardware", "i/o", "io", "pointers",
+            # Hindi (भाषा-विज्ञान, नृतत्त्व, शास्त्र, व्याकरण, ग्रंथ, तकनीकी, सिद्धांत)
+            "भाषा-विज्ञान", "नृतत्त्व", "नृतत्त्व-शास्त्र", "भाषाशास्त्र", "व्याकरण", "सर्वे", "शोध", "वैज्ञानिक", "शास्त्र",
+            "ग्रंथ", "आर्यभाषा", "संस्कृत", "पालि", "प्राकृत", "बोली", "प्रणाली", "प्रक्रिया", "तकनीकी", "संरचना", "सिद्धांत", "तथ्य", "अध्ययन", "विश्लेषण"
         },
         "eli5": {
+            # English
             "is", "are", "means", "example", "like", "simple", "main", "works", "help", "called", "known", "way", "idea", "part",
-            "number", "shows", "look", "time", "what", "how", "easy", "unique", "files", "using", "open"
+            "number", "shows", "look", "time", "what", "how", "easy", "unique", "files", "using", "open",
+            # Hindi (सरल, सहज, उदाहरण, जैसे, अर्थ, सीख, भलाई)
+            "सहज", "सरल", "आसान", "जैसे", "उदाहरण", "सीधा", "अर्थात", "अर्थात्", "अर्थ", "सीख", "बात", "कहानी", "सुख", "दुख", "दुःख", "जीवन", "भलाई", "प्रेम"
         },
         "action_items": {
+            # English
             "must", "should", "will", "scheduled", "deploy", "implement", "prepare", "fix",
             "review", "coordinate", "deadline", "todo", "action", "task", "deliverable", "assigned", "urgent", "step", "plan", "lock",
-            "information", "tracks", "helps", "allocated", "decide", "priority", "scheduling", "descriptors"
+            "information", "tracks", "helps", "allocated", "decide", "priority", "scheduling", "descriptors",
+            # Hindi (चाहिए, होगा, कर्तव्य, संकल्प, मार्ग, सुधार, प्रयत्न, रक्षा)
+            "चाहिए", "होगा", "होगी", "होंगे", "पड़ेगा", "पड़ेगी", "पड़ेंगे", "कर्तव्य", "संकल्प", "व्रत", "उपाय", "रास्ता", "मार्ग", "सुधार", "प्रयत्न", "प्रयास", "कार्य", "सेवा", "बचाना", "लड़ना", "उठाना", "तैयार", "आवश्यक"
         }
     }
 
