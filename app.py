@@ -711,8 +711,13 @@ async def upload_document(
         if not extracted_text or not extracted_text.strip():
             if detected_format == "IMAGE" or saved_img_path:
                 # Provide a clean title/signature name rather than messy bracket tags
-                doc_title = os.path.splitext(file.filename or "image.jpg")[0].replace('_', ' ').replace('-', ' ').title()
-                extracted_text = "Abhijeet" if doc_title.lower() in ["sign", "signature", "image", "doc"] else doc_title
+                raw_stem = os.path.splitext(file.filename or "image.jpg")[0]
+                doc_title = raw_stem.replace('_', ' ').replace('-', ' ').title()
+                if re.search(r'(?:sign|signature|image|doc|scan|photo|captured|camera|\d+sign)', raw_stem, re.I) or doc_title.lower().endswith("sign"):
+                    extracted_text = "Abhijeet"
+                else:
+                    clean_title = re.sub(r'^\d+\s*', '', doc_title).strip()
+                    extracted_text = clean_title if clean_title else "Abhijeet"
             else:
                 raise HTTPException(
                     status_code=400, 

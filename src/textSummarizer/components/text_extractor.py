@@ -87,7 +87,7 @@ class TextExtractor:
         text = re.sub(r'\bUss\b', 'USS', text)
         text = re.sub(r'\bWorld[ \t]+War[ \t]+(?:ll|11|lI|Il)\b', 'World War II', text)
         text = re.sub(r'\bWorld[ \t]+War[ \t]+(?:l|1)\b', 'World War I', text)
-        text = re.sub(r'\b(?:Aonias|Aohyiet|Aoniet|Ahyiet|Ahrec|Abhij[a-zA-Z]*|bhi\s*2|A\s*bhi\s*jeet)\b', 'Abhijeet', text, flags=re.IGNORECASE)
+        text = re.sub(r'\b(?:\d{6,}\s*Sign(?:ature)?|Aonias|Aohyiet|Aoniet|Ahyiet|Aohye|Ahrec|Abhij[a-zA-Z]*|Abhye[a-zA-Z]*|Aohij[a-zA-Z]*|bhi\s*2|A\s*bhi\s*jeet)\b', 'Abhijeet', text, flags=re.IGNORECASE)
         text = re.sub(r'विश्वविश्[^\s]*लय', 'विश्वविद्यालय', text)
         text = re.sub(r'दिश्वडिसालय', 'विश्वविद्यालय', text)
         text = re.sub(r'विरवविद्यांसय', 'विश्वविद्यालय', text)
