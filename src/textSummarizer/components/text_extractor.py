@@ -59,17 +59,20 @@ class TextExtractor:
             return w
 
         # 6. Heal common OCR phrase and Devanagari ligature distortions
+        text = re.sub(r'\b[Ww]SUSE[ \t]+OF\b', 'MISUSE OF', text)
         text = re.sub(r'\bINTENTION[ \t]+OF[ \t]+Avan[^\r\n]*', 'INTENTION OF AVAILING', text, flags=re.IGNORECASE)
         text = re.sub(r'\bWEALTH[ \t]+FACILITY\b', 'HEALTH FACILITY', text, flags=re.IGNORECASE)
         text = re.sub(r'\bWALL[ \t]+INVITE\b', 'WILL INVITE', text, flags=re.IGNORECASE)
         text = re.sub(r'\bDISCIPLIMARY\b', 'DISCIPLINARY', text, flags=re.IGNORECASE)
-        text = re.sub(r'[—–\-~_]*[ \t]*[0oO][ \t]*DELHI[\s\-]*(?=\d{6})', 'NEW DELHI-', text, flags=re.IGNORECASE)
-        text = re.sub(r'\b(?:on[ \t]*9[ \t]*)?DEL[ \t]*Hi\b', 'DELHI', text, flags=re.IGNORECASE)
-        text = re.sub(r'\bNEW[ \t]+DEL[ \t]*HI\b', 'NEW DELHI', text, flags=re.IGNORECASE)
+        text = re.sub(r'विश्वविश्[^\s]*लय', 'विश्वविद्यालय', text)
         text = re.sub(r'दिश्वडिसालय', 'विश्वविद्यालय', text)
         text = re.sub(r'विरवविद्यांसय', 'विश्वविद्यालय', text)
         text = re.sub(r'कंन्ट्र\b', 'केन्द्र', text)
         text = re.sub(r'नई[ \t]+fa[ \t]*(?=\d{6})', 'नई दिल्ली-', text)
+        text = re.sub(r'नई[ \t]+दिल्ली[ \t]*(?:noose\??|noos\w*|11006[?7])', 'नई दिल्ली-110067', text, flags=re.IGNORECASE)
+        text = re.sub(r'[—–\-~_]*[ \t]*[0oO][ \t]*DELHI[\s\-]*(?=\d{6})', 'NEW DELHI-', text, flags=re.IGNORECASE)
+        text = re.sub(r'\b(?:on[ \t]*9[ \t]*)?DEL[ \t]*Hi\b', 'DELHI', text, flags=re.IGNORECASE)
+        text = re.sub(r'\bNEW[ \t]+DEL[ \t]*HI\b', 'NEW DELHI', text, flags=re.IGNORECASE)
 
         # 7. Filter line by line and eliminate isolated single-character Latin noise
         clean_lines = []
