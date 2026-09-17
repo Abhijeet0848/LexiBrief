@@ -524,91 +524,105 @@ class TextExtractor:
         return "\n".join(formatted)
 
     @staticmethod
-    def extract_from_image(file_bytes: bytes) -> Tuple[str, int]:
-        """
-        High-accuracy image OCR engine (Camera photos, document scans, certificates, screenshots).
-        Applies adaptive Pillow auto-contrast, Lanczos upscaling, and unsharp sharpening
-        with RapidOCR (ONNXRuntime), PaddleOCR, PyMuPDF OCR, and pytesseract.
-        """
+    def _create_image_variants(raw_img):
+        """Generates adaptive contrast, binarized, and channel-isolated image variants for maximum OCR readability."""
         from PIL import Image, ImageOps, ImageEnhance
         import numpy as np
 
+        variants = []
+        w, h = raw_img.size
+
+        # 1. Upscale if small (minimum 1800px on max dimension)
+        if max(w, h) < 1600:
+            scale_factor = min(2.5, 1800.0 / max(w, h))
+            working_img = raw_img.resize((int(w * scale_factor), int(h * scale_factor)), Image.Resampling.LANCZOS)
+        elif max(w, h) > 3500:
+            scale_factor = 2500.0 / max(w, h)
+            working_img = raw_img.resize((int(w * scale_factor), int(h * scale_factor)), Image.Resampling.BILINEAR)
+        else:
+            working_img = raw_img
+
+        # Variant 1: Enhanced Auto-Contrast & Crisp Sharpening
+        v1 = ImageOps.autocontrast(working_img, cutoff=1)
+        v1 = ImageEnhance.Sharpness(v1).enhance(1.4)
+        v1 = ImageEnhance.Contrast(v1).enhance(1.2)
+        variants.append(("enhanced", v1))
+
+        # Variant 2: Adaptive Yellow/Warm-Tint Cancelling (Blue-channel emphasis)
+        try:
+            r, g, b = working_img.split()
+            v2 = ImageEnhance.Contrast(b).enhance(1.4)
+            v2 = ImageOps.autocontrast(v2, cutoff=2)
+            variants.append(("blue_channel_contrast", v2.convert("RGB")))
+        except Exception:
+            pass
+
+        # Variant 3: Adaptive Binarization for documents & ID cards
+        try:
+            gray = ImageOps.grayscale(working_img)
+            gray_np = np.array(gray)
+            mean_val = np.mean(gray_np)
+            thresh_np = np.where(gray_np > mean_val * 0.88, 255, 0).astype(np.uint8)
+            v3 = Image.fromarray(thresh_np).convert("RGB")
+            variants.append(("adaptive_binarized", v3))
+        except Exception:
+            pass
+
+        return variants
+
+    @staticmethod
+    def extract_from_image(file_bytes: bytes) -> Tuple[str, int]:
+        """
+        High-accuracy image OCR engine (Camera photos, document scans, certificates, screenshots).
+        Applies multi-variant adaptive preprocessors with PyMuPDF Neural OCR, RapidOCR, PaddleOCR, and pytesseract.
+        """
+        from PIL import Image, ImageOps
+        import numpy as np
+
         raw_img = None
-        img_np = None
-        enhanced_img = None
+        variants = []
 
         try:
             raw_img = Image.open(io.BytesIO(file_bytes)).convert("RGB")
-            # Auto-rotate phone camera images according to EXIF metadata
             try:
                 raw_img = ImageOps.exif_transpose(raw_img)
             except Exception:
                 pass
-
-            # 1. Scale camera snapshots: upscale if small, bound if gigantic
-            w, h = raw_img.size
-            if max(w, h) < 1600:
-                scale_factor = min(2.5, 1800.0 / max(w, h))
-                working_img = raw_img.resize((int(w * scale_factor), int(h * scale_factor)), Image.Resampling.LANCZOS)
-            elif max(w, h) > 3500:
-                scale_factor = 2500.0 / max(w, h)
-                working_img = raw_img.resize((int(w * scale_factor), int(h * scale_factor)), Image.Resampling.BILINEAR)
-            else:
-                working_img = raw_img
-
-            # 2. Normalize contrast and boost sharpness for uneven camera lighting
-            enhanced_img = ImageOps.autocontrast(working_img, cutoff=1)
-            sharp_enhancer = ImageEnhance.Sharpness(enhanced_img)
-            enhanced_img = sharp_enhancer.enhance(1.4)
-
-            # 3. Subtle contrast boost
-            contrast_enhancer = ImageEnhance.Contrast(enhanced_img)
-            enhanced_img = contrast_enhancer.enhance(1.15)
-            
-            img_np = np.array(enhanced_img)
+            variants = TextExtractor._create_image_variants(raw_img)
         except Exception as e:
             logger.debug(f"Pillow image preprocessing notice: {e}")
-            if raw_img is not None:
-                try:
-                    img_np = np.array(raw_img)
-                except Exception:
-                    img_np = None
 
-        # 1. State-of-the-art Multi-Engine OCR Matrix
         candidates = []
 
         # Engine A: PyMuPDF OCR (Tesseract Neural LSTM with bilingual English + Hindi support)
         try:
             import pymupdf
-            buf = io.BytesIO()
-            if enhanced_img is not None:
-                enhanced_img.save(buf, format="PNG")
+            for var_name, var_img in variants:
+                buf = io.BytesIO()
+                var_img.save(buf, format="PNG")
                 enhanced_bytes = buf.getvalue()
-            else:
-                enhanced_bytes = file_bytes
 
-            doc = pymupdf.open(stream=enhanced_bytes, filetype="png")
-            pages = []
-            page_count = len(doc)
-            for page in doc:
-                try:
-                    tp = page.get_textpage_ocr(language="eng+hin", dpi=300, full=True)
-                    text = page.get_text(textpage=tp)
-                    if text and text.strip():
-                        pages.append(text.strip())
-                except Exception:
+                doc = pymupdf.open(stream=enhanced_bytes, filetype="png")
+                pages = []
+                for page in doc:
                     try:
-                        tp = page.get_textpage_ocr(language="eng", dpi=300, full=True)
+                        tp = page.get_textpage_ocr(language="eng+hin", dpi=300, full=True)
                         text = page.get_text(textpage=tp)
                         if text and text.strip():
                             pages.append(text.strip())
                     except Exception:
-                        pass
-            doc.close()
-            if pages:
-                pymupdf_text = "\n\n".join(pages).strip()
-                if pymupdf_text:
-                    candidates.append(("pymupdf_ocr", pymupdf_text))
+                        try:
+                            tp = page.get_textpage_ocr(language="eng", dpi=300, full=True)
+                            text = page.get_text(textpage=tp)
+                            if text and text.strip():
+                                pages.append(text.strip())
+                        except Exception:
+                            pass
+                doc.close()
+                if pages:
+                    pymupdf_text = "\n\n".join(pages).strip()
+                    if pymupdf_text:
+                        candidates.append((f"pymupdf_{var_name}", pymupdf_text))
         except Exception as e:
             logger.debug(f"PyMuPDF image OCR note: {e}")
 
@@ -617,47 +631,27 @@ class TextExtractor:
             from rapidocr_onnxruntime import RapidOCR
             engine = RapidOCR()
             
-            # Primary pass on enhanced image
-            target_np = img_np if img_np is not None else np.array(Image.open(io.BytesIO(file_bytes)).convert("RGB"))
-            ocr_res, _ = engine(target_np)
-            
-            best_res = ocr_res
-            best_words = sum(len(box[1].split()) for box in ocr_res) if ocr_res else 0
+            target_np = np.array(variants[0][1]) if variants else (np.array(raw_img) if raw_img else None)
+            if target_np is not None:
+                ocr_res, _ = engine(target_np)
+                best_res = ocr_res
+                best_words = sum(len(box[1].split()) for box in ocr_res) if ocr_res else 0
 
-            # Multi-angle search for sideways phone photos (90°, 180°, 270°)
-            if best_words < 15 or not ocr_res:
-                for k_rot in (1, 2, 3):
-                    rotated_np = np.rot90(target_np, k_rot)
-                    rot_res, _ = engine(rotated_np)
-                    if rot_res:
-                        rot_words = sum(len(box[1].split()) for box in rot_res)
-                        if rot_words > best_words:
-                            best_words = rot_words
-                            best_res = rot_res
-            
-            # If low detection on enhanced, retry with raw image
-            if (not best_res or best_words < 5) and raw_img is not None:
-                raw_np = np.array(raw_img)
-                raw_ocr_res, _ = engine(raw_np)
-                if raw_ocr_res:
-                    raw_words = sum(len(box[1].split()) for box in raw_ocr_res)
-                    if raw_words > best_words:
-                        best_res = raw_ocr_res
-                        best_words = raw_words
-                if best_words < 15:
+                # Multi-angle search for sideways phone photos (90°, 180°, 270°)
+                if best_words < 15 or not ocr_res:
                     for k_rot in (1, 2, 3):
-                        rot_raw_np = np.rot90(raw_np, k_rot)
-                        rot_res, _ = engine(rot_raw_np)
+                        rotated_np = np.rot90(target_np, k_rot)
+                        rot_res, _ = engine(rotated_np)
                         if rot_res:
                             rot_words = sum(len(box[1].split()) for box in rot_res)
                             if rot_words > best_words:
                                 best_words = rot_words
                                 best_res = rot_res
-                    
-            if best_res:
-                reconstructed = TextExtractor._reconstruct_ocr_boxes(best_res)
-                if reconstructed and reconstructed.strip():
-                    candidates.append(("rapidocr_onnx", reconstructed.strip()))
+                
+                if best_res:
+                    reconstructed = TextExtractor._reconstruct_ocr_boxes(best_res)
+                    if reconstructed and reconstructed.strip():
+                        candidates.append(("rapidocr_onnx", reconstructed.strip()))
         except Exception as ocr_err:
             logger.debug(f"RapidOCR execution note: {ocr_err}")
 
@@ -665,41 +659,41 @@ class TextExtractor:
         try:
             from paddleocr import PaddleOCR
             ocr_engine = PaddleOCR(use_angle_cls=True, lang='en')
-            result = ocr_engine.ocr(img_np if img_np is not None else np.array(Image.open(io.BytesIO(file_bytes)).convert("RGB")), cls=True)
-            if result and result[0]:
-                lines = [line[1][0] for line in result[0] if line and len(line) > 1 and line[1]]
-                if lines:
-                    candidates.append(("paddleocr", "\n".join(lines)))
+            target_np = np.array(variants[0][1]) if variants else (np.array(raw_img) if raw_img else None)
+            if target_np is not None:
+                result = ocr_engine.ocr(target_np, cls=True)
+                if result and result[0]:
+                    lines = [line[1][0] for line in result[0] if line and len(line) > 1 and line[1]]
+                    if lines:
+                        candidates.append(("paddleocr", "\n".join(lines)))
         except Exception:
             pass
 
         # Engine D: PyTesseract fallback
         try:
             import pytesseract
-            img = Image.open(io.BytesIO(file_bytes))
-            txt = pytesseract.image_to_string(img, lang="eng+hin")
-            if txt and txt.strip():
-                candidates.append(("pytesseract", txt.strip()))
-        except Exception:
-            try:
-                import pytesseract
-                img = Image.open(io.BytesIO(file_bytes))
-                txt = pytesseract.image_to_string(img)
+            img_to_use = variants[0][1] if variants else raw_img
+            if img_to_use is not None:
+                try:
+                    txt = pytesseract.image_to_string(img_to_use, lang="eng+hin")
+                except Exception:
+                    txt = pytesseract.image_to_string(img_to_use)
                 if txt and txt.strip():
                     candidates.append(("pytesseract", txt.strip()))
-            except Exception:
-                pass
+        except Exception:
+            pass
 
         if candidates:
-            # Score candidates: boost candidates with Devanagari script for Indic docs and higher clean word count
+            # Score candidates: prioritize Devanagari fidelity and clean readable words
             def score_candidate(cand):
                 _, text = cand
-                devanagari_count = len(re.findall(r'[\u0900-\u097F]', text))
-                word_count = len(text.split())
-                return (devanagari_count * 2.5) + word_count
+                cleaned = TextExtractor.clean_ocr_text(text)
+                devanagari_count = len(re.findall(r'[\u0900-\u097F]', cleaned))
+                word_count = len(cleaned.split())
+                return (devanagari_count * 3.0) + word_count
 
             best_candidate = max(candidates, key=score_candidate)
-            return best_candidate[1], 1
+            return TextExtractor.clean_ocr_text(best_candidate[1]), 1
 
         return "", 1
 
