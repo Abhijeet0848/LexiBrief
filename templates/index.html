@@ -866,16 +866,24 @@
       // 1. Normalize math multiplication symbols (e.g. 1 x 2 x 3 or 1 × 2 × 3)
       let clean = text.replace(/(\d)\s*[\uFFFD\uFEFF×]\s*(\d)/g, '$1 x $2');
 
-      // 2. Normalize bullet points and examples onto separate lines
+      // 2. Normalize arrows (e.g. "last in -> first out" or "last in —> first out")
+      clean = clean.replace(/\s*(?:->|-->|→|—>)\s*/g, ' → ');
+
+      // 3. Heal misclassified bullet glyphs (e.g. '+' or '*' or '-' or Hindi numeral '१.' / '५' before English words)
+      clean = clean.replace(/(?:^|\n)\s*[१२३४५६७८९०][\.\s:]+(?=[A-Za-z])/g, '\n• ');
+      clean = clean.replace(/(?:^|\n)\s*[\+\*]\s+(?=[A-Za-z0-9])/g, '\n• ');
+      clean = clean.replace(/(?:^|\n)\s*-\s+(?=[A-Z])/g, '\n• ');
+
+      // 4. Normalize bullet points and examples onto separate lines
       clean = clean.replace(/(?:^|\n)\s*[\uFFFD\uFEFF•\-\*■▪◆\u2022\u25cf\u25aa\u25b6\u2713\u2714\.]*\s*Example:/g, '\n• Example:');
       clean = clean.replace(/(?<=\S)\s+(?:[\uFFFD\uFEFF•\-\*■▪◆\u2022\u25cf\u25aa\u25b6\u2713\u2714\.]*\s*Example:)/g, '\n• Example:');
 
-      // 3. Strip non-printable control codes while preserving valid letters, numbers, and Indic/Arabic/CJK punctuation
+      // 5. Strip non-printable control codes while preserving valid letters, numbers, and Indic/Arabic/CJK punctuation
       clean = clean.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F\uFFFD\uFEFF]/g, '');
-      // 4. Strip OCR fringe glitches (| ~ ¬ ¢ § ± µ ¿ ¡) but keep valid punctuation (@ / _ - • . , : ; + = & % #)
+      // 6. Strip OCR fringe glitches (| ~ ¬ ¢ § ± µ ¿ ¡) but keep valid punctuation (@ / _ - • . , : ; + = & % #)
       clean = clean.replace(/[|~¬¢§±µ¿¡]+/g, ' ');
       
-      // 5. Heal English OCR digit-in-word substitutions only for pure ASCII words without special symbols
+      // 7. Heal English OCR digit-in-word substitutions only for pure ASCII words without special symbols
       clean = clean.replace(/\b([a-zA-Z0-9]+)\b/g, (match) => {
         if (/^\d+$/.test(match) || /^\d+[a-zA-Z]{1,2}$/.test(match)) return match;
         const alphas = (match.match(/[a-zA-Z]/g) || []).length;
@@ -889,7 +897,7 @@
         return match;
       });
 
-      // 6. Heal common OCR phrase and Devanagari ligature distortions
+      // 8. Heal common OCR phrase and Devanagari ligature distortions
       clean = clean.replace(/\b[Ww]SUSE[ \t]+OF\b/g, 'MISUSE OF');
       clean = clean.replace(/\bINTENTION[ \t]+OF[ \t]+Avan[^\r\n]*/gi, 'INTENTION OF AVAILING');
       clean = clean.replace(/\bWEALTH[ \t]+FACILITY\b/gi, 'HEALTH FACILITY');
@@ -905,11 +913,11 @@
       clean = clean.replace(/\b(?:on[ \t]*9[ \t]*)?DEL[ \t]*Hi\b/gi, 'DELHI');
       clean = clean.replace(/\bNEW[ \t]+DEL[ \t]*HI\b/gi, 'NEW DELHI');
 
-      // 7. Ensure each bullet point is on a discrete new line
+      // 9. Ensure each bullet point is on a discrete new line
       clean = clean.replace(/[ \t]*([•\u2022\u25cf\u25aa\u25b8\u2219\u2023\u2043\u204c\u204d\u2218\u25cb\u25e6\u25ab])[ \t]*/g, '\n• ');
       clean = clean.replace(/\n{2,}• /g, '\n• ');
 
-      // 8. Clean line by line and eliminate isolated single-character Latin noise
+      // 10. Clean line by line and eliminate isolated single-character Latin noise
       const lines = clean.split('\n');
       const validLines = [];
       for (let line of lines) {

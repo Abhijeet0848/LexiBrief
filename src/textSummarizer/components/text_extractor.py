@@ -22,6 +22,7 @@ class TextExtractor:
     def clean_ocr_text(text: str) -> str:
         """
         Cleans OCR artifacts, removes confusing glitch/non-printable symbols,
+        normalizes misrecognized bullet points and arrows,
         and heals digit-in-word confusions while preserving emails, domains, URLs,
         bullets, all international Unicode characters, and Indic/Arabic/CJK punctuation.
         """
@@ -30,18 +31,26 @@ class TextExtractor:
         
         # 1. Normalize math multiplication symbols (e.g. 1 x 2 x 3 or 1 × 2 × 3)
         text = re.sub(r'(\d)\s*[\uFFFD\uFEFF×]\s*(\d)', r'\1 x \2', text)
+
+        # 2. Normalize arrows (e.g. "last in -> first out" or "last in —> first out")
+        text = re.sub(r'\s*(?:->|-->|→|—>)\s*', ' → ', text)
+
+        # 3. Heal misclassified bullet glyphs (e.g. '+' or '*' or '-' or Hindi numeral '१.' / '५' before English words)
+        text = re.sub(r'(?:^|\n)\s*[१२३४५६७८९०][\.\s:]+(?=[A-Za-z])', r'\n• ', text)
+        text = re.sub(r'(?:^|\n)\s*[\+\*]\s+(?=[A-Za-z0-9])', r'\n• ', text)
+        text = re.sub(r'(?:^|\n)\s*-\s+(?=[A-Z])', r'\n• ', text)
         
-        # 2. Normalize bullet points and examples onto separate lines
+        # 4. Normalize bullet points and examples onto separate lines
         text = re.sub(r'(?:^|\n)\s*[\uFFFD\uFEFF•\-\*■▪◆\u2022\u25cf\u25aa\u25b6\u2713\u2714\.]*\s*Example:', r'\n• Example:', text)
         text = re.sub(r'(?<=\S)\s+(?:[\uFFFD\uFEFF•\-\*■▪◆\u2022\u25cf\u25aa\u25b6\u2713\u2714\.]*\s*Example:)', r'\n• Example:', text)
 
-        # 3. Strip unprintable control codes and remaining replacement characters
+        # 5. Strip unprintable control codes and remaining replacement characters
         text = re.sub(r'[\uFFFD\uFEFF\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
         
-        # 4. Strip OCR fringe glitches (isolated bars/tildes/glitches) but keep normal punctuation (. , : ; / @ _ - • & % #)
+        # 6. Strip OCR fringe glitches (isolated bars/tildes/glitches) but keep normal punctuation (. , : ; / @ _ - • & % #)
         text = re.sub(r'[|~¬¢§±µ¿¡]+', ' ', text)
         
-        # 5. Heal English OCR digit-in-word confusions (e.g., 'm0del' -> 'model', 'w1th' -> 'with')
+        # 7. Heal English OCR digit-in-word confusions (e.g., 'm0del' -> 'model', 'w1th' -> 'with')
         def _heal_word(w: str) -> str:
             if not w:
                 return ""
@@ -58,7 +67,7 @@ class TextExtractor:
                     w = re.sub(r'(?<=[a-zA-Z])5(?=[a-zA-Z])', 's', w)
             return w
 
-        # 6. Heal common OCR phrase and Devanagari ligature distortions
+        # 8. Heal common OCR phrase and Devanagari ligature distortions
         text = re.sub(r'\b[Ww]SUSE[ \t]+OF\b', 'MISUSE OF', text)
         text = re.sub(r'\bINTENTION[ \t]+OF[ \t]+Avan[^\r\n]*', 'INTENTION OF AVAILING', text, flags=re.IGNORECASE)
         text = re.sub(r'\bWEALTH[ \t]+FACILITY\b', 'HEALTH FACILITY', text, flags=re.IGNORECASE)
@@ -74,7 +83,7 @@ class TextExtractor:
         text = re.sub(r'\b(?:on[ \t]*9[ \t]*)?DEL[ \t]*Hi\b', 'DELHI', text, flags=re.IGNORECASE)
         text = re.sub(r'\bNEW[ \t]+DEL[ \t]*HI\b', 'NEW DELHI', text, flags=re.IGNORECASE)
 
-        # 7. Filter line by line and eliminate isolated single-character Latin noise
+        # 9. Filter line by line and eliminate isolated single-character Latin noise
         clean_lines = []
         for line in text.split('\n'):
             line_str = line.strip()
@@ -684,13 +693,16 @@ class TextExtractor:
             pass
 
         if candidates:
-            # Score candidates: prioritize Devanagari fidelity and clean readable words
+            # Score candidates: prioritize neural RapidOCR ONNX layout engine and clean readable words
             def score_candidate(cand):
-                _, text = cand
+                engine_name, text = cand
                 cleaned = TextExtractor.clean_ocr_text(text)
                 devanagari_count = len(re.findall(r'[\u0900-\u097F]', cleaned))
                 word_count = len(cleaned.split())
-                return (devanagari_count * 3.0) + word_count
+                score = float(word_count) + (devanagari_count * 1.5)
+                if "rapidocr" in engine_name:
+                    score += 40.0  # Strongly prioritize zero-dependency deep learning RapidOCR ONNX
+                return score
 
             best_candidate = max(candidates, key=score_candidate)
             return TextExtractor.clean_ocr_text(best_candidate[1]), 1
