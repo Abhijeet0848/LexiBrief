@@ -801,9 +801,10 @@
 
     // Universal Multi-Language OCR Configuration
     const OCR_LANGUAGES = [
-      { code: 'hin', label: '🇮🇳 Hindi (हिन्दी)', short: 'Hindi' },
+      { code: 'auto', label: '✨ Auto-Detect Language (Adaptive)', short: 'Auto Detect' },
       { code: 'eng+hin', label: '🌐 Hindi + English (Multilingual)', short: 'Hin + Eng' },
       { code: 'eng', label: '🇬🇧 English', short: 'English' },
+      { code: 'hin', label: '🇮🇳 Hindi (हिन्दी)', short: 'Hindi' },
       { code: 'spa', label: '🇪🇸 Spanish (Español)', short: 'Spanish' },
       { code: 'fra', label: '🇫🇷 French (Français)', short: 'French' },
       { code: 'deu', label: '🇩🇪 German (Deutsch)', short: 'German' },
@@ -876,12 +877,12 @@
     };
 
     // Helper: Execute High-Precision Neural OCR (Server RapidOCR First, Client Tesseract Fallback)
-    const executeHandwritingOCR = async (imageSrc, onProgress, selectedLang = 'eng+hin') => {
+    const executeHandwritingOCR = async (imageSrc, onProgress, selectedLang = 'auto') => {
       if (!imageSrc) return '';
 
-      if (onProgress) onProgress(25, 'Connecting to LexiBrief Deep Neural OCR...');
+      if (onProgress) onProgress(25, 'Connecting to LexiBrief Adaptive Neural OCR...');
 
-      // 1. Primary: Server-side Deep Learning RapidOCR with ONNX Runtime
+      // 1. Primary: Server-side Deep Learning RapidOCR with ONNX Runtime (Adaptive & Multi-Script)
       try {
         const response = await fetch('/api/ocr', {
           method: 'POST',
@@ -891,7 +892,7 @@
         if (response.ok) {
           const data = await response.json();
           if (data && data.text && data.text.trim()) {
-            if (onProgress) onProgress(100, 'Neural OCR extraction complete!');
+            if (onProgress) onProgress(100, 'Adaptive Neural OCR extraction complete!');
             return cleanOCRText(data.text);
           }
         }
@@ -901,12 +902,12 @@
 
       // 2. Secondary Fallback: Client-Side Tesseract.js (WASM)
       if (!window.Tesseract) return '';
-      const langParam = selectedLang ? (selectedLang.includes('+') ? selectedLang.split('+').map(s => s.trim()).filter(Boolean) : selectedLang) : ['eng', 'hin'];
-      const langStr = Array.isArray(langParam) ? langParam.join('+') : selectedLang;
+      const resolvedLang = (!selectedLang || selectedLang === 'auto') ? ['eng', 'hin'] : (selectedLang.includes('+') ? selectedLang.split('+').map(s => s.trim()).filter(Boolean) : selectedLang);
+      const langStr = Array.isArray(resolvedLang) ? resolvedLang.join('+') : resolvedLang;
       
       if (typeof window.Tesseract.createWorker === 'function') {
         try {
-          const worker = await window.Tesseract.createWorker(langParam, 1, {
+          const worker = await window.Tesseract.createWorker(resolvedLang, 1, {
             langPath: 'https://tessdata.projectnaptha.com/4.0.0',
             logger: (m) => {
               if (m.status === 'recognizing text' && typeof m.progress === 'number') {
@@ -965,7 +966,7 @@
       const cameraInputRef = React.useRef(null);
       const [stream, setStream] = React.useState(null);
       const [facingMode, setFacingMode] = React.useState('environment');
-      const [ocrLang, setOcrLang] = React.useState('eng+hin');
+      const [ocrLang, setOcrLang] = React.useState('auto');
       const [capturedImage, setCapturedImage] = React.useState(null);
       const [enhancedPreview, setEnhancedPreview] = React.useState(null);
       const [filterMode, setFilterMode] = React.useState('clarity');
