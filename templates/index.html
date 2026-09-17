@@ -2396,6 +2396,24 @@
         } catch (err) {}
       };
 
+      // Delete All Summaries
+      const handleDeleteAllSummaries = async () => {
+        if (summariesList.length === 0) return;
+        if (!confirm(`Are you sure you want to delete all ${summariesList.length} summaries from history? This cannot be undone.`)) return;
+        try {
+          const res = await fetch('/api/summaries', { method: 'DELETE' });
+          if (res.ok) {
+            const data = await res.json();
+            showToast(`Cleared all history (${data.deleted_count || summariesList.length} items).`, "info");
+            fetchSummaries();
+          } else {
+            showToast("Failed to delete summaries.", "error");
+          }
+        } catch (err) {
+          showToast("Error deleting summaries: " + err.message, "error");
+        }
+      };
+
       // Delete Document
       const handleDeleteDoc = async (id, e) => {
         e?.stopPropagation();
@@ -2407,6 +2425,24 @@
             fetchDocuments();
           }
         } catch (err) {}
+      };
+
+      // Delete All Documents
+      const handleDeleteAllDocuments = async () => {
+        if (documentsList.length === 0) return;
+        if (!confirm(`Are you sure you want to delete all ${documentsList.length} ingested documents? This cannot be undone.`)) return;
+        try {
+          const res = await fetch('/api/documents', { method: 'DELETE' });
+          if (res.ok) {
+            const data = await res.json();
+            showToast(`Deleted all documents (${data.deleted_count || documentsList.length} files).`, "info");
+            fetchDocuments();
+          } else {
+            showToast("Failed to delete documents.", "error");
+          }
+        } catch (err) {
+          showToast("Error deleting documents: " + err.message, "error");
+        }
       };
 
       // Compute ROUGE
@@ -3721,23 +3757,36 @@
                       </p>
                     </div>
                     
-                    <label className={`cursor-pointer inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-sm self-start sm:self-auto ${uploadLoading ? 'opacity-70 pointer-events-none' : ''}`}>
-                      {uploadLoading ? (
-                        <>
-                          <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-                          </svg>
-                          <span>Extracting...</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>+ Ingest Document</span>
-                          <span className="opacity-80 text-[10px] font-normal">(PDF / DOCX / PPTX / TXT / Images)</span>
-                        </>
+                    <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                      {documentsList.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleDeleteAllDocuments}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs transition cursor-pointer shadow-2xs"
+                          title="Delete all ingested documents"
+                        >
+                          <span>🗑️ Delete All ({documentsList.length})</span>
+                        </button>
                       )}
-                      <input type="file" accept=".pdf,.docx,.doc,.pptx,.ppt,.txt,.jpg,.jpeg,.png,.webp,.bmp" onChange={handleFileUpload} className="hidden" disabled={uploadLoading} />
-                    </label>
+
+                      <label className={`cursor-pointer inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-sm ${uploadLoading ? 'opacity-70 pointer-events-none' : ''}`}>
+                        {uploadLoading ? (
+                          <>
+                            <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                            </svg>
+                            <span>Extracting...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>+ Ingest Document</span>
+                            <span className="opacity-80 text-[10px] font-normal">(PDF / DOCX / PPTX / TXT / Images)</span>
+                          </>
+                        )}
+                        <input type="file" accept=".pdf,.docx,.doc,.pptx,.ppt,.txt,.jpg,.jpeg,.png,.webp,.bmp" onChange={handleFileUpload} className="hidden" disabled={uploadLoading} />
+                      </label>
+                    </div>
                   </div>
 
                   {/* Real-Time Upload Progress Card in Documents Tab */}
@@ -4003,9 +4052,9 @@
                               </div>
                             </div>
 
-                            {/* Text Preview Snippet */}
-                            <div className="p-3 rounded-xl bg-slate-50/80 border-l-2 border-indigo-400 border-t border-r border-b border-slate-200 text-xs text-slate-600 leading-relaxed font-sans line-clamp-3 min-h-[4rem]">
-                              {doc.text_snippet || "Document content extracted and ready for summarization."}
+                            {/* Text Preview Snippet (Scrollable) */}
+                            <div className="p-3 rounded-xl bg-slate-50/80 border-l-2 border-indigo-400 border-t border-r border-b border-slate-200 text-xs text-slate-600 leading-relaxed font-sans max-h-32 overflow-y-auto whitespace-pre-wrap select-text">
+                              {doc.text_content || doc.text_snippet || "Document content extracted and ready for summarization."}
                             </div>
                           </div>
 
@@ -4096,9 +4145,9 @@
                             </span>
                           </div>
 
-                          {/* Row 2: Text Preview */}
-                          <div className="p-3.5 rounded-xl bg-slate-50/80 border-l-2 border-indigo-400 border-t border-r border-b border-slate-200 text-xs text-slate-700 leading-relaxed font-sans">
-                            {doc.text_snippet || "Document content extracted and ready for summarization."}
+                          {/* Row 2: Text Preview (Scrollable) */}
+                          <div className="p-3.5 rounded-xl bg-slate-50/80 border-l-2 border-indigo-400 border-t border-r border-b border-slate-200 text-xs text-slate-700 leading-relaxed font-sans max-h-40 overflow-y-auto whitespace-pre-wrap select-text">
+                            {doc.text_content || doc.text_snippet || "Document content extracted and ready for summarization."}
                           </div>
 
                           {/* Row 3: Stats & Actions */}
@@ -4175,22 +4224,35 @@
                     <p className="text-xs text-slate-500 mt-0.5">Browse, search, and reload previously generated summaries</p>
                   </div>
                   
-                  <div className="relative w-full sm:w-72">
-                    <input
-                      type="text"
-                      value={historySearch}
-                      onChange={(e) => setHistorySearch(e.target.value)}
-                      placeholder="Search summary text..."
-                      className="w-full bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 text-slate-800 text-xs pl-3.5 pr-8 py-2 rounded-xl focus:outline-none focus:border-indigo-500 transition"
-                    />
-                    {historySearch && (
-                      <button 
-                        onClick={() => setHistorySearch('')}
-                        className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 text-xs"
+                  <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                    {summariesList.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleDeleteAllSummaries}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs transition cursor-pointer shadow-2xs flex-shrink-0"
+                        title="Delete all summaries from history"
                       >
-                        ✕
+                        <span>🗑️ Clear All ({summariesList.length})</span>
                       </button>
                     )}
+
+                    <div className="relative flex-1 sm:w-72">
+                      <input
+                        type="text"
+                        value={historySearch}
+                        onChange={(e) => setHistorySearch(e.target.value)}
+                        placeholder="Search summary text..."
+                        className="w-full bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 text-slate-800 text-xs pl-3.5 pr-8 py-2 rounded-xl focus:outline-none focus:border-indigo-500 transition"
+                      />
+                      {historySearch && (
+                        <button 
+                          onClick={() => setHistorySearch('')}
+                          className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 text-xs"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
 

@@ -201,7 +201,6 @@ pytest -v
 | `GET` | `/` | Serves the interactive LexiBrief web application |
 | `GET` | `/docs` | Interactive Swagger API documentation |
 | `GET` | `/api/health` | Health check and engine runtime status |
-| `GET` | `/api/presets` | Sample test cases (Meeting dialogue, Tech news, Support chat) |
 | `GET` | `/api/metrics` | Returns pipeline status and ROUGE benchmark scores |
 | `POST`| `/predict` | Generates summary from JSON payload or Form data |
 | `GET` | `/train` | Triggers the end-to-end model training pipeline |

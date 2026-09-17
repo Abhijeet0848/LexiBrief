@@ -244,6 +244,28 @@ class MongoDBManager:
             pass
         return deleted
 
+    def delete_all_summaries(self) -> int:
+        """Deletes all summaries from MongoDB and local storage."""
+        count = 0
+        if self.use_mongo and self.db is not None:
+            try:
+                res = self.db.summaries.delete_many({})
+                count = res.deleted_count
+            except Exception as e:
+                logger.warning(f"MongoDB delete_all_summaries error: {e}")
+
+        try:
+            self._ensure_local_dirs()
+            if os.path.exists(self.summaries_file):
+                with open(self.summaries_file, "r", encoding="utf-8") as fp:
+                    items = json.load(fp)
+                count = max(count, len(items))
+                with open(self.summaries_file, "w", encoding="utf-8") as fp:
+                    json.dump([], fp)
+        except Exception as err:
+            logger.error(f"Local delete_all_summaries error: {err}")
+        return count
+
     # ------------------ DOCUMENTS COLLECTION ------------------
 
     def save_document(self, doc_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -252,7 +274,7 @@ class MongoDBManager:
             "_id": str(uuid.uuid4()),
             "filename": doc_data.get("filename", "untitled.txt"),
             "format": doc_data.get("format", "TXT"),
-            "text_snippet": (doc_data.get("text", "")[:220] + ("..." if len(doc_data.get("text", "")) > 220 else "")),
+            "text_snippet": (doc_data.get("text", "")[:3000] + ("..." if len(doc_data.get("text", "")) > 3000 else "")),
             "text_content": doc_data.get("text", ""),
             "words": doc_data.get("stats", {}).get("words", 0),
             "characters": doc_data.get("stats", {}).get("characters", 0),
@@ -354,6 +376,28 @@ class MongoDBManager:
         except Exception:
             pass
         return deleted
+
+    def delete_all_documents(self) -> int:
+        """Deletes all documents from MongoDB and local storage."""
+        count = 0
+        if self.use_mongo and self.db is not None:
+            try:
+                res = self.db.documents.delete_many({})
+                count = res.deleted_count
+            except Exception as e:
+                logger.warning(f"MongoDB delete_all_documents error: {e}")
+
+        try:
+            self._ensure_local_dirs()
+            if os.path.exists(self.documents_file):
+                with open(self.documents_file, "r", encoding="utf-8") as fp:
+                    items = json.load(fp)
+                count = max(count, len(items))
+                with open(self.documents_file, "w", encoding="utf-8") as fp:
+                    json.dump([], fp)
+        except Exception as err:
+            logger.error(f"Local delete_all_documents error: {err}")
+        return count
 
     def get_database_status(self) -> Dict[str, Any]:
         """Returns current database connectivity and collection counts."""

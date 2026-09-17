@@ -31,13 +31,6 @@ def test_health_check_endpoint():
     assert data["status"] == "healthy"
     assert data["service"] == "LexiBrief NLP Engine"
 
-def test_presets_endpoint():
-    """Verify that sample presets endpoint returns valid list."""
-    response = client.get("/api/presets")
-    assert response.status_code == 200
-    data = response.json()
-    assert "presets" in data
-    assert isinstance(data["presets"], list)
 
 def test_tts_endpoint():
     """Verify that neural text-to-speech audio streaming endpoint returns valid audio."""
@@ -142,7 +135,7 @@ def test_rouge_evaluation_endpoint():
     assert data["rouge"]["rougeL"]["f1"] > 0.5
 
 def test_mongodb_crud_endpoints():
-    """Verify MongoDB document and summary CRUD endpoints."""
+    """Verify MongoDB document and summary CRUD endpoints and delete-all operations."""
     # Summaries list
     res_sums = client.get("/api/summaries")
     assert res_sums.status_code == 200
@@ -154,6 +147,16 @@ def test_mongodb_crud_endpoints():
     assert res_docs.status_code == 200
     docs_data = res_docs.json()
     assert "documents" in docs_data
+
+    # Delete all documents
+    res_del_docs = client.delete("/api/documents")
+    assert res_del_docs.status_code == 200
+    assert res_del_docs.json()["success"] is True
+
+    # Delete all summaries
+    res_del_sums = client.delete("/api/summaries")
+    assert res_del_sums.status_code == 200
+    assert res_del_sums.json()["success"] is True
 
     # DB status
     res_status = client.get("/api/db/status")

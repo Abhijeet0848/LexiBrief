@@ -181,7 +181,7 @@ class TTSRequest(BaseModel):
     speed: Optional[float] = Field(1.0, description="Speech rate multiplier")
 
 
-SAMPLE_PRESETS = []
+
 
 
 
@@ -320,9 +320,6 @@ async def health_check():
     }
 
 
-@app.get("/api/presets", tags=["UI"])
-async def get_presets():
-    return {"presets": SAMPLE_PRESETS}
 
 
 @app.post("/api/upload", tags=["Text Extraction & MongoDB"])
@@ -572,6 +569,13 @@ async def get_document_item(doc_id: str):
     return doc
 
 
+@app.delete("/api/documents", tags=["MongoDB Documents"])
+async def delete_all_documents_endpoint():
+    """Deletes all documents from MongoDB and local storage."""
+    deleted_count = db_manager.delete_all_documents()
+    return {"success": True, "deleted_count": deleted_count}
+
+
 @app.delete("/api/documents/{doc_id}", tags=["MongoDB Documents"])
 async def delete_document_item(doc_id: str):
     """Deletes a document from MongoDB."""
@@ -602,6 +606,13 @@ async def get_summary_item(summary_id: str):
     if not item:
         raise HTTPException(status_code=404, detail="Summary not found")
     return item
+
+
+@app.delete("/api/summaries", tags=["MongoDB Summaries"])
+async def delete_all_summaries_endpoint():
+    """Deletes all summaries from MongoDB and local storage."""
+    deleted_count = db_manager.delete_all_summaries()
+    return {"success": True, "deleted_count": deleted_count}
 
 
 @app.delete("/api/summaries/{summary_id}", tags=["MongoDB Summaries"])
