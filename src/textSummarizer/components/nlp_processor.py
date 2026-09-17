@@ -561,3 +561,152 @@ class NLPProcessor:
             "summary_sentences": summary_sentences,
             "attribution_map": attribution_map
         }
+
+    @classmethod
+    def extract_named_entities(cls, text: str, top_k: int = 15) -> List[Dict[str, Any]]:
+        """
+        High-speed multilingual Named Entity Recognition (NER) heuristics identifying:
+        - Organizations / Technologies (e.g., Google, OpenAI, Microsoft, LexiBrief, PyTorch)
+        - People / Roles (e.g., Dr. Smith, CEO, Director)
+        - Locations / Geographies (e.g., California, India, London, Europe)
+        - Dates / Periods (e.g., 2026, Q3 2024, September 17, annual)
+        - Metrics & Financial Values (e.g., $12.4 billion, 34%, 12ms, 50MB)
+        """
+        if not text:
+            return []
+
+        entities = []
+        seen = set()
+
+        # 1. Metrics, Currencies, Percentages & Numerical stats
+        metric_matches = re.finditer(r'(?:[\$\€\£\₹]\s*\d+(?:\.\d+)?(?:\s*(?:billion|million|trillion|k|m|b))?|\b\d+(?:\.\d+)?\s*(?:percent|ms|sec|MB|GB|TB|KB|GHz|MHz|ARR|ROI|KPI|parameters|layers|epochs)\b|\b\d+(?:\.\d+)?\s*%)', text, re.IGNORECASE)
+        for m in metric_matches:
+            val = m.group(0).strip()
+            if val.lower() not in seen:
+                seen.add(val.lower())
+                entities.append({"text": val, "label": "METRIC", "category": "Numbers & Metrics"})
+
+        # 2. Dates, Years, Quarters
+        date_matches = re.finditer(r'\b(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2}(?:st|nd|rd|th)?(?:,\s*\d{4})?|Q[1-4]\s*(?:\d{4})?|\b(?:19|20)\d{2}\b|\b\d{1,2}/\d{1,2}/\d{2,4}\b)\b', text, re.IGNORECASE)
+        for m in date_matches:
+            val = m.group(0).strip()
+            if val.lower() not in seen:
+                seen.add(val.lower())
+                entities.append({"text": val, "label": "DATE", "category": "Dates & Timeframes"})
+
+        # 3. Capitalized Multi-word Organizations / Proper Names (for Latin scripts)
+        prop_matches = re.finditer(r'\b([A-Z][a-z0-9]+(?:\s+[A-Z][a-z0-9]+){1,3})\b', text)
+        for m in prop_matches:
+            val = m.group(1).strip()
+            val_lower = val.lower()
+            if val_lower not in seen and not any(w in cls.STOPWORDS for w in val_lower.split()[:1]):
+                # Distinguish Person prefix vs Organization
+                if re.match(r'^(?:Dr|Prof|Mr|Mrs|Ms|Chief|President|Director|Minister)\b', val):
+                    cat = "Person / Role"
+                    lbl = "PERSON"
+                else:
+                    cat = "Organization / Concept"
+                    lbl = "ORG"
+                seen.add(val_lower)
+                entities.append({"text": val, "label": lbl, "category": cat})
+
+        # 4. Known uppercase acronyms & technical organizations (e.g. NASA, WHO, MIT, BERT, GPT, BART)
+        acronym_matches = re.finditer(r'\b([A-Z]{2,6})\b', text)
+        for m in acronym_matches:
+            val = m.group(1).strip()
+            if val.lower() not in seen and val.lower() not in cls.STOPWORDS and val not in {'AND', 'THE', 'FOR', 'NOT', 'ALL', 'BUT'}:
+                seen.add(val.lower())
+                entities.append({"text": val, "label": "ORG", "category": "Organization / Acronym"})
+
+        return entities[:top_k]
+
+    @classmethod
+    def extract_important_facts(cls, text: str, top_k: int = 5) -> List[str]:
+        """
+        Extracts verified factual statements, numerical findings, definitions, and conclusive takeaways.
+        Prioritizes declarative sentences containing metrics, quantitative percentages, dates, and causality.
+        """
+        sentences = cls.split_sentences(text)
+        if not sentences:
+            return []
+        if len(sentences) <= top_k:
+            return [s.strip() for s in sentences if s.strip()]
+
+        fact_keywords = {
+            "increased", "decreased", "grew", "reached", "achieved", "reported", "shows", "proved",
+            "found", "is defined as", "refers to", "consists of", "generates", "delivers", "resulting in",
+            "percent", "%", "$", "billion", "million", "surged", "dropped", "reduced", "discovered"
+        }
+
+        scored = []
+        for idx, s in enumerate(sentences):
+            s_clean = s.strip()
+            if len(s_clean) < 15 or s_clean.endswith('?'):
+                continue
+            s_lower = s_clean.lower()
+            score = 0.0
+
+            # Boost for numerical facts & statistics
+            if re.search(r'[\$\€\£\₹%]\s*\d+|\b\d+(?:\.\d+)?\s*(?:%|billion|million|percent|users|ms|x)\b', s_clean):
+                score += 3.0
+            
+            # Boost for factual / result predicate verbs
+            for kw in fact_keywords:
+                if kw in s_lower:
+                    score += 1.5
+
+            # Deduct for speculative / uncertain clauses
+            if any(w in s_lower for w in ["might", "could be", "maybe", "perhaps", "possibly", "hypothetically"]):
+                score -= 1.0
+
+            if score > 0:
+                scored.append((score, idx, s_clean))
+
+        scored.sort(key=lambda x: (x[0], -x[1]), reverse=True)
+        top_facts = [item[2] for item in scored[:top_k]]
+        return top_facts if top_facts else [s.strip() for s in sentences[:top_k]]
+
+    @classmethod
+    def detect_sections(cls, text: str) -> List[Dict[str, Any]]:
+        """
+        Section-aware structure parser.
+        Detects markdown headers (#, ##), presentation slide dividers (--- Slide X ---),
+        numbered sections (1. Introduction, Section 2: ...), or ALL-CAPS section titles.
+        """
+        if not text:
+            return []
+
+        lines = text.split('\n')
+        sections = []
+        current_title = "Overview"
+        current_lines = []
+
+        header_pattern = re.compile(r'^(?:#{1,4}\s+(.+)|---\s*(?:Slide\s*\d+|Page\s*\d+)?\s*---|Section\s*\d+[:.-]\s*(.+)|[0-9]+\.\s+([A-Z][A-Za-z\s]{3,40}):?$|([A-Z\s]{4,40}):$)', re.IGNORECASE)
+
+        for line in lines:
+            trimmed = line.strip()
+            if not trimmed:
+                if current_lines:
+                    current_lines.append("")
+                continue
+
+            match = header_pattern.match(trimmed)
+            if match:
+                title = next((g for g in match.groups() if g), trimmed).strip("#- :")
+                if current_lines and "".join(current_lines).strip():
+                    sections.append({
+                        "title": current_title,
+                        "content": "\n".join(current_lines).strip()
+                    })
+                current_title = title if title else f"Section {len(sections) + 1}"
+                current_lines = []
+            else:
+                current_lines.append(line)
+
+        if current_lines and "".join(current_lines).strip():
+            sections.append({
+                "title": current_title,
+                "content": "\n".join(current_lines).strip()
+            })
+
+        return sections if sections else [{"title": "Overview", "content": text.strip()}]

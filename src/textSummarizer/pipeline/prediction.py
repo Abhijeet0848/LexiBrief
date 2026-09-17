@@ -40,6 +40,9 @@ class PredictionPipeline:
             return {
                 "summary": "",
                 "key_points": [],
+                "named_entities": [],
+                "important_facts": [],
+                "sections": [],
                 "method_used": "none",
                 "model_source": "none",
                 "mode": mode,
@@ -73,8 +76,11 @@ class PredictionPipeline:
         nlp_stats["language_name"] = lang_name
         keywords = NLPProcessor.extract_keywords(cleaned_text, top_k=8, precomputed_tokens=pre_words)
 
-        # 3. Extract structured key takeaways (action points) with precomputed sentences
+        # 3. Extract structured key takeaways, named entities, important facts, and section structure
         key_points = NLPProcessor.extract_key_points(cleaned_text, top_k=4, precomputed_sentences=pre_sentences)
+        named_entities = NLPProcessor.extract_named_entities(cleaned_text, top_k=15)
+        important_facts = NLPProcessor.extract_important_facts(cleaned_text, top_k=5)
+        sections = NLPProcessor.detect_sections(cleaned_text)
 
         # 4. Mode configuration mapping
         mode_configs = {
@@ -162,6 +168,9 @@ class PredictionPipeline:
             "original_summary": original_summary,
             "key_points": key_points,
             "original_key_points": original_key_points,
+            "named_entities": named_entities,
+            "important_facts": important_facts,
+            "sections": sections,
             "translated_to_english": translated_flag,
             "original_language": lang_code,
             "method_used": engine_used,

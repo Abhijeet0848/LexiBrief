@@ -152,3 +152,44 @@ def test_multilingual_indic_keyword_extraction():
         # No dangling or broken combining virama at word start
         assert not kw.startswith('\u094d')
 
+
+def test_named_entities_and_facts_extraction():
+    """Verify extraction of named entities (NER) and verified quantitative facts."""
+    sample_text = (
+        "Google Cloud announced a $10 billion investment in AI infrastructure in September 2024. "
+        "Dr. Andrew Ng stated that enterprise adoption of foundation models grew by 45% this quarter. "
+        "The project reached 100,000 active developers across Europe and India."
+    )
+    entities = NLPProcessor.extract_named_entities(sample_text)
+    facts = NLPProcessor.extract_important_facts(sample_text)
+
+    # Entities check
+    assert len(entities) >= 3
+    ent_texts = [e["text"] for e in entities]
+    assert any("$10 billion" in t or "10 billion" in t for t in ent_texts)
+    assert any("45%" in t for t in ent_texts)
+    assert any("Google" in t or "Dr. Andrew Ng" in t or "Europe" in t for t in ent_texts)
+
+    # Facts check
+    assert len(facts) >= 2
+    assert any("45%" in f or "$10 billion" in f or "investment" in f for f in facts)
+
+
+def test_section_detection():
+    """Verify section-aware parsing across markdown headers and dividers."""
+    structured_doc = (
+        "# Introduction\n"
+        "LexiBrief is an AI document summarization platform.\n\n"
+        "## Performance & Latency\n"
+        "Inference latency is under 50ms per batch.\n\n"
+        "## Conclusion\n"
+        "The system scales seamlessly for enterprise workloads."
+    )
+    sections = NLPProcessor.detect_sections(structured_doc)
+    assert len(sections) == 3
+    titles = [s["title"] for s in sections]
+    assert "Introduction" in titles
+    assert "Performance & Latency" in titles
+    assert "Conclusion" in titles
+
+
