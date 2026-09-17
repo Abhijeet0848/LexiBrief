@@ -4778,238 +4778,227 @@
                 )}
 
                 {/* Document Items List */}
-                {docFormatFilter !== 'CAPTURED' && (
-                  filteredDocuments.length === 0 ? (
-                    <div className="bg-white border border-slate-200/80 rounded-2xl p-12 text-center text-slate-500 card-shadow">
-                      <div className="text-3xl mb-2">📄</div>
-                      <h3 className="text-sm font-bold text-slate-800 font-heading">
-                        {documentsList.length === 0 ? 'No documents uploaded yet' : 'No matching documents found'}
-                      </h3>
-                      <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1 mb-4">
-                        {documentsList.length === 0 
-                          ? 'Upload any PDF, DOCX, PPTX, or TXT document to extract text, calculate NLP metrics, and generate instant summaries.'
-                          : 'Try searching with a different keyword or reset the format filter.'}
-                      </p>
-                      {docSearch && (
-                        <button
-                          onClick={() => { setDocSearch(''); setDocFormatFilter('ALL'); }}
-                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition"
-                        >
-                          Reset Filter
-                        </button>
-                      )}
-                    </div>
-                  ) : (
-                    docViewMode === 'grid' ? (
-                      /* GRID VIEW */
+                {(() => {
+                  if (docFormatFilter === 'CAPTURED') return null;
+
+                  if (filteredDocuments.length === 0) {
+                    return (
+                      <div className="bg-white border border-slate-200/80 rounded-2xl p-12 text-center text-slate-500 card-shadow">
+                        <div className="text-3xl mb-2">📄</div>
+                        <h3 className="text-sm font-bold text-slate-800 font-heading">
+                          {documentsList.length === 0 ? 'No documents uploaded yet' : 'No matching documents found'}
+                        </h3>
+                        <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1 mb-4">
+                          {documentsList.length === 0 
+                            ? 'Upload any PDF, DOCX, PPTX, or TXT document to extract text, calculate NLP metrics, and generate instant summaries.'
+                            : 'Try searching with a different keyword or reset the format filter.'}
+                        </p>
+                        {docSearch && (
+                          <button
+                            onClick={() => { setDocSearch(''); setDocFormatFilter('ALL'); }}
+                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition"
+                          >
+                            Reset Filter
+                          </button>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  if (docViewMode === 'grid') {
+                    return (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredDocuments.map(doc => {
-                      const fmt = (doc.format || 'TXT').toUpperCase();
-                      const badgeClass = fmt === 'PDF' ? 'bg-rose-50 text-rose-700 border-rose-200' :
-                                         fmt === 'DOCX' ? 'bg-sky-50 text-sky-700 border-sky-200' :
-                                         (fmt === 'PPTX' || fmt === 'PPT') ? 'bg-orange-50 text-orange-700 border-orange-200' :
-                                         'bg-indigo-50 text-indigo-700 border-indigo-200';
-                      const formatIcon = fmt === 'PDF' ? '📕' : fmt === 'DOCX' ? '📘' : (fmt === 'PPTX' || fmt === 'PPT') ? '📙' : '📄';
-                      const estReadTime = Math.max(1, Math.ceil((doc.words || 0) / 200));
+                        {filteredDocuments.map(doc => {
+                          const fmt = (doc.format || 'TXT').toUpperCase();
+                          const badgeClass = fmt === 'PDF' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                                             fmt === 'DOCX' ? 'bg-sky-50 text-sky-700 border-sky-200' :
+                                             (fmt === 'PPTX' || fmt === 'PPT') ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                                             'bg-indigo-50 text-indigo-700 border-indigo-200';
+                          const formatIcon = fmt === 'PDF' ? '📕' : fmt === 'DOCX' ? '📘' : (fmt === 'PPTX' || fmt === 'PPT') ? '📙' : '📄';
+                          const estReadTime = Math.max(1, Math.ceil((doc.words || 0) / 200));
 
-                      return (
-                        <div 
-                          key={doc._id} 
-                          className="bg-white rounded-2xl border border-slate-200/80 p-5 hover:border-indigo-300 hover:shadow-md transition card-shadow flex flex-col justify-between space-y-3.5 group"
-                        >
-                          <div className="space-y-3">
-                            {/* Card Top: Format Badge & Date */}
-                            <div className="flex items-center justify-between gap-2">
-                              <span className={`px-2.5 py-0.5 border text-xs font-bold rounded-lg flex items-center gap-1.5 ${badgeClass}`}>
-                                <span>{formatIcon}</span>
-                                <span>{fmt}</span>
-                              </span>
+                          return (
+                            <div 
+                              key={doc._id} 
+                              className="bg-white rounded-2xl border border-slate-200/80 p-5 hover:border-indigo-300 hover:shadow-md transition card-shadow flex flex-col justify-between space-y-3.5 group"
+                            >
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className={`px-2.5 py-0.5 border text-xs font-bold rounded-lg flex items-center gap-1.5 ${badgeClass}`}>
+                                    <span>{formatIcon}</span>
+                                    <span>{fmt}</span>
+                                  </span>
 
-                              <span className="text-[11px] text-slate-400 font-medium">
+                                  <span className="text-[11px] text-slate-400 font-medium">
+                                    📅 {doc.uploaded_at}
+                                  </span>
+                                </div>
+
+                                <div>
+                                  <h3 
+                                    className="text-sm font-bold text-slate-900 font-heading line-clamp-1 group-hover:text-indigo-600 transition" 
+                                    title={doc.filename}
+                                  >
+                                    {doc.filename}
+                                  </h3>
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-1.5 text-center text-[11px]">
+                                  <div className="p-1.5 bg-slate-50 border border-slate-200 rounded-lg">
+                                    <span className="text-slate-400 block text-[10px]">Words</span>
+                                    <span className="font-bold text-slate-800">{doc.words || 0}</span>
+                                  </div>
+                                  <div className="p-1.5 bg-slate-50 border border-slate-200 rounded-lg">
+                                    <span className="text-slate-400 block text-[10px]">Sentences</span>
+                                    <span className="font-bold text-slate-800">{doc.sentences || 0}</span>
+                                  </div>
+                                  <div className="p-1.5 bg-slate-50 border border-slate-200 rounded-lg">
+                                    <span className="text-slate-400 block text-[10px]">Chars</span>
+                                    <span className="font-bold text-slate-800">{doc.characters || 0}</span>
+                                  </div>
+                                </div>
+
+                                <div className="p-3 rounded-xl bg-slate-50/80 border-l-2 border-indigo-400 border-t border-r border-b border-slate-200 text-xs text-slate-600 leading-relaxed font-sans max-h-32 overflow-y-auto whitespace-pre-wrap select-text">
+                                  {normalizeBullets(doc.text_content || doc.text_snippet || "Document content extracted and ready for summarization.")}
+                                </div>
+                              </div>
+
+                              <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      const res = await fetch(`/api/documents/${doc._id}`);
+                                      const full = await res.json();
+                                      setInputText(normalizeBullets(full.text_content || full.text_snippet || ''));
+                                      setActiveTab('summarize');
+                                      showToast(`Loaded ${doc.filename} into active editor!`, "info");
+                                    } catch (e) {}
+                                  }}
+                                  className="flex-1 py-2 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center justify-center gap-1.5"
+                                >
+                                  <span>⚡ Summarize</span>
+                                </button>
+
+                                <button
+                                  onClick={() => openDocPreview(doc)}
+                                  className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition border border-slate-200/60"
+                                  title="Preview Full Document"
+                                >
+                                  👁️
+                                </button>
+
+                                <button
+                                  onClick={(e) => exportDocTxt(doc, e)}
+                                  className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition border border-slate-200/60"
+                                  title="Download Text (.txt)"
+                                >
+                                  📥
+                                </button>
+
+                                <button
+                                  onClick={(e) => handleDeleteDoc(doc._id, e)}
+                                  className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition"
+                                  title="Delete Document"
+                                >
+                                  🗑️
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-3">
+                      {filteredDocuments.map(doc => {
+                        const fmt = (doc.format || 'TXT').toUpperCase();
+                        const badgeClass = fmt === 'PDF' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                                           fmt === 'DOCX' ? 'bg-sky-50 text-sky-700 border-sky-200' :
+                                           (fmt === 'PPTX' || fmt === 'PPT') ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                                           'bg-indigo-50 text-indigo-700 border-indigo-200';
+                        const formatIcon = fmt === 'PDF' ? '📕' : fmt === 'DOCX' ? '📘' : (fmt === 'PPTX' || fmt === 'PPT') ? '📙' : '📄';
+
+                        return (
+                          <div 
+                            key={doc._id} 
+                            className="bg-white rounded-2xl border border-slate-200/80 p-5 hover:border-indigo-300 hover:shadow-md transition card-shadow space-y-3.5"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex items-center gap-2.5">
+                                <span className={`px-2.5 py-0.5 border text-xs font-bold rounded-lg flex items-center gap-1.5 ${badgeClass}`}>
+                                  <span>{formatIcon}</span>
+                                  <span>{fmt}</span>
+                                </span>
+                                <h3 className="text-sm font-bold text-slate-900 font-heading">
+                                  {doc.filename}
+                                </h3>
+                              </div>
+
+                              <span className="text-xs text-slate-400 font-medium">
                                 📅 {doc.uploaded_at}
                               </span>
                             </div>
 
-                            {/* Document Title */}
-                            <div>
-                              <h3 
-                                className="text-sm font-bold text-slate-900 font-heading line-clamp-1 group-hover:text-indigo-600 transition" 
-                                title={doc.filename}
-                              >
-                                {doc.filename}
-                              </h3>
-                            </div>
-
-                            {/* Metadata Chips */}
-                            <div className="grid grid-cols-3 gap-1.5 text-center text-[11px]">
-                              <div className="p-1.5 bg-slate-50 border border-slate-200 rounded-lg">
-                                <span className="text-slate-400 block text-[10px]">Words</span>
-                                <span className="font-bold text-slate-800">{doc.words || 0}</span>
-                              </div>
-                              <div className="p-1.5 bg-slate-50 border border-slate-200 rounded-lg">
-                                <span className="text-slate-400 block text-[10px]">Sentences</span>
-                                <span className="font-bold text-slate-800">{doc.sentences || 0}</span>
-                              </div>
-                              <div className="p-1.5 bg-slate-50 border border-slate-200 rounded-lg">
-                                <span className="text-slate-400 block text-[10px]">Chars</span>
-                                <span className="font-bold text-slate-800">{doc.characters || 0}</span>
-                              </div>
-                            </div>
-
-                            {/* Text Preview Snippet (Scrollable) */}
-                            <div className="p-3 rounded-xl bg-slate-50/80 border-l-2 border-indigo-400 border-t border-r border-b border-slate-200 text-xs text-slate-600 leading-relaxed font-sans max-h-32 overflow-y-auto whitespace-pre-wrap select-text">
+                            <div className="p-3.5 rounded-xl bg-slate-50/80 border-l-2 border-indigo-400 border-t border-r border-b border-slate-200 text-xs text-slate-700 leading-relaxed font-sans max-h-40 overflow-y-auto whitespace-pre-wrap select-text">
                               {normalizeBullets(doc.text_content || doc.text_snippet || "Document content extracted and ready for summarization.")}
                             </div>
-                          </div>
 
-                          {/* Card Footer Actions */}
-                          <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
-                            
-                            {/* Primary Summarize Action */}
-                            <button
-                              onClick={async () => {
-                                try {
-                                  const res = await fetch(`/api/documents/${doc._id}`);
-                                  const full = await res.json();
-                                  setInputText(normalizeBullets(full.text_content || full.text_snippet || ''));
-                                  setActiveTab('summarize');
-                                  showToast(`Loaded ${doc.filename} into active editor!`, "info");
-                                } catch (e) {}
-                              }}
-                              className="flex-1 py-2 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center justify-center gap-1.5"
-                            >
-                              <span>⚡ Summarize</span>
-                            </button>
+                            <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                              <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 font-medium">
+                                <span><b>{doc.words || 0}</b> words</span>
+                                <span>•</span>
+                                <span><b>{doc.sentences || 0}</b> sentences</span>
+                                <span>•</span>
+                                <span><b>{doc.characters || 0}</b> characters</span>
+                              </div>
 
-                            {/* Preview Modal Button */}
-                            <button
-                              onClick={() => openDocPreview(doc)}
-                              className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition border border-slate-200/60"
-                              title="Preview Full Document"
-                            >
-                              👁️
-                            </button>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      const res = await fetch(`/api/documents/${doc._id}`);
+                                      const full = await res.json();
+                                      setInputText(full.text_content || full.text_snippet || '');
+                                      setActiveTab('summarize');
+                                      showToast(`Loaded ${doc.filename} into active editor!`, "info");
+                                    } catch (e) {}
+                                  }}
+                                  className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1.5"
+                                >
+                                  <span>⚡ Summarize Document</span>
+                                </button>
 
-                            {/* Export TXT */}
-                            <button
-                              onClick={(e) => exportDocTxt(doc, e)}
-                              className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition border border-slate-200/60"
-                              title="Download Text (.txt)"
-                            >
-                              📥
-                            </button>
+                                <button
+                                  onClick={() => openDocPreview(doc)}
+                                  className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition border border-slate-200/60 flex items-center gap-1"
+                                >
+                                  <span>👁️ Preview</span>
+                                </button>
 
-                            {/* Delete Button */}
-                            <button
-                              onClick={(e) => handleDeleteDoc(doc._id, e)}
-                              className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition"
-                              title="Delete Document"
-                            >
-                              🗑️
-                            </button>
-
-                          </div>
-
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                ) : (
-
-                  /* DETAILED LIST VIEW */
-                  <div className="space-y-3">
-                    {filteredDocuments.map(doc => {
-                      const fmt = (doc.format || 'TXT').toUpperCase();
-                      const badgeClass = fmt === 'PDF' ? 'bg-rose-50 text-rose-700 border-rose-200' :
-                                         fmt === 'DOCX' ? 'bg-sky-50 text-sky-700 border-sky-200' :
-                                         (fmt === 'PPTX' || fmt === 'PPT') ? 'bg-orange-50 text-orange-700 border-orange-200' :
-                                         'bg-indigo-50 text-indigo-700 border-indigo-200';
-                      const formatIcon = fmt === 'PDF' ? '📕' : fmt === 'DOCX' ? '📘' : (fmt === 'PPTX' || fmt === 'PPT') ? '📙' : '📄';
-
-                      return (
-                        <div 
-                          key={doc._id} 
-                          className="bg-white rounded-2xl border border-slate-200/80 p-5 hover:border-indigo-300 hover:shadow-md transition card-shadow space-y-3.5"
-                        >
-                          {/* Row 1: Badges, Title, Date */}
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="flex items-center gap-2.5">
-                              <span className={`px-2.5 py-0.5 border text-xs font-bold rounded-lg flex items-center gap-1.5 ${badgeClass}`}>
-                                <span>{formatIcon}</span>
-                                <span>{fmt}</span>
-                              </span>
-                              <h3 className="text-sm font-bold text-slate-900 font-heading">
-                                {doc.filename}
-                              </h3>
-                            </div>
-
-                            <span className="text-xs text-slate-400 font-medium">
-                              📅 {doc.uploaded_at}
-                            </span>
-                          </div>
-
-                          {/* Row 2: Text Preview (Scrollable) */}
-                          <div className="p-3.5 rounded-xl bg-slate-50/80 border-l-2 border-indigo-400 border-t border-r border-b border-slate-200 text-xs text-slate-700 leading-relaxed font-sans max-h-40 overflow-y-auto whitespace-pre-wrap select-text">
-                            {normalizeBullets(doc.text_content || doc.text_snippet || "Document content extracted and ready for summarization.")}
-                          </div>
-
-                          {/* Row 3: Stats & Actions */}
-                          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-                            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 font-medium">
-                              <span><b>{doc.words || 0}</b> words</span>
-                              <span>•</span>
-                              <span><b>{doc.sentences || 0}</b> sentences</span>
-                              <span>•</span>
-                              <span><b>{doc.characters || 0}</b> characters</span>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={async () => {
-                                  try {
-                                    const res = await fetch(`/api/documents/${doc._id}`);
-                                    const full = await res.json();
-                                    setInputText(full.text_content || full.text_snippet || '');
-                                    setActiveTab('summarize');
-                                    showToast(`Loaded ${doc.filename} into active editor!`, "info");
-                                  } catch (e) {}
-                                }}
-                                className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1.5"
-                              >
-                                <span>⚡ Summarize Document</span>
-                              </button>
-
-                              <button
-                                onClick={() => openDocPreview(doc)}
-                                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition border border-slate-200/60 flex items-center gap-1"
-                              >
-                                <span>👁️ Preview</span>
-                              </button>
-
-                              <button
-                                onClick={(e) => exportDocTxt(doc, e)}
-                                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition border border-slate-200/60 flex items-center gap-1"
-                              >
-                                <span>📥 Download</span>
-                              </button>
-                              
-                              <button
-                                onClick={(e) => handleDeleteDoc(doc._id, e)}
-                                className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition"
-                                title="Delete Document"
-                              >
-                                🗑️
-                              </button>
+                                <button
+                                  onClick={(e) => exportDocTxt(doc, e)}
+                                  className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition border border-slate-200/60 flex items-center gap-1"
+                                >
+                                  <span>📥 Download</span>
+                                </button>
+                                
+                                <button
+                                  onClick={(e) => handleDeleteDoc(doc._id, e)}
+                                  className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition"
+                                  title="Delete Document"
+                                >
+                                  🗑️
+                                </button>
+                              </div>
                             </div>
                           </div>
-
-                        </div>
-                      );
-                    })}
-                  </div>
-                )
-              )}
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
 
               </div>
             )}
