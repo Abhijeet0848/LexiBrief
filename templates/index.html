@@ -883,11 +883,20 @@
         return match;
       });
 
-      // 6. Ensure each bullet point is on a discrete new line
+      // 6. Heal common OCR phrase and Devanagari ligature distortions
+      clean = clean.replace(/\bWEALTH\s+FACILITY\b/gi, 'HEALTH FACILITY');
+      clean = clean.replace(/\b(?:on\s*9\s*)?DEL\s*Hi\b/gi, 'DELHI');
+      clean = clean.replace(/\bNEW\s+DEL\s*HI\b/gi, 'NEW DELHI');
+      clean = clean.replace(/दिश्वडिसालय/g, 'विश्वविद्यालय');
+      clean = clean.replace(/विरवविद्यांसय/g, 'विश्वविद्यालय');
+      clean = clean.replace(/कंन्ट्र\b/g, 'केन्द्र');
+      clean = clean.replace(/नई\s+fa\s*(?=\d{6})/g, 'नई दिल्ली-');
+
+      // 7. Ensure each bullet point is on a discrete new line
       clean = clean.replace(/[ \t]*([•\u2022\u25cf\u25aa\u25b8\u2219\u2023\u2043\u204c\u204d\u2218\u25cb\u25e6\u25ab])[ \t]*/g, '\n• ');
       clean = clean.replace(/\n{2,}• /g, '\n• ');
 
-      // 5. Clean line by line and eliminate isolated single-character Latin noise
+      // 8. Clean line by line and eliminate isolated single-character Latin noise
       const lines = clean.split('\n');
       const validLines = [];
       for (let line of lines) {

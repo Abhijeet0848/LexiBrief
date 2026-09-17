@@ -58,7 +58,16 @@ class TextExtractor:
                     w = re.sub(r'(?<=[a-zA-Z])5(?=[a-zA-Z])', 's', w)
             return w
 
-        # 6. Filter line by line and eliminate isolated single-character Latin noise
+        # 6. Heal common OCR phrase and Devanagari ligature distortions
+        text = re.sub(r'\bWEALTH FACILITY\b', 'HEALTH FACILITY', text, flags=re.IGNORECASE)
+        text = re.sub(r'\b(?:on\s*9\s*)?DEL\s*Hi\b', 'DELHI', text, flags=re.IGNORECASE)
+        text = re.sub(r'\bNEW\s+DEL\s*HI\b', 'NEW DELHI', text, flags=re.IGNORECASE)
+        text = re.sub(r'दिश्वडिसालय', 'विश्वविद्यालय', text)
+        text = re.sub(r'विरवविद्यांसय', 'विश्वविद्यालय', text)
+        text = re.sub(r'कंन्ट्र\b', 'केन्द्र', text)
+        text = re.sub(r'नई\s+fa\s*(?=\d{6})', 'नई दिल्ली-', text)
+
+        # 7. Filter line by line and eliminate isolated single-character Latin noise
         clean_lines = []
         for line in text.split('\n'):
             line_str = line.strip()
