@@ -108,6 +108,7 @@ class MongoDBManager:
             os.makedirs(tmp_dir, exist_ok=True)
             self.summaries_file = os.path.join(tmp_dir, "summaries.json")
             self.documents_file = os.path.join(tmp_dir, "documents.json")
+            self.images_file = os.path.join(tmp_dir, "captured_images.json")
         else:
             try:
                 local_dir = os.path.join("artifacts", "database")
@@ -118,13 +119,15 @@ class MongoDBManager:
                 os.remove(test_file)
                 self.summaries_file = os.path.join(local_dir, "summaries.json")
                 self.documents_file = os.path.join(local_dir, "documents.json")
+                self.images_file = os.path.join(local_dir, "captured_images.json")
             except (OSError, PermissionError):
                 tmp_dir = os.path.join(tempfile.gettempdir(), "lexibrief_db")
                 os.makedirs(tmp_dir, exist_ok=True)
                 self.summaries_file = os.path.join(tmp_dir, "summaries.json")
                 self.documents_file = os.path.join(tmp_dir, "documents.json")
+                self.images_file = os.path.join(tmp_dir, "captured_images.json")
 
-        for f in [self.summaries_file, self.documents_file]:
+        for f in [self.summaries_file, self.documents_file, self.images_file]:
             try:
                 if not os.path.exists(f):
                     with open(f, "w", encoding="utf-8") as fp:
@@ -400,10 +403,116 @@ class MongoDBManager:
             logger.error(f"Local delete_all_documents error: {err}")
         return count
 
+    # ------------------ CAPTURED IMAGES COLLECTION ------------------
+
+    def save_captured_image(self, image_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Saves a captured image record (metadata and base64 data) into MongoDB."""
+        record = {
+            "_id": str(uuid.uuid4()),
+            "filename": image_data.get("filename"),
+            "path": image_data.get("path") or f"artifacts/captured_images/{image_data.get('filename')}",
+            "url": image_data.get("url") or f"/artifacts/captured_images/{image_data.get('filename')}",
+            "data_base64": image_data.get("data_base64", ""),
+            "size_bytes": image_data.get("size_bytes", 0),
+            "size_formatted": image_data.get("size_formatted", "0 KB"),
+            "created_at": image_data.get("created_at") or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        }
+
+        if self.use_mongo and self.db is not None:
+            try:
+                # Update existing if filename matches, else insert
+                self.db.captured_images.update_one(
+                    {"filename": record["filename"]},
+                    {"$set": record},
+                    upsert=True
+                )
+                return record
+            except Exception as e:
+                logger.warning(f"MongoDB save_captured_image error: {e}")
+
+        # Local fallback write
+        try:
+            self._ensure_local_dirs()
+            with open(self.images_file, "r", encoding="utf-8") as fp:
+                items = json.load(fp)
+            # Remove any matching filename
+            items = [it for it in items if it.get("filename") != record["filename"]]
+            items.insert(0, record)
+            with open(self.images_file, "w", encoding="utf-8") as fp:
+                json.dump(items[:100], fp, indent=2)
+        except Exception as err:
+            logger.error(f"Local save_captured_image error: {err}")
+
+        return record
+
+    def get_captured_images(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """Retrieves list of captured images without full base64 data for performance."""
+        if self.use_mongo and self.db is not None:
+            try:
+                cursor = self.db.captured_images.find({}, {"data_base64": 0}).sort("created_at", -1).limit(limit)
+                return list(cursor)
+            except Exception as e:
+                logger.warning(f"MongoDB get_captured_images error: {e}")
+
+        # Local fallback read
+        try:
+            self._ensure_local_dirs()
+            with open(self.images_file, "r", encoding="utf-8") as fp:
+                items = json.load(fp)
+            clean_items = []
+            for it in items[:limit]:
+                c = {k: v for k, v in it.items() if k != "data_base64"}
+                clean_items.append(c)
+            return clean_items
+        except Exception:
+            return []
+
+    def get_captured_image_by_filename(self, filename: str) -> Optional[Dict[str, Any]]:
+        """Retrieves a single captured image record including full base64 data."""
+        if self.use_mongo and self.db is not None:
+            try:
+                return self.db.captured_images.find_one({"filename": filename})
+            except Exception as e:
+                logger.warning(f"MongoDB get_captured_image_by_filename error: {e}")
+
+        try:
+            self._ensure_local_dirs()
+            with open(self.images_file, "r", encoding="utf-8") as fp:
+                items = json.load(fp)
+            for it in items:
+                if it.get("filename") == filename:
+                    return it
+        except Exception:
+            pass
+        return None
+
+    def delete_captured_image(self, filename: str) -> bool:
+        """Deletes a captured image record from MongoDB and local storage."""
+        deleted = False
+        if self.use_mongo and self.db is not None:
+            try:
+                res = self.db.captured_images.delete_one({"filename": filename})
+                deleted = res.deleted_count > 0
+            except Exception as e:
+                logger.warning(f"MongoDB delete_captured_image error: {e}")
+
+        try:
+            self._ensure_local_dirs()
+            with open(self.images_file, "r", encoding="utf-8") as fp:
+                items = json.load(fp)
+            new_items = [it for it in items if it.get("filename") != filename]
+            with open(self.images_file, "w", encoding="utf-8") as fp:
+                json.dump(new_items, fp, indent=2)
+            deleted = True
+        except Exception:
+            pass
+        return deleted
+
     def get_database_status(self) -> Dict[str, Any]:
         """Returns current database connectivity and collection counts."""
         summaries = self.get_summaries()
         documents = self.get_documents()
+        captured_imgs = self.get_captured_images()
         return {
             "engine": "MongoDB (Atlas Cloud / Local)" if self.use_mongo else "MongoDB (Resilient Local Engine)",
             "status": "connected" if self.use_mongo else "active",
@@ -411,6 +520,7 @@ class MongoDBManager:
             "connection_error": getattr(self, "last_connection_error", None),
             "collections": {
                 "summaries": len(summaries),
-                "documents": len(documents)
+                "documents": len(documents),
+                "captured_images": len(captured_imgs)
             }
         }

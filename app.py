@@ -360,6 +360,29 @@ async def serve_artifact_file(file_path: str):
                     )
             except Exception:
                 pass
+
+    # Check MongoDB cloud storage for captured images (e.g. on serverless Vercel)
+    try:
+        rec = db_manager.get_captured_image_by_filename(filename)
+        if rec and rec.get("data_base64"):
+            img_bytes = base64.b64decode(rec["data_base64"])
+            mime_type = "image/png" if filename.lower().endswith(".png") else "image/webp" if filename.lower().endswith(".webp") else "image/jpeg"
+            # Cache locally to tempdir for faster subsequent requests
+            try:
+                cache_dir = os.path.join(tempfile.gettempdir(), "lexibrief_captured_images")
+                os.makedirs(cache_dir, exist_ok=True)
+                with open(os.path.join(cache_dir, filename), "wb") as f_cache:
+                    f_cache.write(img_bytes)
+            except Exception:
+                pass
+            return Response(
+                content=img_bytes,
+                media_type=mime_type,
+                headers={"Cache-Control": "public, max-age=86400"}
+            )
+    except Exception as db_err:
+        logger.warning(f"Could not retrieve artifact from MongoDB: {db_err}")
+
     raise HTTPException(status_code=404, detail=f"Artifact file '{file_path}' not found")
 
 
@@ -377,7 +400,8 @@ async def health_check():
 
 def save_captured_image(content_bytes: bytes, filename: Optional[str] = None) -> Optional[str]:
     """
-    Saves uploaded or captured camera photo bytes into a dedicated 'artifacts/captured_images' folder in the project.
+    Saves uploaded or captured camera photo bytes into a dedicated 'artifacts/captured_images' folder in the project,
+    and syncs to MongoDB for persistent cloud and serverless access.
     Returns the relative path to the saved image file.
     """
     if not content_bytes:
@@ -410,17 +434,38 @@ def save_captured_image(content_bytes: bytes, filename: Optional[str] = None) ->
         if filename:
             raw_base = os.path.splitext(os.path.basename(filename))[0]
             sanitized = re.sub(r'[^a-zA-Z0-9_\-]', '_', raw_base)[:40].strip('_')
-            if sanitized:
+            if sanitized and sanitized not in ["camera_capture", "blob"]:
                 raw_prefix = sanitized
 
         clean_filename = f"{raw_prefix}_{timestamp}_{unique_suffix}.{detected_ext}"
         full_filepath = os.path.join(target_dir, clean_filename)
 
-        with open(full_filepath, "wb") as fp:
-            fp.write(content_bytes)
+        try:
+            with open(full_filepath, "wb") as fp:
+                fp.write(content_bytes)
+        except Exception as write_err:
+            logger.warning(f"Could not write to local filepath {full_filepath}: {write_err}")
 
-        rel_path = os.path.relpath(full_filepath, BASE_DIR).replace("\\", "/")
-        logger.info(f"Saved uploaded/captured image to dedicated folder: {rel_path} ({len(content_bytes)} bytes)")
+        rel_path = f"artifacts/captured_images/{clean_filename}"
+        
+        # Persist to MongoDB for persistent cloud access
+        try:
+            b64_str = base64.b64encode(content_bytes).decode('utf-8')
+            size_kb = max(1, round(len(content_bytes) / 1024))
+            size_fmt = f"{size_kb} KB" if len(content_bytes) < 1024*1024 else f"{(len(content_bytes) / (1024*1024)):.2f} MB"
+            db_manager.save_captured_image({
+                "filename": clean_filename,
+                "path": rel_path,
+                "url": f"/{rel_path}",
+                "data_base64": b64_str,
+                "size_bytes": len(content_bytes),
+                "size_formatted": size_fmt,
+                "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+            })
+        except Exception as m_err:
+            logger.warning(f"Failed to sync captured image to MongoDB: {m_err}")
+
+        logger.info(f"Saved uploaded/captured image: {rel_path} ({len(content_bytes)} bytes)")
         return rel_path
     except Exception as e:
         logger.warning(f"Failed to save image to dedicated folder: {e}")
@@ -523,59 +568,77 @@ async def save_captured_image_endpoint(body: SaveImageRequest):
 
 @app.get("/api/captured-images", tags=["Text Extraction & MongoDB"])
 async def list_captured_images():
-    """Lists all user-uploaded and captured camera photos stored in artifacts/captured_images or serverless temp storage."""
+    """Lists all user-uploaded and captured camera photos stored in MongoDB or artifacts/captured_images."""
+    files_map = {}
+    
+    # 1. Fetch persistent cloud records from MongoDB
+    try:
+        mongo_images = db_manager.get_captured_images(limit=100)
+        for img in mongo_images:
+            fname = img.get("filename")
+            if fname:
+                files_map[fname] = {
+                    "filename": fname,
+                    "path": img.get("path") or f"artifacts/captured_images/{fname}",
+                    "url": img.get("url") or f"/artifacts/captured_images/{fname}",
+                    "size_bytes": img.get("size_bytes", 0),
+                    "size_formatted": img.get("size_formatted", "0 KB"),
+                    "created_at": img.get("created_at", "")
+                }
+    except Exception as m_err:
+        logger.warning(f"Error fetching captured images from MongoDB: {m_err}")
+
+    # 2. Merge local disk files
     search_dirs = [
         CAPTURED_IMAGES_DIR,
         os.path.join(tempfile.gettempdir(), "lexibrief_captured_images")
     ]
-    seen_filenames = set()
-    files = []
-    
     for target_dir in search_dirs:
         if not target_dir or not os.path.exists(target_dir):
             continue
         try:
             for f in os.listdir(target_dir):
-                if f in seen_filenames:
+                if f in files_map or f.startswith('.'):
                     continue
                 if f.lower().endswith(('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff', '.gif')):
-                    seen_filenames.add(f)
                     fp = os.path.join(target_dir, f)
                     stat = os.stat(fp)
                     rel_path = f"artifacts/captured_images/{f}"
                     size_formatted = f"{max(1, round(stat.st_size / 1024))} KB" if stat.st_size < 1024*1024 else f"{(stat.st_size / (1024*1024)):.2f} MB"
-                    files.append({
+                    files_map[f] = {
                         "filename": f,
                         "path": rel_path,
                         "url": f"/{rel_path}",
                         "size_bytes": stat.st_size,
                         "size_formatted": size_formatted,
                         "created_at": datetime.fromtimestamp(stat.st_mtime, timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-                    })
+                    }
         except Exception as err:
             logger.warning(f"Error scanning captured images in {target_dir}: {err}")
             
-    files.sort(key=lambda x: x["created_at"], reverse=True)
+    files = list(files_map.values())
+    files.sort(key=lambda x: x.get("created_at", ""), reverse=True)
     return {"images": files, "count": len(files), "directory": "artifacts/captured_images"}
 
 
 @app.delete("/api/captured-images/{filename}", tags=["Text Extraction & MongoDB"])
 async def delete_captured_image(filename: str):
-    """Deletes a captured image from artifacts/captured_images or serverless temp storage."""
+    """Deletes a captured image from artifacts/captured_images and MongoDB storage."""
     sanitized = os.path.basename(filename)
+    deleted_mongo = db_manager.delete_captured_image(sanitized)
     search_paths = [
         os.path.join(CAPTURED_IMAGES_DIR, sanitized),
         os.path.join(tempfile.gettempdir(), "lexibrief_captured_images", sanitized)
     ]
-    deleted = False
+    deleted_disk = False
     for fp in search_paths:
         if os.path.exists(fp) and os.path.isfile(fp):
             try:
                 os.remove(fp)
-                deleted = True
+                deleted_disk = True
             except Exception as e:
                 logger.warning(f"Could not delete {fp}: {e}")
-    if deleted:
+    if deleted_mongo or deleted_disk:
         return {"success": True, "message": f"Deleted {sanitized}"}
     raise HTTPException(status_code=404, detail="Captured image not found.")
 
