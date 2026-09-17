@@ -342,4 +342,14 @@ def test_ocr_endpoint_and_image_extraction():
     assert data["success"] is True
     assert "Certificate" in data["text"] or "Domain" in data["text"]
     assert data["words"] > 0
+    assert "saved_image_path" in data
+    assert data["saved_image_path"] is not None
+    assert os.path.exists(data["saved_image_path"])
+
+    # 2. Test /api/captured-images listing endpoint
+    res_list = client.get("/api/captured-images")
+    assert res_list.status_code == 200
+    list_data = res_list.json()
+    assert "images" in list_data
+    assert list_data["count"] >= 1
 

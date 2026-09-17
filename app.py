@@ -35,6 +35,7 @@ from typing import Optional, Dict, Any, List, Tuple
 import uvicorn
 import subprocess
 import time
+from datetime import datetime, timezone
 import io
 import base64
 import requests
@@ -322,6 +323,61 @@ async def health_check():
 
 
 
+CAPTURED_IMAGES_DIR = os.path.join(BASE_DIR, "artifacts", "captured_images")
+
+
+def save_captured_image(content_bytes: bytes, filename: Optional[str] = None) -> Optional[str]:
+    """
+    Saves uploaded or captured camera photo bytes into a dedicated 'artifacts/captured_images' folder in the project.
+    Returns the relative path to the saved image file.
+    """
+    if not content_bytes:
+        return None
+    try:
+        target_dir = CAPTURED_IMAGES_DIR
+        try:
+            os.makedirs(target_dir, exist_ok=True)
+        except (OSError, PermissionError):
+            import tempfile
+            target_dir = os.path.join(tempfile.gettempdir(), "lexibrief_captured_images")
+            os.makedirs(target_dir, exist_ok=True)
+
+        detected_ext = "jpg"
+        if filename and "." in filename:
+            cand_ext = filename.rsplit(".", 1)[-1].lower()
+            if cand_ext in ["jpg", "jpeg", "png", "webp", "bmp", "tiff", "gif"]:
+                detected_ext = cand_ext
+        elif content_bytes[:8].startswith(b'\x89PNG\r\n\x1a\n'):
+            detected_ext = "png"
+        elif content_bytes[:3] == b'\xff\xd8\xff':
+            detected_ext = "jpg"
+        elif content_bytes[:4] == b'RIFF' and b'WEBP' in content_bytes[:12]:
+            detected_ext = "webp"
+
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        unique_suffix = uuid.uuid4().hex[:8]
+        
+        raw_prefix = "captured_photo"
+        if filename:
+            raw_base = os.path.splitext(os.path.basename(filename))[0]
+            sanitized = re.sub(r'[^a-zA-Z0-9_\-]', '_', raw_base)[:40].strip('_')
+            if sanitized:
+                raw_prefix = sanitized
+
+        clean_filename = f"{raw_prefix}_{timestamp}_{unique_suffix}.{detected_ext}"
+        full_filepath = os.path.join(target_dir, clean_filename)
+
+        with open(full_filepath, "wb") as fp:
+            fp.write(content_bytes)
+
+        rel_path = os.path.relpath(full_filepath, BASE_DIR).replace("\\", "/")
+        logger.info(f"Saved uploaded/captured image to dedicated folder: {rel_path} ({len(content_bytes)} bytes)")
+        return rel_path
+    except Exception as e:
+        logger.warning(f"Failed to save image to dedicated folder: {e}")
+        return None
+
+
 class OCRRequest(BaseModel):
     image: Optional[str] = Field(None, description="Base64-encoded image or Data URL")
     lang: Optional[str] = Field("auto", description="Language hint")
@@ -336,22 +392,29 @@ async def ocr_image_endpoint(
     """
     High-speed, neural OCR text extraction endpoint.
     Accepts image file upload or base64 data URI and returns accurate extracted text with preserved bullet layout.
+    Automatically saves the input image/photo into the dedicated 'artifacts/captured_images' project folder.
     """
     try:
         content_bytes = None
+        orig_filename = None
         if file is not None:
+            orig_filename = file.filename
             content_bytes = await file.read(MAX_UPLOAD_SIZE + 1)
         elif body is not None and body.image:
             raw_str = body.image.strip()
             if "," in raw_str:
                 raw_str = raw_str.split(",", 1)[1]
             content_bytes = base64.b64decode(raw_str)
+            orig_filename = "camera_capture.jpg"
         
         if not content_bytes:
             raise HTTPException(status_code=400, detail="No image data provided for OCR.")
 
         if len(content_bytes) > MAX_UPLOAD_SIZE:
             raise HTTPException(status_code=413, detail="Image size exceeds maximum 50 MB limit.")
+
+        # Persist captured photo/image to dedicated folder in project structure
+        saved_img_path = save_captured_image(content_bytes, filename=orig_filename)
 
         extracted_text, pages_count = TextExtractor.extract_from_image(content_bytes)
         cleaned_text = TextExtractor.clean_ocr_text(extracted_text) if extracted_text else ""
@@ -363,13 +426,40 @@ async def ocr_image_endpoint(
             "raw_text": extracted_text,
             "words": words,
             "pages": pages_count,
-            "engine": "rapidocr_onnx"
+            "engine": "rapidocr_onnx",
+            "saved_image_path": saved_img_path,
+            "image_path": saved_img_path
         }
     except HTTPException as he:
         raise he
     except Exception as e:
         logger.error(f"OCR image endpoint error: {e}")
         raise HTTPException(status_code=500, detail=f"OCR processing failed: {str(e)}")
+
+
+@app.get("/api/captured-images", tags=["Text Extraction & MongoDB"])
+async def list_captured_images():
+    """Lists all user-uploaded and captured camera photos stored in artifacts/captured_images."""
+    target_dir = CAPTURED_IMAGES_DIR
+    if not os.path.exists(target_dir):
+        return {"images": [], "count": 0, "directory": "artifacts/captured_images"}
+    
+    files = []
+    try:
+        for f in os.listdir(target_dir):
+            if f.lower().endswith(('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff', '.gif')):
+                fp = os.path.join(target_dir, f)
+                stat = os.stat(fp)
+                files.append({
+                    "filename": f,
+                    "path": os.path.relpath(fp, BASE_DIR).replace("\\", "/"),
+                    "size_bytes": stat.st_size,
+                    "created_at": datetime.fromtimestamp(stat.st_mtime, timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+                })
+        files.sort(key=lambda x: x["created_at"], reverse=True)
+    except Exception as err:
+        logger.warning(f"Error listing captured images: {err}")
+    return {"images": files, "count": len(files), "directory": "artifacts/captured_images"}
 
 
 @app.post("/api/upload", tags=["Text Extraction & MongoDB"])
@@ -406,6 +496,11 @@ async def upload_document(
             if (file.filename or '').lower().endswith(('.jpg', '.jpeg', '.png', '.webp', '.bmp')):
                 detected_format = "IMAGE"
 
+        # Persist uploaded image or live photo capture to dedicated artifacts/captured_images folder
+        saved_img_path = None
+        if detected_format == "IMAGE" or (file.filename or '').lower().endswith(('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff', '.gif')):
+            saved_img_path = save_captured_image(content_bytes, filename=file.filename)
+
         if not extracted_text or not extracted_text.strip():
             raise HTTPException(
                 status_code=400, 
@@ -425,7 +520,8 @@ async def upload_document(
             "words": stats.get("words", 0),
             "stats": stats,
             "keywords": keywords,
-            "key_points": key_points
+            "key_points": key_points,
+            "image_path": saved_img_path
         }
 
         # Persist to MongoDB documents collection with safe fallback
@@ -446,7 +542,9 @@ async def upload_document(
             "stats": stats,
             "keywords": keywords,
             "key_points": key_points,
-            "saved_to_db": True
+            "saved_to_db": True,
+            "saved_image_path": saved_img_path,
+            "image_path": saved_img_path
         }
     except HTTPException as he:
         raise he
