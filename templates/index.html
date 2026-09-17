@@ -987,7 +987,11 @@
           const raw = ret?.data?.text || '';
           return cleanOCRText(raw);
         } catch (workerErr) {
-        // Fallback: standard recognize with selected language
+          console.warn("Worker error, attempting simple recognize:", workerErr);
+        }
+      }
+
+      // 3. Fallback: Standard Tesseract.recognize
       try {
         const ret = await window.Tesseract.recognize(imageSrc, langStr, {
           langPath: 'https://tessdata.projectnaptha.com/4.0.0',
