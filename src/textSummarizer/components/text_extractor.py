@@ -35,8 +35,8 @@ class TextExtractor:
         # 2. Normalize arrows (e.g. "last in -> first out" or "last in —> first out")
         text = re.sub(r'\s*(?:->|-->|→|—>)\s*', ' → ', text)
 
-        # 3. Heal misclassified bullet glyphs (e.g. '+' or '*' or '-' or Hindi numeral '१.' / '५' before English words)
-        text = re.sub(r'(?:^|\n)\s*[१२३४५६७८९०][\.\s:]+(?=[A-Za-z])', r'\n• ', text)
+        # 3. Heal misclassified bullet glyphs (e.g. '+' or '*' or '-' or Hindi numerals '१.' / '५' / '५०' / '०' before English words)
+        text = re.sub(r'(?:^|\n)\s*[१२३४५६७८९०\u0966-\u096F]+[\.\s:o°\-_*~]*(?=[A-Za-z])', r'\n• ', text)
         text = re.sub(r'(?:^|\n)\s*[\+\*]\s+(?=[A-Za-z0-9])', r'\n• ', text)
         text = re.sub(r'(?:^|\n)\s*-\s+(?=[A-Z])', r'\n• ', text)
         

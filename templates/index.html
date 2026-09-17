@@ -869,8 +869,8 @@
       // 2. Normalize arrows (e.g. "last in -> first out" or "last in —> first out")
       clean = clean.replace(/\s*(?:->|-->|→|—>)\s*/g, ' → ');
 
-      // 3. Heal misclassified bullet glyphs (e.g. '+' or '*' or '-' or Hindi numeral '१.' / '५' before English words)
-      clean = clean.replace(/(?:^|\n)\s*[१२३४५६७८९०][\.\s:]+(?=[A-Za-z])/g, '\n• ');
+      // 3. Heal misclassified bullet glyphs (e.g. '+' or '*' or '-' or Hindi numerals '१.' / '५' / '५०' / '०' before English words)
+      clean = clean.replace(/(?:^|\n)\s*[१२३४५६७८९०\u0966-\u096F]+[\.\s:o°\-_*~]*(?=[A-Za-z])/g, '\n• ');
       clean = clean.replace(/(?:^|\n)\s*[\+\*]\s+(?=[A-Za-z0-9])/g, '\n• ');
       clean = clean.replace(/(?:^|\n)\s*-\s+(?=[A-Z])/g, '\n• ');
 
