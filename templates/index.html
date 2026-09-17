@@ -961,12 +961,14 @@
 
       const videoRef = React.useRef(null);
       const canvasRef = React.useRef(null);
+      const fileInputRef = React.useRef(null);
+      const cameraInputRef = React.useRef(null);
       const [stream, setStream] = React.useState(null);
-      const [facingMode, setFacingMode] = React.useState('environment'); // 'environment' (back) or 'user' (front)
-      const [ocrLang, setOcrLang] = React.useState('eng+hin'); // Default to Multilingual English+Hindi
+      const [facingMode, setFacingMode] = React.useState('environment');
+      const [ocrLang, setOcrLang] = React.useState('eng+hin');
       const [capturedImage, setCapturedImage] = React.useState(null);
       const [enhancedPreview, setEnhancedPreview] = React.useState(null);
-      const [filterMode, setFilterMode] = React.useState('clarity'); // 'clarity', 'contrast', 'original'
+      const [filterMode, setFilterMode] = React.useState('clarity');
       const [cropBox, setCropBox] = React.useState({ x: 2, y: 2, width: 96, height: 96 });
       const [isCropActive, setIsCropActive] = React.useState(true);
       const [cameraError, setCameraError] = React.useState(null);
@@ -974,19 +976,20 @@
       const [isOcrProcessing, setIsOcrProcessing] = React.useState(false);
       const [ocrProgress, setOcrProgress] = React.useState({ status: '', percent: 0 });
       const [extractedTextPreview, setExtractedTextPreview] = React.useState(null);
+      const [copiedToast, setCopiedToast] = React.useState(false);
+      const [isDraggingOver, setIsDraggingOver] = React.useState(false);
 
       const startCamera = async (facing) => {
         setIsInitializing(true);
         setCameraError(null);
 
-        // Stop previous stream
         if (stream) {
           stream.getTracks().forEach(track => track.stop());
         }
 
         try {
           if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            throw new Error("Web Camera API is not supported on this browser context (HTTPS or localhost is required).");
+            throw new Error("Live camera streaming is not accessible in this browser context (HTTPS or localhost is required).");
           }
 
           const constraints = {
@@ -1007,7 +1010,7 @@
         } catch (err) {
           console.warn("Camera access note:", err);
           setIsInitializing(false);
-          setCameraError(err.message || "Camera permission was denied or no video input device was found.");
+          setCameraError(err.message || "Camera access was denied or no active camera hardware was detected.");
         }
       };
 
@@ -1022,7 +1025,28 @@
         };
       }, [facingMode]);
 
-      // When photo or filterMode changes, generate enhanced preview
+      // Global Clipboard Paste (Ctrl+V) listener
+      React.useEffect(() => {
+        const handlePaste = (e) => {
+          if (extractedTextPreview !== null) return;
+          const items = e.clipboardData?.items;
+          if (!items) return;
+          for (let item of items) {
+            if (item.type.indexOf('image') !== -1) {
+              const file = item.getAsFile();
+              if (file) {
+                processLoadedFile(file);
+                showToast("📸 Screenshot pasted from clipboard!", "success");
+                break;
+              }
+            }
+          }
+        };
+        window.addEventListener('paste', handlePaste);
+        return () => window.removeEventListener('paste', handlePaste);
+      }, [extractedTextPreview, stream]);
+
+      // Enhanced preview on filter/crop change
       React.useEffect(() => {
         if (capturedImage) {
           preprocessImageForOCR(capturedImage, filterMode).then(res => {
@@ -1034,7 +1058,6 @@
         }
       }, [capturedImage, filterMode]);
 
-      // Stop stream on modal close
       const handleClose = () => {
         if (stream) {
           stream.getTracks().forEach(track => track.stop());
@@ -1048,12 +1071,10 @@
         onClose();
       };
 
-      // Toggle camera facing mode
       const toggleCamera = () => {
         setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
       };
 
-      // Snap photo
       const snapPhoto = () => {
         if (!videoRef.current || !canvasRef.current) return;
         const video = videoRef.current;
@@ -1077,7 +1098,6 @@
         }
       };
 
-      // Retake photo
       const retakePhoto = () => {
         setCapturedImage(null);
         setEnhancedPreview(null);
@@ -1088,29 +1108,25 @@
         startCamera(facingMode);
       };
 
-      // Run OCR on captured/cropped photo and show preview
       const runExtractHandwriting = async () => {
         if (!capturedImage) return;
         setIsOcrProcessing(true);
         const langObj = OCR_LANGUAGES.find(l => l.code === ocrLang);
-        setOcrProgress({ status: `Preparing OCR engine (${langObj ? langObj.short : ocrLang})...`, percent: 15 });
+        setOcrProgress({ status: `Connecting to LexiBrief Deep Neural Vision (${langObj ? langObj.short : ocrLang})...`, percent: 20 });
 
         try {
-          // 1. Crop image if crop box is active & adjusted
           let baseImageToOcr = capturedImage;
           if (isCropActive && (cropBox.width < 98 || cropBox.height < 98 || cropBox.x > 2 || cropBox.y > 2)) {
-            setOcrProgress({ status: 'Cropping selected document region...', percent: 20 });
+            setOcrProgress({ status: 'Cropping selected document region...', percent: 35 });
             baseImageToOcr = await cropImageToDataUrl(capturedImage, cropBox);
           }
 
-          // 2. High-clarity contrast enhancement
           const enhancedForOcr = await preprocessImageForOCR(baseImageToOcr, filterMode);
 
-          // 3. Neural OCR recognition
           const recognizedText = await executeHandwritingOCR(enhancedForOcr, (pct, statusText) => {
             setOcrProgress({
               status: statusText || (pct ? `Recognizing text (${pct}%)...` : 'Processing neural OCR...'),
-              percent: pct !== null ? Math.max(15, Math.min(92, pct)) : 35
+              percent: pct !== null ? Math.max(20, Math.min(95, pct)) : 50
             });
           }, ocrLang);
 
@@ -1122,7 +1138,6 @@
         }
       };
 
-      // Submit verified / edited text to summarizer
       const submitExtractedText = async () => {
         const textToSubmit = (extractedTextPreview || '').trim();
         if (!textToSubmit) {
@@ -1131,7 +1146,7 @@
         }
 
         setIsOcrProcessing(true);
-        setOcrProgress({ status: 'Ingesting handwritten notes into LexiBrief...', percent: 95 });
+        setOcrProgress({ status: 'Ingesting document notes into LexiBrief...', percent: 95 });
 
         try {
           let imageToProcess = capturedImage;
@@ -1151,9 +1166,7 @@
         }
       };
 
-      // Fallback: Choose image from device
-      const handleFallbackFile = (e) => {
-        const file = e.target.files?.[0];
+      const processLoadedFile = (file) => {
         if (!file) return;
         const reader = new FileReader();
         reader.onload = (ev) => {
@@ -1168,101 +1181,96 @@
         reader.readAsDataURL(file);
       };
 
+      const copyToClipboard = () => {
+        if (!extractedTextPreview) return;
+        navigator.clipboard.writeText(extractedTextPreview);
+        setCopiedToast(true);
+        setTimeout(() => setCopiedToast(false), 2000);
+      };
+
       return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
-          <div className="bg-slate-900 border border-slate-700/80 w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[94vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/85 backdrop-blur-xl animate-fadeIn">
+          <div className="bg-slate-900/95 border border-indigo-500/25 w-full max-w-2xl rounded-3xl shadow-[0_25px_70px_rgba(0,0,0,0.85)] ring-1 ring-white/10 overflow-hidden flex flex-col max-h-[92vh] transition-all">
             
+            {/* Top Accent Neon Bar */}
+            <div className="h-1 bg-gradient-to-r from-indigo-500 via-purple-500 via-sky-400 to-emerald-400 w-full" />
+
             {/* Header */}
-            <div className="p-4 border-b border-slate-800 flex items-center justify-between text-white">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-sm border border-indigo-500/30">
-                  ✍️
+            <div className="px-5 py-4 border-b border-slate-800/90 flex items-center justify-between bg-slate-900/80 backdrop-blur-md">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center font-bold text-base shadow-lg shadow-indigo-500/25 border border-white/20">
+                  📷
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-sm sm:text-base text-white font-heading">
-                    {extractedTextPreview !== null ? 'Verify & Review Extracted Text' : capturedImage ? 'Crop Area & Enhance Document Scan' : 'Live Document & Notes Scanner'}
-                  </h3>
-                  <p className="text-[11px] text-slate-400 font-medium">
-                    {extractedTextPreview !== null ? 'Review or tweak recognized text before summarizing' : capturedImage ? 'Drag handles to crop text area, select language & extract' : 'Position notes inside viewfinder or choose target language'}
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-extrabold text-sm sm:text-base text-white font-heading tracking-tight">
+                      {extractedTextPreview !== null ? 'Verify & Review Extracted Text' : capturedImage ? 'Crop & Enhance Document Scan' : 'LexiBrief AI Vision Scanner'}
+                    </h3>
+                    <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[10px] font-extrabold text-emerald-300">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                      <span>RapidOCR Neural</span>
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                    {extractedTextPreview !== null ? 'Fine-tune recognized text before summarizing' : capturedImage ? 'Position handles over notes or text, then scan' : 'Snap with camera, upload document photos, or paste screenshot'}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {!capturedImage && !cameraError && (
-                  <div className="flex items-center gap-1.5 mr-1">
-                    <div className="hidden sm:flex items-center gap-1 bg-slate-800 p-0.5 rounded-xl border border-slate-700 text-[11px]">
-                      <button
-                        type="button"
-                        onClick={() => setOcrLang('hin')}
-                        className={`px-2 py-1 rounded-lg font-bold transition cursor-pointer ${
-                          ocrLang === 'hin' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-300 hover:text-white'
-                        }`}
-                      >
-                        🇮🇳 Hindi
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setOcrLang('eng+hin')}
-                        className={`px-2 py-1 rounded-lg font-bold transition cursor-pointer ${
-                          ocrLang === 'eng+hin' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-300 hover:text-white'
-                        }`}
-                      >
-                        🌐 Hin+Eng
-                      </button>
-                    </div>
 
-                    <select
-                      value={ocrLang}
-                      onChange={(e) => setOcrLang(e.target.value)}
-                      className="bg-slate-800/90 border border-slate-700 text-indigo-300 text-xs rounded-xl px-2 py-1.5 font-bold focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer max-w-[130px] sm:max-w-[160px] truncate"
-                      title="Select OCR Language"
-                    >
-                      {OCR_LANGUAGES.map(lang => (
-                        <option key={lang.code} value={lang.code} className="bg-slate-900 text-white">
-                          {lang.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+              <div className="flex items-center gap-2">
+                {/* Language quick switcher */}
+                <div className="flex items-center gap-1 bg-slate-800/90 p-1 rounded-xl border border-slate-700/80 text-[11px]">
+                  <select
+                    value={ocrLang}
+                    onChange={(e) => setOcrLang(e.target.value)}
+                    disabled={isOcrProcessing}
+                    className="bg-transparent text-indigo-300 font-bold focus:outline-none cursor-pointer text-xs px-1"
+                    title="Select OCR Recognition Language"
+                  >
+                    {OCR_LANGUAGES.map(lang => (
+                      <option key={lang.code} value={lang.code} className="bg-slate-900 text-white">
+                        {lang.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 {!capturedImage && !cameraError && (
                   <button
                     type="button"
                     onClick={toggleCamera}
                     className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer border border-slate-700 text-xs flex items-center gap-1"
-                    title="Flip camera"
+                    title="Switch camera"
                   >
                     <span>🔄</span>
-                    <span className="hidden sm:inline text-[11px] font-bold">Flip</span>
                   </button>
                 )}
+
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition flex items-center justify-center cursor-pointer border border-slate-700"
-                  title="Close"
+                  className="w-8 h-8 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition flex items-center justify-center cursor-pointer border border-slate-700"
+                  title="Close scanner"
                 >
                   ✕
                 </button>
               </div>
             </div>
 
-            {/* Filter, Crop & Language Mode Selector (When Photo is Captured & Not in text review mode) */}
+            {/* Filter & Crop Strip (When Photo is Captured & Not in text review) */}
             {capturedImage && extractedTextPreview === null && (
-              <div className="px-3.5 py-2 bg-slate-950 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs">
-                {/* Crop & Filter Controls */}
-                <div className="flex items-center gap-1.5 overflow-x-auto">
+              <div className="px-4 py-2.5 bg-slate-950 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-2 overflow-x-auto">
                   <button
                     type="button"
                     onClick={() => setIsCropActive(prev => !prev)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                       isCropActive
-                        ? 'bg-emerald-600 text-white shadow-xs'
+                        ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-1 ring-emerald-400/50'
                         : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                     }`}
-                    title="Toggle crop bounding box"
                   >
-                    <span>✂️ Crop Area</span>
+                    <span>✂️ Adjust Crop Box</span>
                     {isCropActive && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>}
                   </button>
 
@@ -1272,134 +1280,104 @@
                       setCropBox({ x: 0, y: 0, width: 100, height: 100 });
                       setIsCropActive(false);
                     }}
-                    className="px-2 py-1 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition cursor-pointer"
-                    title="Reset to full image"
+                    className="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition cursor-pointer"
                   >
-                    <span>🔄 Full</span>
+                    <span>Full Image</span>
                   </button>
 
                   <div className="h-4 w-px bg-slate-800 mx-1"></div>
 
-                  <button
-                    type="button"
-                    onClick={() => setFilterMode('clarity')}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
-                      filterMode === 'clarity'
-                        ? 'bg-indigo-600 text-white shadow-xs'
-                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                    }`}
-                    title="Clarity enhancement (preserves fine font details & Hindi matras)"
-                  >
-                    <span>✨ Clarity</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFilterMode('contrast')}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
-                      filterMode === 'contrast'
-                        ? 'bg-indigo-600 text-white shadow-xs'
-                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                    }`}
-                  >
-                    <span>🔍 Gray</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFilterMode('original')}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
-                      filterMode === 'original'
-                        ? 'bg-indigo-600 text-white shadow-xs'
-                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                    }`}
-                  >
-                    <span>📸 Raw</span>
-                  </button>
-                </div>
-
-                {/* Language Selector Quick Pills + Dropdown */}
-                <div className="flex items-center gap-1.5 ml-auto">
-                  <div className="flex items-center gap-1 bg-slate-800 p-0.5 rounded-lg border border-slate-700 text-[11px]">
+                  <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded-xl border border-slate-800">
                     <button
                       type="button"
-                      onClick={() => setOcrLang('hin')}
-                      className={`px-2 py-0.5 rounded font-bold transition cursor-pointer ${
-                        ocrLang === 'hin' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-300 hover:text-white'
+                      onClick={() => setFilterMode('clarity')}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                        filterMode === 'clarity' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-400 hover:text-slate-200'
                       }`}
-                      title="Hindi OCR (Highest accuracy for Hindi/Devanagari)"
                     >
-                      🇮🇳 Hindi
+                      ✨ Neural Clarity
                     </button>
                     <button
                       type="button"
-                      onClick={() => setOcrLang('eng+hin')}
-                      className={`px-2 py-0.5 rounded font-bold transition cursor-pointer ${
-                        ocrLang === 'eng+hin' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-300 hover:text-white'
+                      onClick={() => setFilterMode('contrast')}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                        filterMode === 'contrast' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-400 hover:text-slate-200'
                       }`}
-                      title="Hindi + English Multilingual OCR"
                     >
-                      🌐 Hin+Eng
+                      🔍 High Contrast
                     </button>
                     <button
                       type="button"
-                      onClick={() => setOcrLang('eng')}
-                      className={`px-2 py-0.5 rounded font-bold transition cursor-pointer ${
-                        ocrLang === 'eng' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-300 hover:text-white'
+                      onClick={() => setFilterMode('original')}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                        filterMode === 'original' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-400 hover:text-slate-200'
                       }`}
-                      title="English OCR"
                     >
-                      🇬🇧 Eng
+                      📸 Original
                     </button>
                   </div>
-
-                  <select
-                    value={ocrLang}
-                    onChange={(e) => setOcrLang(e.target.value)}
-                    disabled={isOcrProcessing}
-                    className="bg-slate-800 border border-slate-700 text-indigo-300 text-xs rounded-lg px-1.5 py-1 font-bold focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer max-w-[110px] truncate"
-                    title="All Languages"
-                  >
-                    {OCR_LANGUAGES.map(lang => (
-                      <option key={lang.code} value={lang.code} className="bg-slate-900 text-white">
-                        {lang.label}
-                      </option>
-                    ))}
-                  </select>
                 </div>
+
+                <span className="text-[11px] text-slate-400 font-mono hidden sm:inline">
+                  Drag corners to crop
+                </span>
               </div>
             )}
 
-            {/* Main Area: Viewfinder OR Interactive Cropper OR Extracted Text Editor */}
-            <div className="relative flex-1 bg-black min-h-[300px] sm:min-h-[380px] flex items-center justify-center overflow-hidden">
-              
-              {/* Hidden Canvas for snapshot rendering */}
+            {/* Main Viewport */}
+            <div className="relative flex-1 bg-slate-950 min-h-[320px] sm:min-h-[400px] flex items-center justify-center overflow-hidden">
               <canvas ref={canvasRef} className="hidden" />
 
+              {/* Hidden file inputs for direct camera snap and gallery browsing */}
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleFallbackFile}
+                className="hidden"
+              />
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFallbackFile}
+                className="hidden"
+              />
+
               {extractedTextPreview !== null ? (
-                /* State 3: Editable Extracted Text Preview */
-                <div className="w-full h-full p-4 sm:p-5 flex flex-col bg-slate-950 animate-fadeIn overflow-y-auto">
-                  <div className="flex items-center justify-between mb-2">
+                /* State 3: Editable Extracted Text Review */
+                <div className="w-full h-full p-4 sm:p-6 flex flex-col bg-slate-950 animate-fadeIn overflow-y-auto">
+                  <div className="flex items-center justify-between mb-2.5">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">
+                      <span className="text-xs font-extrabold text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
                         <span>✓</span>
-                        <span>Text Recognized</span>
+                        <span>Neural Extraction Complete</span>
                       </span>
-                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono">
+                      <span className="text-xs px-2.5 py-1 rounded-lg bg-slate-800/90 text-slate-300 font-mono border border-slate-700">
                         {extractedTextPreview.split(/\s+/).filter(Boolean).length} words
                       </span>
                     </div>
-                    <span className="text-[11px] text-slate-400">You can edit text before summarizing</span>
+
+                    <button
+                      type="button"
+                      onClick={copyToClipboard}
+                      className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition border border-slate-700 flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>{copiedToast ? '✓ Copied' : '📋 Copy'}</span>
+                    </button>
                   </div>
 
                   <textarea
                     value={extractedTextPreview}
                     onChange={(e) => setExtractedTextPreview(e.target.value)}
-                    rows={8}
-                    placeholder="Recognized text will appear here. You can make adjustments..."
-                    className="w-full flex-1 bg-slate-900 border border-slate-700 rounded-2xl p-3.5 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-mono leading-relaxed resize-none shadow-inner"
+                    rows={9}
+                    placeholder="Extracted text will appear here. Edit or review freely..."
+                    className="w-full flex-1 bg-slate-900 border border-slate-700/80 rounded-2xl p-4 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 font-mono leading-relaxed resize-none shadow-inner"
                   />
                 </div>
               ) : !capturedImage ? (
-                /* State 1: Live Video Camera Stream */
+                /* State 1: Live Camera Stream OR Studio Ingest Dropzone */
                 <>
                   {isInitializing && !cameraError && (
                     <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-slate-950/90 text-white">
@@ -1409,23 +1387,73 @@
                   )}
 
                   {cameraError ? (
-                    <div className="p-6 text-center space-y-4 max-w-md">
-                      <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center justify-center text-2xl">
-                        📷
+                    /* Elegant Studio Dropzone & Multi-Ingest Card */
+                    <div
+                      onDragOver={(e) => { e.preventDefault(); setIsDraggingOver(true); }}
+                      onDragLeave={() => setIsDraggingOver(false)}
+                      onDrop={handleDropFile}
+                      className="w-full h-full p-5 sm:p-8 flex flex-col items-center justify-center text-center max-w-lg mx-auto"
+                    >
+                      <div className={`w-full p-6 sm:p-7 rounded-3xl border-2 border-dashed transition-all duration-300 flex flex-col items-center justify-center gap-4 ${
+                        isDraggingOver
+                          ? 'border-indigo-400 bg-indigo-500/15 scale-[1.02]'
+                          : 'border-indigo-500/30 hover:border-indigo-400/60 bg-gradient-to-b from-indigo-950/20 to-slate-900/40'
+                      }`}>
+                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 flex items-center justify-center text-3xl shadow-inner">
+                          📑
+                        </div>
+
+                        <div className="space-y-1">
+                          <h4 className="text-white font-extrabold text-base font-heading">
+                            Upload or Capture Document Photo
+                          </h4>
+                          <p className="text-slate-400 text-xs max-w-xs leading-relaxed">
+                            Take a photo with your device camera, browse images, or drag & drop certificates and notes here.
+                          </p>
+                        </div>
+
+                        {/* 3 Quick Action Cards */}
+                        <div className="grid grid-cols-2 gap-2.5 w-full pt-1">
+                          <button
+                            type="button"
+                            onClick={() => cameraInputRef.current?.click()}
+                            className="btn-3d-primary py-3 px-3 rounded-2xl text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer"
+                          >
+                            <span>📸 Take Photo</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="bg-slate-800 hover:bg-slate-700 text-slate-200 py-3 px-3 rounded-2xl font-extrabold text-xs transition border border-slate-700/90 flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                          >
+                            <span>📁 Browse Files</span>
+                          </button>
+                        </div>
+
+                        {/* Paste Shortcut Pill */}
+                        <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium">
+                          <span className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-indigo-300 font-mono text-[10px]">Ctrl+V</span>
+                          <span>Paste screenshot directly from clipboard</span>
+                        </div>
                       </div>
-                      <div className="space-y-1">
-                        <h4 className="text-white font-bold text-sm">Direct Camera Access Blocked</h4>
-                        <p className="text-slate-400 text-xs leading-relaxed">{cameraError}</p>
-                      </div>
-                      <div className="pt-2">
-                        <label className="btn-3d-primary cursor-pointer inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white shadow-md">
-                          <span>📸 Take Photo with Device Camera</span>
-                          <input type="file" accept="image/*" capture="environment" onChange={handleFallbackFile} className="hidden" />
-                        </label>
+
+                      {/* Camera Permission Tip */}
+                      <div className="mt-3.5 flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-slate-800 text-[11px] text-slate-400">
+                        <span>🔒 Live streaming blocked</span>
+                        <span className="text-slate-600">•</span>
+                        <button
+                          type="button"
+                          onClick={() => startCamera(facingMode)}
+                          className="text-indigo-400 hover:text-indigo-300 font-bold underline cursor-pointer"
+                        >
+                          Retry Camera Stream
+                        </button>
                       </div>
                     </div>
                   ) : (
-                    <div className="relative w-full h-full flex items-center justify-center">
+                    /* Live Camera Viewfinder */
+                    <div className="relative w-full h-full flex items-center justify-center bg-black">
                       <video
                         ref={videoRef}
                         autoPlay
@@ -1434,28 +1462,31 @@
                         className="w-full h-full object-cover"
                       />
 
-                      {/* Document Scanner Viewfinder Overlay */}
+                      {/* Laser scanning beam */}
+                      <div className="absolute inset-x-8 top-12 h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_15px_#34d399] animate-pulse pointer-events-none"></div>
+
+                      {/* Document Viewfinder Overlay */}
                       <div className="absolute inset-6 sm:inset-10 pointer-events-none flex flex-col justify-between">
                         <div className="flex justify-between">
-                          <div className="w-8 h-8 border-t-4 border-l-4 border-emerald-400 rounded-tl-xl shadow-xs"></div>
-                          <div className="w-8 h-8 border-t-4 border-r-4 border-emerald-400 rounded-tr-xl shadow-xs"></div>
+                          <div className="w-9 h-9 border-t-4 border-l-4 border-emerald-400 rounded-tl-2xl shadow-[0_0_10px_rgba(52,211,153,0.5)]"></div>
+                          <div className="w-9 h-9 border-t-4 border-r-4 border-emerald-400 rounded-tr-2xl shadow-[0_0_10px_rgba(52,211,153,0.5)]"></div>
                         </div>
                         <div className="flex justify-between">
-                          <div className="w-8 h-8 border-b-4 border-l-4 border-emerald-400 rounded-bl-xl shadow-xs"></div>
-                          <div className="w-8 h-8 border-b-4 border-r-4 border-emerald-400 rounded-br-xl shadow-xs"></div>
+                          <div className="w-9 h-9 border-b-4 border-l-4 border-emerald-400 rounded-bl-2xl shadow-[0_0_10px_rgba(52,211,153,0.5)]"></div>
+                          <div className="w-9 h-9 border-b-4 border-r-4 border-emerald-400 rounded-br-2xl shadow-[0_0_10px_rgba(52,211,153,0.5)]"></div>
                         </div>
                       </div>
 
-                      {/* Hint pill */}
-                      <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-[11px] font-bold text-emerald-300 pointer-events-none flex items-center gap-1.5 shadow-md">
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                        <span>Align notes or document inside frame</span>
+                      {/* Live Alignment Pill */}
+                      <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3.5 py-1 rounded-full bg-slate-950/80 backdrop-blur-md border border-emerald-500/30 text-[11px] font-extrabold text-emerald-300 pointer-events-none flex items-center gap-2 shadow-lg">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                        <span>Align Document Inside Frame</span>
                       </div>
                     </div>
                   )}
                 </>
               ) : (
-                /* State 2: Photo Preview with Interactive Cropper & OCR Overlay */
+                /* State 2: Captured Photo Cropper & OCR Overlay */
                 <div className="relative w-full h-full flex items-center justify-center bg-slate-950 p-2">
                   <InteractiveImageCropper
                     imageSrc={enhancedPreview || capturedImage}
@@ -1464,23 +1495,22 @@
                     isCropActive={isCropActive}
                   />
 
-                  {/* OCR Processing Overlay */}
                   {isOcrProcessing && (
-                    <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-white text-center space-y-3.5 animate-fadeIn z-40">
-                      <div className="w-12 h-12 rounded-2xl bg-indigo-600/20 border border-indigo-500/40 text-indigo-400 flex items-center justify-center font-bold text-xl animate-pulse">
+                    <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-white text-center space-y-4 animate-fadeIn z-40">
+                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center font-bold text-2xl shadow-xl shadow-indigo-500/40 animate-pulse">
                         ⚡
                       </div>
                       <div className="space-y-1">
-                        <h4 className="font-extrabold text-sm text-white font-heading">Recognizing Document Text</h4>
+                        <h4 className="font-extrabold text-base text-white font-heading">Running Deep Neural OCR</h4>
                         <p className="text-xs text-indigo-200 font-medium">{ocrProgress.status || 'Processing neural OCR...'}</p>
                       </div>
-                      <div className="w-full max-w-xs bg-slate-800 rounded-full h-2 overflow-hidden shadow-inner border border-slate-700">
+                      <div className="w-full max-w-xs bg-slate-800 rounded-full h-2.5 overflow-hidden shadow-inner border border-slate-700">
                         <div
-                          className="h-full bg-gradient-to-r from-indigo-500 via-indigo-400 to-purple-500 transition-all duration-200"
-                          style={{ width: `${Math.max(5, ocrProgress.percent)}%` }}
+                          className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 transition-all duration-300"
+                          style={{ width: `${Math.max(10, ocrProgress.percent)}%` }}
                         />
                       </div>
-                      <span className="text-[11px] font-mono text-slate-400">{ocrProgress.percent}% Complete</span>
+                      <span className="text-xs font-mono text-slate-400">{ocrProgress.percent}% Complete</span>
                     </div>
                   )}
                 </div>
@@ -1488,9 +1518,9 @@
             </div>
 
             {/* Bottom Actions Bar */}
-            <div className="p-4 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-3">
+            <div className="p-4 bg-slate-900 border-t border-slate-800/90 flex items-center justify-between gap-3">
               {extractedTextPreview !== null ? (
-                /* Bottom buttons for Text Review State */
+                /* Text Review State */
                 <div className="flex items-center justify-between gap-3 w-full">
                   <button
                     type="button"
@@ -1506,7 +1536,7 @@
                     type="button"
                     onClick={submitExtractedText}
                     disabled={isOcrProcessing || !extractedTextPreview.trim()}
-                    className={`btn-3d-primary px-6 py-2.5 rounded-xl text-white text-xs font-extrabold flex items-center gap-2 cursor-pointer shadow-md ${
+                    className={`btn-3d-primary px-6 py-2.5 rounded-xl text-white text-xs font-extrabold flex items-center gap-2 cursor-pointer shadow-lg ${
                       isOcrProcessing ? 'opacity-60 cursor-wait' : ''
                     }`}
                   >
@@ -1515,26 +1545,37 @@
                   </button>
                 </div>
               ) : !capturedImage ? (
-                /* Bottom buttons for Camera Viewfinder */
+                /* Viewfinder or Ingest State */
                 <>
-                  <label className="text-xs font-bold text-slate-400 hover:text-white transition cursor-pointer flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-slate-800">
-                    <span>📁 Gallery</span>
-                    <input type="file" accept="image/*" onChange={handleFallbackFile} className="hidden" />
-                  </label>
-
                   <button
                     type="button"
-                    onClick={snapPhoto}
-                    disabled={isInitializing || !!cameraError}
-                    className={`group relative flex items-center justify-center w-14 h-14 rounded-full bg-white text-slate-950 hover:scale-105 active:scale-95 transition shadow-lg cursor-pointer ${
-                      isInitializing || !!cameraError ? 'opacity-40 cursor-not-allowed' : ''
-                    }`}
-                    title="Take Photo"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-xs font-bold text-slate-300 hover:text-white transition cursor-pointer flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-slate-800 border border-transparent hover:border-slate-700"
                   >
-                    <div className="w-12 h-12 rounded-full border-2 border-slate-950 flex items-center justify-center">
-                      <div className="w-9 h-9 rounded-full bg-indigo-600 group-hover:bg-indigo-700 transition"></div>
-                    </div>
+                    <span>📁 Browse Photos</span>
                   </button>
+
+                  {!cameraError ? (
+                    <button
+                      type="button"
+                      onClick={snapPhoto}
+                      disabled={isInitializing}
+                      className="group relative flex items-center justify-center w-16 h-16 rounded-full bg-white text-slate-950 hover:scale-105 active:scale-95 transition-all shadow-xl shadow-indigo-500/25 ring-4 ring-indigo-500/40 hover:ring-indigo-400 cursor-pointer"
+                      title="Capture Photo"
+                    >
+                      <div className="w-13 h-13 rounded-full border-2 border-slate-950 flex items-center justify-center">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 group-hover:from-indigo-500 group-hover:to-purple-500 transition"></div>
+                      </div>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => cameraInputRef.current?.click()}
+                      className="btn-3d-primary px-5 py-2.5 rounded-xl text-white text-xs font-extrabold flex items-center gap-2 shadow-md cursor-pointer"
+                    >
+                      <span>📸 Snap with Camera</span>
+                    </button>
+                  )}
 
                   <button
                     type="button"
@@ -1545,7 +1586,7 @@
                   </button>
                 </>
               ) : (
-                /* Bottom buttons for Captured Photo */
+                /* Captured Photo State */
                 <div className="flex items-center justify-between gap-3 w-full">
                   <button
                     type="button"
@@ -1554,26 +1595,26 @@
                     className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition border border-slate-700 cursor-pointer flex items-center gap-1.5"
                   >
                     <span>🔄</span>
-                    <span>Retake</span>
+                    <span>Retake / Change Photo</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={runExtractHandwriting}
                     disabled={isOcrProcessing}
-                    className={`btn-3d-primary px-6 py-2.5 rounded-xl text-white text-xs font-extrabold flex items-center gap-2 cursor-pointer shadow-md ${
+                    className={`btn-3d-primary px-6 py-2.5 rounded-xl text-white text-xs font-extrabold flex items-center gap-2 cursor-pointer shadow-lg shadow-indigo-500/30 ${
                       isOcrProcessing ? 'opacity-60 cursor-wait' : ''
                     }`}
                   >
                     {isOcrProcessing ? (
                       <>
                         <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                        <span>Extracting {ocrLang === 'hin' ? 'Hindi' : 'Text'}...</span>
+                        <span>Extracting with Neural OCR...</span>
                       </>
                     ) : (
                       <>
                         <span>⚡</span>
-                        <span>Scan & Extract {ocrLang === 'hin' ? 'Hindi (हिन्दी)' : ocrLang === 'eng+hin' ? 'Hindi + English' : 'Selected Text'}</span>
+                        <span>Scan & Extract with Neural OCR</span>
                       </>
                     )}
                   </button>
