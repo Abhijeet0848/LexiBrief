@@ -66,3 +66,23 @@ def test_pptx_fallback_without_library():
     assert pages == 3
     assert "LexiBrief NLP Architecture" in text
     assert "Key System Capabilities" in text
+
+
+def test_pptx_with_tables():
+    """Validates table extraction in PPTX slides."""
+    prs = Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[6]) # blank layout
+    table_shape = slide.shapes.add_table(2, 2, Inches(1), Inches(1), Inches(4), Inches(2))
+    table = table_shape.table
+    table.cell(0, 0).text = "Model"
+    table.cell(0, 1).text = "Accuracy"
+    table.cell(1, 0).text = "Pegasus"
+    table.cell(1, 1).text = "94.5%"
+    
+    buf = io.BytesIO()
+    prs.save(buf)
+    
+    text, fmt, pages = TextExtractor.extract("table_test.pptx", buf.getvalue())
+    assert fmt == "PPTX"
+    assert "Model | Accuracy" in text
+    assert "Pegasus | 94.5%" in text

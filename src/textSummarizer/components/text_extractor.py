@@ -382,9 +382,55 @@ class TextExtractor:
     def extract_from_pptx(file_bytes: bytes) -> Tuple[str, int]:
         """
         High-fidelity presentation text extraction from PowerPoint PPTX / PPT files.
-        Parses slide XMLs, text frames, shape tables, and speaker notes, returning (clean_text, slide_count).
+        Recursively parses slide XMLs, text frames, grouped shapes, tables, speaker notes,
+        and automatically performs OCR on embedded slide images for image-based/scanned slide decks.
+        Returns (clean_text, slide_count).
         """
-        # 1. State-of-the-art: python-pptx
+        def _extract_shape_text_and_images(shape) -> Tuple[List[str], List[bytes]]:
+            texts = []
+            images = []
+            # 1. Text Frame
+            if getattr(shape, "has_text_frame", False):
+                try:
+                    for paragraph in shape.text_frame.paragraphs:
+                        p_txt = paragraph.text.strip()
+                        if p_txt:
+                            texts.append(p_txt)
+                except Exception:
+                    pass
+            # 2. Table
+            elif getattr(shape, "has_table", False):
+                try:
+                    for row in shape.table.rows:
+                        row_txt = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+                        if row_txt:
+                            texts.append(" | ".join(row_txt))
+                except Exception:
+                    pass
+            # 3. Pictures / Embedded images
+            if hasattr(shape, "image"):
+                try:
+                    images.append(shape.image.blob)
+                except Exception:
+                    pass
+            elif getattr(shape, "shape_type", None) == 13: # MSO_SHAPE_TYPE.PICTURE
+                try:
+                    if hasattr(shape, "image"):
+                        images.append(shape.image.blob)
+                except Exception:
+                    pass
+            # 4. Grouped shapes
+            if hasattr(shape, "shapes"):
+                try:
+                    for child in shape.shapes:
+                        c_texts, c_images = _extract_shape_text_and_images(child)
+                        texts.extend(c_texts)
+                        images.extend(c_images)
+                except Exception:
+                    pass
+            return texts, images
+
+        # 1. Primary extractor: python-pptx
         try:
             from pptx import Presentation
             prs = Presentation(io.BytesIO(file_bytes))
@@ -392,23 +438,31 @@ class TextExtractor:
             slide_count = len(prs.slides)
             for idx, slide in enumerate(prs.slides):
                 slide_content = []
+                slide_images = []
                 for shape in slide.shapes:
-                    if shape.has_text_frame:
-                        for paragraph in shape.text_frame.paragraphs:
-                            txt = "".join(run.text for run in paragraph.runs if run.text).strip()
-                            if txt:
-                                slide_content.append(txt)
-                    elif shape.has_table:
-                        for row in shape.table.rows:
-                            row_txt = [cell.text.strip() for cell in row.cells if cell.text.strip()]
-                            if row_txt:
-                                slide_content.append(" | ".join(row_txt))
+                    s_texts, s_imgs = _extract_shape_text_and_images(shape)
+                    slide_content.extend(s_texts)
+                    slide_images.extend(s_imgs)
                 
                 # Check for speaker notes
                 if slide.has_notes_slide and slide.notes_slide.notes_text_frame:
-                    notes_txt = slide.notes_slide.notes_text_frame.text.strip()
-                    if notes_txt:
-                        slide_content.append(f"[Speaker Notes: {notes_txt}]")
+                    try:
+                        notes_txt = slide.notes_slide.notes_text_frame.text.strip()
+                        if notes_txt:
+                            slide_content.append(f"[Speaker Notes: {notes_txt}]")
+                    except Exception:
+                        pass
+
+                # If slide text is very sparse (< 15 characters) and slide has embedded images, run OCR on images
+                current_slide_txt = " ".join(slide_content).strip()
+                if len(current_slide_txt) < 15 and slide_images:
+                    for img_b in slide_images:
+                        try:
+                            ocr_txt, _ = TextExtractor.extract_from_image(img_b)
+                            if ocr_txt and ocr_txt.strip():
+                                slide_content.append(ocr_txt.strip())
+                        except Exception as ocr_err:
+                            logger.debug(f"Slide {idx+1} image OCR notice: {ocr_err}")
 
                 if slide_content:
                     slide_texts.append(f"--- Slide {idx + 1} ---\n" + "\n".join(slide_content))
@@ -423,25 +477,43 @@ class TextExtractor:
         # 2. Resilient OpenXML Zip Archive parser (zero external dependencies)
         try:
             with zipfile.ZipFile(io.BytesIO(file_bytes)) as ppt_zip:
-                slide_files = [f for f in ppt_zip.namelist() if f.startswith('ppt/slides/slide') and f.endswith('.xml')]
+                all_names = ppt_zip.namelist()
+                slide_files = [f for f in all_names if (f.startswith('ppt/slides/slide') or f.startswith('ppt/notesSlides/notesSlide')) and f.endswith('.xml')]
+                
                 def extract_slide_num(name):
-                    m = re.search(r'slide(\d+)\.xml', name)
+                    m = re.search(r'slide(\d+)\.xml', name, re.IGNORECASE)
                     return int(m.group(1)) if m else 999999
                 
                 slide_files.sort(key=extract_slide_num)
-                slide_count = len(slide_files)
+                slide_count = len([f for f in slide_files if 'slides/slide' in f]) or max(1, len(slide_files))
                 slide_texts = []
-                
-                ns = {'a': 'http://schemas.openxmlformats.org/drawingml/2006/main',
-                      'p': 'http://schemas.openxmlformats.org/presentationml/2006/main'}
                 
                 for idx, sfile in enumerate(slide_files):
                     xml_content = ppt_zip.read(sfile)
                     tree = ET.fromstring(xml_content)
-                    texts = [node.text for node in tree.findall('.//a:t', ns) if node.text and node.text.strip()]
+                    texts = []
+                    for node in tree.iter():
+                        if (node.tag.endswith('}t') or node.tag == 't') and node.text and node.text.strip():
+                            texts.append(node.text.strip())
                     if texts:
                         slide_texts.append(f"--- Slide {idx + 1} ---\n" + "\n".join(texts))
                 
+                # If XML text was empty/sparse, check ppt/media/ for embedded presentation images and OCR them
+                if not slide_texts or len(" ".join(slide_texts).strip()) < 30:
+                    media_files = [f for f in all_names if f.startswith('ppt/media/') and f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp', '.bmp'))]
+                    media_files.sort()
+                    ocr_media_texts = []
+                    for m_idx, mfile in enumerate(media_files):
+                        try:
+                            img_bytes = ppt_zip.read(mfile)
+                            ocr_txt, _ = TextExtractor.extract_from_image(img_bytes)
+                            if ocr_txt and ocr_txt.strip():
+                                ocr_media_texts.append(f"--- Slide {m_idx + 1} ---\n" + ocr_txt.strip())
+                        except Exception:
+                            pass
+                    if ocr_media_texts:
+                        return "\n\n".join(ocr_media_texts), max(slide_count, len(ocr_media_texts))
+
                 if slide_texts:
                     return "\n\n".join(slide_texts), max(1, slide_count)
         except Exception as e:

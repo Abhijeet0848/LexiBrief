@@ -731,15 +731,17 @@ async def upload_document(
             saved_img_path = save_captured_image(content_bytes, filename=file.filename)
 
         if not extracted_text or not extracted_text.strip():
-            if detected_format == "IMAGE" or saved_img_path:
+            raw_stem = os.path.splitext(file.filename or "document.txt")[0]
+            clean_title = re.sub(r'^\d+[\s_\-\.]*', '', raw_stem).replace('_', ' ').replace('-', ' ').strip().title()
+            if detected_format in ["PPTX", "PDF", "DOCX"] and clean_title:
+                extracted_text = f"Title: {clean_title}\n\n[Uploaded {detected_format} document with {pages_count} {'slide' if detected_format == 'PPTX' else 'page'}{'s' if pages_count > 1 else ''}]"
+            elif detected_format == "IMAGE" or saved_img_path:
                 # Provide a clean document title rather than throwing raw errors on non-text image uploads
-                raw_stem = os.path.splitext(file.filename or "image.jpg")[0]
-                clean_title = re.sub(r'^\d+[\s_\-\.]*', '', raw_stem).replace('_', ' ').replace('-', ' ').strip().title()
                 extracted_text = clean_title if clean_title else "Scanned Document"
             else:
                 raise HTTPException(
                     status_code=400, 
-                    detail="Could not extract readable text or words from uploaded photo/document. Please ensure good lighting and clear handwriting/print."
+                    detail="Could not extract readable text or words from uploaded photo/document. Please ensure the document contains readable text or clear images."
                 )
             
         stats = NLPProcessor.compute_stats(extracted_text)
