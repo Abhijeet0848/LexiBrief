@@ -2430,6 +2430,20 @@
 
         const isImage = ['.jpg', '.jpeg', '.png', '.webp', '.bmp'].some(ext => lowerName.endsWith(ext));
         const isPdf = lowerName.endsWith('.pdf');
+        const isPptx = lowerName.endsWith('.pptx') || lowerName.endsWith('.ppt');
+        const isDocx = lowerName.endsWith('.docx') || lowerName.endsWith('.doc');
+
+        // Helper to guarantee JSZip is present
+        const ensureJSZip = async () => {
+          if (window.JSZip) return window.JSZip;
+          return new Promise((resolve) => {
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+            script.onload = () => resolve(window.JSZip);
+            script.onerror = () => resolve(null);
+            document.head.appendChild(script);
+          });
+        };
 
         // 4. Size within limit (<= 50 MB) -> Proceed with upload
         uploadCancelledRef.current = false;
@@ -2439,7 +2453,7 @@
           fileName: file.name,
           totalSize: totalSizeFormatted,
           loadedSize: '0 KB',
-          statusText: isImage ? `Enhancing image & preparing OCR engine for "${file.name}"...` : isPdf ? `Inspecting PDF structure for "${file.name}"...` : `Connecting to server (${totalSizeFormatted})...`,
+          statusText: isImage ? `Enhancing image & preparing OCR engine for "${file.name}"...` : isPdf ? `Inspecting PDF structure for "${file.name}"...` : isPptx ? `Reading PowerPoint slides for "${file.name}"...` : isDocx ? `Reading Word document for "${file.name}"...` : `Connecting to server (${totalSizeFormatted})...`,
           stage: 'uploading'
         });
 
@@ -2588,133 +2602,106 @@
           } catch (pdfOcrErr) {
             console.warn("Client PDF OCR scan notice:", pdfOcrErr);
           }
-        } else if (isPptx && window.JSZip) {
+        } else if (isPptx) {
           try {
             if (uploadCancelledRef.current) return;
             setUploadProgress({
-              percent: 15,
+              percent: 25,
               fileName: file.name,
               totalSize: totalSizeFormatted,
               loadedSize: '0 KB',
-              statusText: `Parsing presentation slides & extracting text in browser...`,
+              statusText: `Unpacking presentation slides in browser...`,
               stage: 'processing'
             });
 
-            const zip = await window.JSZip.loadAsync(file);
-            const slideFiles = [];
-            const notesFiles = [];
-            const mediaFiles = [];
+            const jszipInstance = await ensureJSZip();
+            if (jszipInstance) {
+              const zip = await jszipInstance.loadAsync(file);
+              const slideFiles = [];
+              const notesFiles = [];
 
-            zip.forEach((relPath, entry) => {
-              if (relPath.match(/^ppt\/slides\/slide\d+\.xml$/i)) {
-                slideFiles.push(entry);
-              } else if (relPath.match(/^ppt\/notesSlides\/notesSlide\d+\.xml$/i)) {
-                notesFiles.push(entry);
-              } else if (relPath.match(/^ppt\/media\//i)) {
-                mediaFiles.push(entry);
-              }
-            });
-
-            slideFiles.sort((a, b) => {
-              const numA = parseInt(a.name.match(/slide(\d+)\.xml/i)?.[1] || "0", 10);
-              const numB = parseInt(b.name.match(/slide(\d+)\.xml/i)?.[1] || "0", 10);
-              return numA - numB;
-            });
-
-            const parser = new DOMParser();
-            const slideTexts = [];
-
-            for (let i = 0; i < slideFiles.length; i++) {
-              if (uploadCancelledRef.current) return;
-              const xmlText = await slideFiles[i].async('text');
-              const xmlDoc = parser.parseFromString(xmlText, 'application/xml');
-              const textNodes = xmlDoc.querySelectorAll('a\\:t, t');
-              const nodeTexts = [];
-              textNodes.forEach(node => {
-                const val = (node.textContent || '').trim();
-                if (val) nodeTexts.push(val);
+              zip.forEach((relPath, entry) => {
+                const norm = relPath.replace(/\\/g, '/').toLowerCase();
+                if (norm.startsWith('ppt/slides/slide') && norm.endsWith('.xml')) {
+                  slideFiles.push(entry);
+                } else if (norm.startsWith('ppt/notesslides/notesslide') && norm.endsWith('.xml')) {
+                  notesFiles.push(entry);
+                }
               });
-              if (nodeTexts.length > 0) {
-                slideTexts.push(`--- Slide ${i + 1} ---\n` + nodeTexts.join('\n'));
-              }
-            }
 
-            // Also check speaker notes
-            for (let j = 0; j < notesFiles.length; j++) {
-              if (uploadCancelledRef.current) return;
-              const noteXml = await notesFiles[j].async('text');
-              const noteDoc = parser.parseFromString(noteXml, 'application/xml');
-              const noteNodes = noteDoc.querySelectorAll('a\\:t, t');
-              const nTexts = [];
-              noteNodes.forEach(node => {
-                const val = (node.textContent || '').trim();
-                if (val) nTexts.push(val);
+              slideFiles.sort((a, b) => {
+                const numA = parseInt(a.name.match(/slide(\d+)\.xml/i)?.[1] || "0", 10);
+                const numB = parseInt(b.name.match(/slide(\d+)\.xml/i)?.[1] || "0", 10);
+                return numA - numB;
               });
-              if (nTexts.length > 0) {
-                slideTexts.push(`[Speaker Notes: ${nTexts.join(' ')}]`);
-              }
-            }
 
-            // If slide texts are sparse and images exist in presentation, run OCR on images
-            if (slideTexts.length === 0 && mediaFiles.length > 0 && window.Tesseract) {
-              for (let m = 0; m < Math.min(mediaFiles.length, 8); m++) {
+              const parser = new DOMParser();
+              const slideTexts = [];
+
+              for (let i = 0; i < slideFiles.length; i++) {
                 if (uploadCancelledRef.current) return;
-                setUploadProgress({
-                  percent: Math.round(20 + (m / mediaFiles.length) * 60),
-                  fileName: file.name,
-                  totalSize: totalSizeFormatted,
-                  loadedSize: totalSizeFormatted,
-                  statusText: `OCR reading slide graphic ${m + 1} of ${mediaFiles.length}...`,
-                  stage: 'processing'
-                });
-                try {
-                  const imgBlob = await mediaFiles[m].async('blob');
-                  const imgDataUrl = await new Promise((res, rej) => {
-                    const r = new FileReader();
-                    r.onload = () => res(r.result);
-                    r.onerror = rej;
-                    r.readAsDataURL(imgBlob);
-                  });
-                  const enhancedUrl = await preprocessImageForOCR(imgDataUrl, 'document');
-                  const ocrRes = await executeHandwritingOCR(enhancedUrl, null, 'hin+eng');
-                  if (ocrRes && ocrRes.trim()) {
-                    slideTexts.push(`--- Slide ${m + 1} ---\n` + ocrRes.trim());
-                  }
-                } catch (imgErr) {
-                  console.warn("Slide image OCR notice:", imgErr);
+                const xmlText = await slideFiles[i].async('text');
+                const xmlDoc = parser.parseFromString(xmlText, 'application/xml');
+                
+                // Fast cross-browser text extraction using localName 't'
+                const allElements = Array.from(xmlDoc.getElementsByTagName('*'));
+                const tElements = allElements.filter(el => el.localName === 't');
+                const textTokens = [];
+                for (const node of tElements) {
+                  const val = (node.textContent || '').trim();
+                  if (val) textTokens.push(val);
+                }
+                
+                if (textTokens.length > 0) {
+                  slideTexts.push(`--- Slide ${i + 1} ---\n` + textTokens.join('\n'));
                 }
               }
-            }
 
-            if (slideTexts.length > 0) {
-              clientOcrText = slideTexts.join('\n\n');
+              // Also check speaker notes
+              for (let j = 0; j < notesFiles.length; j++) {
+                if (uploadCancelledRef.current) return;
+                const noteXml = await notesFiles[j].async('text');
+                const noteDoc = parser.parseFromString(noteXml, 'application/xml');
+                const allNoteEls = Array.from(noteDoc.getElementsByTagName('*'));
+                const tNoteEls = allNoteEls.filter(el => el.localName === 't');
+                const nTokens = [];
+                for (const node of tNoteEls) {
+                  const val = (node.textContent || '').trim();
+                  if (val) nTokens.push(val);
+                }
+                if (nTokens.length > 0) {
+                  slideTexts.push(`[Speaker Notes: ${nTokens.join(' ')}]`);
+                }
+              }
+
+              if (slideTexts.length > 0) {
+                clientOcrText = slideTexts.join('\n\n');
+              }
             }
           } catch (pptxErr) {
             console.warn("Client PPTX extraction notice:", pptxErr);
           }
-        } else if (isDocx && window.JSZip) {
+        } else if (isDocx) {
           try {
             if (uploadCancelledRef.current) return;
-            const zip = await window.JSZip.loadAsync(file);
-            const docXmlEntry = zip.file("word/document.xml");
-            if (docXmlEntry) {
-              const xmlText = await docXmlEntry.async('text');
-              const parser = new DOMParser();
-              const xmlDoc = parser.parseFromString(xmlText, 'application/xml');
-              const pNodes = xmlDoc.querySelectorAll('w\\:p, p');
-              const docLines = [];
-              pNodes.forEach(p => {
-                const tNodes = p.querySelectorAll('w\\:t, t');
-                const lineParts = [];
-                tNodes.forEach(t => {
-                  const val = t.textContent;
-                  if (val) lineParts.push(val);
-                });
-                const line = lineParts.join('').trim();
-                if (line) docLines.push(line);
-              });
-              if (docLines.length > 0) {
-                clientOcrText = docLines.join('\n\n');
+            const jszipInstance = await ensureJSZip();
+            if (jszipInstance) {
+              const zip = await jszipInstance.loadAsync(file);
+              const docXmlEntry = zip.file("word/document.xml") || zip.file("word/document2.xml");
+              if (docXmlEntry) {
+                const xmlText = await docXmlEntry.async('text');
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlText, 'application/xml');
+                const allElements = Array.from(xmlDoc.getElementsByTagName('*'));
+                const tElements = allElements.filter(el => el.localName === 't');
+                const docLines = [];
+                for (const node of tElements) {
+                  const val = (node.textContent || '').trim();
+                  if (val) docLines.push(val);
+                }
+                if (docLines.length > 0) {
+                  clientOcrText = docLines.join('\n\n');
+                }
               }
             }
           } catch (docxErr) {
@@ -2725,8 +2712,8 @@
         if (uploadCancelledRef.current) return;
 
         let fileToSend = file;
-        // If file is > 4 MB (exceeds Vercel Serverless Function 4.5MB request limit), wrap extracted text as lightweight file
-        if (file.size > 4 * 1024 * 1024 && clientOcrText && clientOcrText.trim()) {
+        // If file is > 4 MB (exceeds Vercel Serverless Function 4.5MB request limit) or client text already extracted
+        if (clientOcrText && clientOcrText.trim() && file.size > 4 * 1024 * 1024) {
           fileToSend = new File([new Blob([clientOcrText], { type: 'text/plain' })], file.name, {
             type: 'text/plain'
           });
