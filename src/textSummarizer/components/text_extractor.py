@@ -3,7 +3,7 @@ import re
 import io
 import zipfile
 import xml.etree.ElementTree as ET
-from typing import Tuple
+from typing import Tuple, List, Dict, Any, Optional
 from textSummarizer.logging import logger
 
 _RE_CRLF = re.compile(r'\r\n')
