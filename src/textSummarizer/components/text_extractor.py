@@ -462,8 +462,9 @@ class TextExtractor:
     def _reconstruct_ocr_boxes(ocr_res) -> str:
         """
         Sorts and groups 2D spatial OCR bounding boxes into natural reading-order lines.
-        Maintains paragraph flow, joins inline words left-to-right, and guarantees that
-        every bullet point and enumerated list item starts on its own discrete line.
+        Maintains paragraph flow, joins inline words left-to-right, preserves multi-column
+        and sidebar/caption block isolation, and guarantees that every bullet point and
+        enumerated list item starts on its own discrete line.
         """
         if not ocr_res:
             return ""
@@ -485,46 +486,122 @@ class TextExtractor:
             min_y = float(np.min(box[:, 1]))
             max_y = float(np.max(box[:, 1]))
             center_y = (min_y + max_y) / 2.0
+            center_x = (min_x + max_x) / 2.0
             height = max(1.0, max_y - min_y)
+            width = max(1.0, max_x - min_x)
             boxes_data.append({
                 "text": text,
                 "min_x": min_x,
                 "max_x": max_x,
                 "min_y": min_y,
                 "max_y": max_y,
+                "center_x": center_x,
                 "center_y": center_y,
-                "height": height
+                "height": height,
+                "width": width
             })
 
         if not boxes_data:
             return ""
 
-        # Sort primarily top-to-bottom
+        med_h = float(np.median([b["height"] for b in boxes_data]))
+        
+        # 1. Group horizontally contiguous word boxes on the same line into line segments
         boxes_data.sort(key=lambda b: (b["min_y"], b["min_x"]))
-
+        
+        line_segments = []
+        for b in boxes_data:
+            placed = False
+            for seg in line_segments:
+                avg_y = sum(x["center_y"] for x in seg) / len(seg)
+                avg_h = sum(x["height"] for x in seg) / len(seg)
+                if abs(b["center_y"] - avg_y) <= max(6.0, avg_h * 0.48):
+                    seg_min_x = min(x["min_x"] for x in seg)
+                    seg_max_x = max(x["max_x"] for x in seg)
+                    max_inline_gap = max(25.0, avg_h * 2.2)
+                    # Merge into the line only if horizontally contiguous (prevent column gutter jumping)
+                    if (b["min_x"] - seg_max_x <= max_inline_gap and b["min_x"] >= seg_max_x - 5.0) or \
+                       (seg_min_x - b["max_x"] <= max_inline_gap and seg_min_x >= b["max_x"] - 5.0):
+                        seg.append(b)
+                        placed = True
+                        break
+            if not placed:
+                line_segments.append([b])
+                
+        # Form structured line objects
         lines = []
-        current_line = [boxes_data[0]]
+        for seg in line_segments:
+            seg.sort(key=lambda x: x["min_x"])
+            seg_text = " ".join(x["text"] for x in seg)
+            lines.append({
+                "text": seg_text,
+                "min_x": min(x["min_x"] for x in seg),
+                "max_x": max(x["max_x"] for x in seg),
+                "min_y": min(x["min_y"] for x in seg),
+                "max_y": max(x["max_y"] for x in seg),
+                "center_x": sum(x["center_x"] for x in seg) / len(seg),
+                "center_y": sum(x["center_y"] for x in seg) / len(seg),
+                "height": max(x["max_y"] for x in seg) - min(x["min_y"] for x in seg),
+                "width": max(x["max_x"] for x in seg) - min(x["min_x"] for x in seg)
+            })
 
-        for b in boxes_data[1:]:
-            line_avg_y = sum(x["center_y"] for x in current_line) / len(current_line)
-            line_avg_h = sum(x["height"] for x in current_line) / len(current_line)
-            threshold = max(6.0, line_avg_h * 0.48)
-
-            if abs(b["center_y"] - line_avg_y) <= threshold:
-                current_line.append(b)
+        # 2. Cluster line segments into column / flow layout blocks
+        lines.sort(key=lambda l: (l["min_y"], l["min_x"]))
+        blocks = []
+        for l in lines:
+            best_block_idx = -1
+            best_overlap = 0.0
+            for idx, blk in enumerate(blocks):
+                last_line = blk[-1]
+                v_gap = l["min_y"] - last_line["max_y"]
+                if -last_line["height"] * 0.5 <= v_gap <= max(40.0, med_h * 3.2):
+                    blk_min_x = min(x["min_x"] for x in blk)
+                    blk_max_x = max(x["max_x"] for x in blk)
+                    x_overlap = max(0.0, min(l["max_x"], blk_max_x) - max(l["min_x"], blk_min_x))
+                    min_w = min(l["width"], blk_max_x - blk_min_x)
+                    overlap_ratio = x_overlap / min_w if min_w > 0 else 0
+                    if overlap_ratio > 0.35 and overlap_ratio > best_overlap:
+                        best_overlap = overlap_ratio
+                        best_block_idx = idx
+            if best_block_idx >= 0:
+                blocks[best_block_idx].append(l)
             else:
-                current_line.sort(key=lambda x: x["min_x"])
-                lines.append(" ".join(x["text"] for x in current_line))
-                current_line = [b]
+                blocks.append([l])
 
-        if current_line:
-            current_line.sort(key=lambda x: x["min_x"])
-            lines.append(" ".join(x["text"] for x in current_line))
+        # 3. Classify blocks (body paragraphs vs side captions/sidebars)
+        classified = []
+        for blk in blocks:
+            blk_min_x = min(x["min_x"] for x in blk)
+            blk_max_x = max(x["max_x"] for x in blk)
+            blk_min_y = min(x["min_y"] for x in blk)
+            blk_max_y = max(x["max_y"] for x in blk)
+            blk_text = "\n".join(x["text"] for x in blk)
+            word_count = len(blk_text.split())
+            is_caption = (len(blocks) > 1 and (blk_max_x - blk_min_x < 300) and (word_count <= 15))
+            classified.append({
+                "lines": blk,
+                "text": blk_text,
+                "min_x": blk_min_x,
+                "max_x": blk_max_x,
+                "min_y": blk_min_y,
+                "max_y": blk_max_y,
+                "is_caption": is_caption,
+                "words": word_count
+            })
 
-        # Format bullets and paragraphs ensuring separate lines
+        # Reading order: Body blocks sorted top-to-bottom, followed by isolated side captions
+        body_blocks = [c for c in classified if not c["is_caption"]]
+        caption_blocks = [c for c in classified if c["is_caption"]]
+        body_blocks.sort(key=lambda b: (b["min_y"], b["min_x"]))
+        caption_blocks.sort(key=lambda b: (b["min_y"], b["min_x"]))
+
+        rendered_sections = [b["text"] for b in body_blocks] + [c["text"] for c in caption_blocks]
+        raw_text = "\n\n".join(rendered_sections)
+
+        # 4. Format bullets and sub-items ensuring separate lines
         formatted = []
         bullet_marker_pattern = re.compile(r'^(?:[•\-\*■▪◆\u2022\u25cf\u25aa\u25b6\u2713\u2714]|->|-->|\d+[\.\)]|[a-zA-Z][\.\)])\s*')
-        for line in lines:
+        for line in raw_text.split('\n'):
             line_str = line.strip()
             if not line_str:
                 continue
@@ -654,13 +731,13 @@ class TextExtractor:
                 for page in doc:
                     try:
                         tp = page.get_textpage_ocr(language="eng+hin", dpi=300, full=True)
-                        text = page.get_text(textpage=tp)
+                        text = page.get_text(textpage=tp, sort=True)
                         if text and text.strip():
                             pages.append(text.strip())
                     except Exception:
                         try:
                             tp = page.get_textpage_ocr(language="eng", dpi=300, full=True)
-                            text = page.get_text(textpage=tp)
+                            text = page.get_text(textpage=tp, sort=True)
                             if text and text.strip():
                                 pages.append(text.strip())
                         except Exception:

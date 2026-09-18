@@ -9,6 +9,7 @@ for p in [BASE_DIR, SRC_DIR]:
 import pytest
 from textSummarizer.components.nlp_processor import NLPProcessor
 from textSummarizer.components.extractive_summarizer import ExtractiveSummarizer
+from textSummarizer.components.text_extractor import TextExtractor
 from textSummarizer.pipeline.prediction import PredictionPipeline
 
 
@@ -191,5 +192,49 @@ def test_section_detection():
     assert "Introduction" in titles
     assert "Performance & Latency" in titles
     assert "Conclusion" in titles
+
+
+def test_ocr_multi_column_and_caption_layout_reconstruction():
+    """Verify that multi-column and side-caption images do not interleave captions into body paragraphs."""
+    import numpy as np
+    
+    # Realistic layout coordinates mimicking an image with a left caption and right body text
+    mock_ocr_boxes = [
+        # Right column body lines (top)
+        ([[320, 40], [950, 40], [950, 65], [320, 65]], "The Noemvriana was an armed confrontation in Athens on", 0.99),
+        ([[320, 75], [950, 75], [950, 100], [320, 100]], "1 December 1916 between the Kingdom of Greece and the", 0.99),
+        ([[320, 110], [950, 110], [950, 135], [320, 135]], "Allied Powers and their supporters. The crisis arose from", 0.99),
+        ([[320, 145], [950, 145], [950, 170], [320, 170]], "disputes over Greek neutrality during the First World War. The", 0.99),
+        ([[320, 180], [950, 180], [950, 205], [320, 205]], "Allies feared a secret alliance between King Constantine I and", 0.99),
+        ([[320, 215], [950, 215], [950, 240], [320, 240]], "the Central Powers that could endanger their army", 0.99),
+        ([[320, 250], [950, 250], [950, 275], [320, 275]], "bivouacking in Thessaloniki. The establishment of Eleftherios", 0.99),
+        ([[320, 285], [950, 285], [950, 310], [320, 310]], "Venizelos's Allied-backed provisional government in", 0.99),
+        
+        # Left column caption (under image on the left)
+        ([[10, 180], [220, 180], [220, 205], [10, 205]], "Naval bombardment of", 0.99),
+        ([[10, 215], [180, 215], [180, 240], [10, 240]], "Athens during the", 0.99),
+        ([[10, 250], [130, 250], [130, 275], [10, 275]], "Noemvriana", 0.99),
+        
+        # Full-width bottom lines
+        ([[10, 320], [950, 320], [950, 345], [10, 345]], "Thessaloniki to create an army in assistance to the Allies divided Greece. Failed", 0.99),
+        ([[10, 355], [950, 355], [950, 380], [10, 380]], "negotiations prompted the Allies to land in Athens to compel the surrender of war materiel.", 0.99),
+    ]
+    
+    extracted = TextExtractor._reconstruct_ocr_boxes(mock_ocr_boxes)
+    cleaned = TextExtractor.clean_ocr_text(extracted)
+    
+    # 1. Main body sentences must be coherent and not spliced with caption words
+    assert "Naval bombardment of Allies feared" not in cleaned
+    assert "Athens during the the Central Powers" not in cleaned
+    assert "Noemvriana bivouacking in Thessaloniki" not in cleaned
+    
+    # 2. Main continuous article flow must be preserved intact
+    assert "Allies feared a secret alliance between King Constantine I and" in cleaned
+    assert "the Central Powers that could endanger their army" in cleaned
+    
+    # 3. Caption must be extracted cleanly as an isolated section
+    assert "Naval bombardment of" in cleaned
+    assert "Athens during the" in cleaned
+    assert "Noemvriana" in cleaned
 
 
